@@ -1,0 +1,316 @@
+# ANG NATIVE — BUILD PLAN (Rust-first, web + mobile + desktop)
+
+**Date:** 14 November 2026 · **Status:** proposal, awaiting sign-off
+**Derived from:** `2026-11-11-nativeangular-design.md` (primary), `2026-11-11-nativeangular-m0-spike.md`,
+`readiness-scorecard.md`, `task-5-report.md`, `task-12-integration-report.md`
+**Supersedes:** the four 14-Nov task lists (they were written for the Fabric track and against an
+unverified tree)
+
+---
+
+## 0. What this plan decides, and what it assumes
+
+| # | Decision | Value used here | Source / note |
+|---|---|---|---|
+| D-1 | Backend | **Rust host is the only native backend.** No React Native, no Fabric, no Expo runtime. | User direction, 14 Nov. Replaces spec D1. |
+| D-2 | Canonical identity | **AngNative**, npm scope `@angnative/*`, element prefix `na-` | The repo is `angnative`. Spec says `NativeAngular`/`@nativeangular/*`/`an-` — **must be reconciled** (P0.1). Prefix `na-` follows spec D9. |
+| D-3 | Licence | **MIT** | Spec §14 + §15. Repo metadata says "MIT OR Apache-2.0" — fix it. |
+| D-4 | Layout owner | **Rust (taffy) lays out; the platform draws.** | Spec §5.6 CSS subset must be exact. If the platform lays out, "one codebase, every platform" is false. |
+| D-5 | JS engine | **Engine-neutral trait; QuickJS-ng (rquickjs) default; JavaScriptCore on Apple platforms where available.** | Spec D5 + §11.1 "iOS: 0 KB (JavaScriptCore is in the OS image)". Dropping RN removes Hermes from Apple; JSC keeps that 0 KB. |
+| D-6 | Web | **Web does not use the native renderer.** It uses Angular's own DOM renderer. | Free lane — see §3.6. This is how RN's web story works too (`react-native-web` is a DOM renderer). |
+| D-7 | Scope order | **Android → iOS → macOS → watchOS/tvOS → Windows/Linux** | Android-first per every task list; watch/tv last because they are the only platforms RN cannot reach. |
+
+**Scope reality, stated plainly.** Spec §14 assumes a team of 2–4 and says plainly: *"If the team is
+one Angular engineer, M1 alone is the realistic ceiling and M3 is a multi-year proposition."* This
+plan targets **one engineer**. Therefore: **Phase 1 and Phase 2 are the whole near-term game**;
+Phase 3 is one platform at a time; the breadth (web + mobile + desktop + watch/TV) is a *direction*,
+not a quarter. Nothing in this plan requires more than one machine and one person to complete a
+phase end to end.
+
+---
+
+## 1. Non-negotiables (carried from the spec, with the corrections this plan makes)
+
+1. Angular pinned **exactly 22.2.5**; TypeScript **exactly 6.0.3**; Node **>= 22.12**; pnpm **10.34.9**.
+2. **AOT only.** `@angular/compiler` never reaches a runtime, test or device bundle. The device
+   never runs a compiler — not even in dev (spec D7).
+3. **Zoneless.** Zero `zone.js`, ever.
+4. Angular private (`ɵ`) API confined to **exactly one file**: `packages/platform/src/angular-internals.ts`.
+5. **Unknown property writes must throw**, not no-op (spec §5.3). This is the rule that converts a
+   silent device failure into a loud test failure.
+6. **Every gate is mutation-tested**: inject the original defect, confirm the gate fails with that
+   defect's exact numbers (spec §10.7).
+7. npm scope `@angnative/*` — never `@angular/*`, never `ng-native` (taken upstream).
+8. Size budget: **<= 60 KB gzip** hello-world JS, **<= 250 KB** typical app, **0 B** `@angular/compiler`
+   and `zone.js`. Rust core **<= 1 MB per platform, measured** (spec D8).
+9. Dev loop: **<= 200 ms** per changed component, **<= 500 ms** inner loop end to end.
+10. Perf gates are measured **against an RN baseline on the same device** (spec §11.2) — see R-4.
+
+---
+
+## 2. Architecture — one diagram, three languages, one boundary
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ APPLICATION (Angular)                                                │
+│ components · signals · DI · @angular/router · Signal Forms          │
+│ <na-view> <na-text> <na-list> <na-text-input> <na-pressable> …      │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │ Renderer2 / RendererFactory2 SPI
+┌───────────────────────────▼──────────────────────────────────────────┐
+│ TYPESCRIPT LAYER  (backend-agnostic — survives every backend choice)│
+│ @angnative/contract   elements · style table · command protocol     │
+│ @angnative/core       ElementRegistry · CapabilityRegistry · SPI    │
+│ @angnative/platform   DOM-less Angular platform (bootstrap)         │
+│ @angnative/testing    fake backend + THE SHARED CONFORMANCE SUITE   │
+│ @angnative/router     native navigation · LocationStrategy          │
+│ @angnative/cli        doctor · create · test · build · dev          │
+└───────────────────────────┬──────────────────────────────────────────┘
+              command protocol (JSON, versioned)  ← THE BOUNDARY
+┌───────────────────────────▼──────────────────────────────────────────┐
+│ RUST HOST  (the only native backend)                                │
+│ angnative-host-core      element tree · command decode · diff/patch  │
+│ angnative-host-layout    taffy layout · text-measure trait           │
+│ angnative-host-view      view tree · ViewFactory trait · platform ops│
+│ angnative-host-engine    engine-neutral trait · QuickJS-ng · JSC     │
+│ angnative-host-ffi       C ABI for the platform shells (no TS here) │
+│ angnative-services-core  capability resolver · offline-sync · crypto│
+│                           · serialization · diagnostics (usable     │
+│                           without Angular — spec §5.9)               │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │ FFI (C ABI / JNI / Swift)
+┌───────────────────────────▼──────────────────────────────────────────┐
+│ PLATFORM SHELLS (thin)                                               │
+│ Android (Kotlin + android.view.View) · iOS (Swift + UIKit)          │
+│ macOS (AppKit) · watchOS · tvOS · Windows · Linux                    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**The boundary is the product.** Everything above it is TypeScript; everything below it is Rust and
+platform code. The conformance suite is what keeps both sides honest.
+
+**Web sits beside the native stack, not inside it.** A web build uses Angular's own
+`@angular/platform-browser`. Same components, same services, same validators — different renderer.
+That is how React Native does web too.
+
+---
+
+## 3. The build plan
+
+Legend: **SV** = sandbox-verifiable (no device, no Xcode, no Android SDK)
+
+### 3.0 Phase 0 — Provenance and identity (blocking, ~1–2 days)
+
+| ID | Task | Definition of done |
+|---|---|---|
+| P0.1 | Decide canonical identity (AngNative vs NativeAngular), scope, element prefix, licence. One file, one decision, no hedging. | A committed `docs/identity.md`; README + package.json + Cargo.toml agree |
+| P0.2 | Locate the M1 tree (commits `c6cba46`, `a35432c`, `c94f3e3`, `c839f55`, `70a7ad8`, `8f3fe28`, `36ae31c`, `c140bd6`). Search clones, remotes, worktrees, bundles, backups. | Either the commits are found and `git log --oneline` proves ancestry, **or** their absence is documented and Phase 1 is re-scoped |
+| P0.3 | Reconcile the six Rust members in `Cargo.toml` against §2's crate list. | One workspace, no dead members, every member builds |
+| P0.4 | Record D8 as **decided** (Rust-first), with the 1 MB budget as the constraint. | One line in the scorecard's "decisions" log |
+
+> **Rule from the last three days:** on an unverified tree, no parallel agent tracks. Five agents on
+> five worktrees is what produced five unmerged branches and a token-limit death. Phase 1 runs as
+> one track, verified at every commit.
+
+### 3.1 Phase 1 — TypeScript layer (backend-agnostic, survives everything) — **SV**
+
+This phase is the foundation for the Rust host *and* the reason the Rust host is cheap. It is the
+part of M1 that does not care which backend wins.
+
+| ID | Task | Definition of done | Verification |
+|---|---|---|---|
+| T1 | `@angnative/contract` — 10 element contracts, the §5.6 CSS-subset style table, value parsers, and the **command protocol** (this is the TS↔Rust wire format) | Round-trip tests; every element kind has a contract | `pnpm vitest run packages/contract` |
+| T2 | `createElementRenderer` — **one** renderer, written once, above an element-factory SPI. No per-platform forks. | Used by the fake backend *and* the Rust host | conformance suite green |
+| T3 | **The shared conformance suite** — create / append / remove / prop / style semantics, view flattening, list recycling, capability degradation, error cases | Every backend passes it; the suite is the only place backend semantics are defined | `pnpm vitest run packages/contract/src/conformance.spec.ts` |
+| T3a | **The 7 mutation "teeth" specs** — inject the original defect, assert the suite fails with that defect's exact numbers | The specs are committed, not just documented | each mutant ⇒ red |
+| T4 | Fixture migration `an-` → `na-` + wire `createElementRenderer` into `bootstrapNativeAngular`; prove a real Angular 22.2.5 AOT app renders through it | The AOT artefact shows `inputs: {…}` + `consts: […]` and no `renderer.setProperty` | `pnpm run compile:fixtures && pnpm test` |
+| T5 | Close the 7 "fix before M1" items from the M0 review: fake-node DOM fidelity (re-parent, non-member `removeChild`), `createNativeDocument` keeping text/comment payloads, multiple listeners per event, the `@angular/core/testing` guard, `exports` → `dist`, `provideNativeAngular` coverage, `backend.elements` → `ElementRegistry` | Each has a test that fails without the fix | the M0-review list, item by item |
+| T6 | CLI — `doctor` / `create` / `test` / `build` / `dev`. `create` must not advertise commands that do not exist. | Every advertised command runs | clean-checkout test |
+| T7 | Size budget CI — terser-class DCE to reach <= 60 KB gzip (measured baseline today: **90,438 B** gzip prod, `@angular/core` = 96.3% of payload). Gate blocks when the budget is exceeded, when the metafile is missing, or when the bundle contains `@angular/compiler` / `zone.js`. | `node scripts/check-size-budget.mjs` prints measured gzip size and exits 0 | budget is a gate, not a number to move |
+| T8 | Dev server — incremental AOT, **<= 200 ms** per changed component, <= 500 ms inner loop. Dev bundles stay out of the production size gate. | Reproducible benchmark, multiple warm runs | benchmark artefact |
+| T9 | Router — `@angnative/router`, native navigation stack, hardware back + swipe-back, deep links, guards/resolvers/lazy routes unchanged | `LocationStrategy` API verified against installed `@angular/common@22.2.5` | spec suite |
+
+### 3.2 Phase 2 — The Rust host (sandbox-verifiable, no device needed) — **SV**
+
+This is the new work. It is deliberately small and boring: a host that owns a tree, computes
+layout, and emits platform operations.
+
+| ID | Task | Definition of done |
+|---|---|---|
+| R1 | `angnative-host-core` — element tree, command decode (serde), retained-tree model, **diff/patch engine** (Fabric's model: a commit is a set of mutations, not a rebuild) | Unit tests; commands decode; diff emits minimal op set |
+| R2 | `angnative-host-layout` — taffy 0.15 layout + a `TextMeasurer` trait; `NaiveMeasurer` for unit tests, platform measurer (CoreText / StaticLayout) behind the same trait | Layout tests against known flex/grid cases; text cache keyed `(text, font, available width)` |
+| R3 | `angnative-host-view` — view tree + `ViewFactory` trait + platform op emission (`Create / SetFrame / SetProps / SetText / Append / Insert / Remove / Destroy`) | Ops are deterministic and ordered |
+| R4 | **The Rust host passes the same conformance suite as the TS fake backend** — same JSON fixtures, two runners | One suite, two implementations, both green. **This is the keystone of the whole plan.** |
+| R5 | `angnative-host-engine` — engine-neutral trait; QuickJS-ng (rquickjs) impl; JavaScriptCore impl for Apple; dev-mode inspector hook | The TS side never learns which engine is embedded (spec D5 / `nativeangular-js`) |
+| R6 | `angnative-host-ffi` — C ABI for platform shells. No TypeScript anywhere in this crate. | A shell in Swift or Kotlin can call it |
+| R7 | `angnative-services-core` — capability resolver, offline-sync queue (durable, conflict-aware, **no lost acknowledged operation**), crypto + secure storage, serialization, performance diagnostics. **Usable without Angular.** | Unit-tested; no Angular dependency in `Cargo.toml` |
+| R8 | **Measure D8's number**: stripped + LTO static library size of `host-core + host-layout + host-view + host-engine` per platform | A measured figure, published. If it blows past 1 MB, that is the finding — not a reason to move the goalpost. |
+| R9 | **View flattening + list recycling in Rust** — a component host with no style/prop/listener gets no native view; `na-list` recycles a fixed slot count | Matches §5.5 semantics; asserted by the suite |
+
+> **R4 is the reason this plan is cheap.** Without a shared, mutation-tested suite, swapping the
+> backend is a rewrite with no detector. With it, the Rust host is a drop-in that must pass a
+> suite that already has teeth.
+
+### 3.3 Phase 3 — Platform shells (one at a time)
+
+Element → native view mapping (the spec's §8 element set, `na-` prefix per D9):
+
+| Element | iOS (UIKit) | Android (android.view) | macOS (AppKit) |
+|---|---|---|---|
+| `na-view` | `UIView` | `ViewGroup` | `NSView` |
+| `na-text` | `UILabel` | `TextView` | `NSTextField` |
+| `na-image` | `UIImageView` | `ImageView` | `NSImageView` |
+| `na-scroll-view` | `UIScrollView` | `ScrollView` | `NSScrollView` |
+| `na-list` | `UICollectionView` (recycled) | `RecyclerView` (recycled) | `NSTableView` |
+| `na-text-input` | `UITextField` | `EditText` | `NSTextField` |
+| `na-pressable` | `UIControl` | `View` + listener | `NSControl` |
+| `na-switch` | `UISwitch` | `Switch` | `NSSwitch` |
+| `na-activity-indicator` | `UIActivityIndicatorView` | `ProgressBar` | `NSProgressIndicator` |
+| `na-slot` | `UIView` container | `ViewGroup` container | `NSView` container |
+
+| ID | Task | Definition of done |
+|---|---|---|
+| P3.1 | **Android shell** (first device target) — Kotlin app module, `android.view.View` hierarchy, JNI → Rust host, Hermes or QuickJS-ng engine | The sample app renders `na-view`/`na-text` on a real device or emulator |
+| P3.2 | iOS shell — Swift app target, UIKit, Swift ↔ Rust via the C ABI | Same app, same contract, no second contract |
+| P3.3 | macOS shell — AppKit | Desktop parity |
+| P3.4 | watchOS + tvOS shells — the platforms RN cannot reach; this is where the Rust core earns its place | One Angular app runs on iPhone, Watch and TV from one codebase (spec M3 exit criterion) |
+| P3.5 | Windows + Linux shells — **requires extending `PlatformId`** (spec §5.2 lists only ios/android/watchos/tvos/visionos/macos/wearos) and adding host crates for them | SPI extended; shells exist |
+| P3.6 | **Capture the perf table** (§11.2): cold start, 1000-item list at 60 FPS, input latency, memory, package size, crash-free sessions | Every cell filled with a measurement, not a target |
+
+### 3.4 Phase 4 — Capability system and plugins
+
+| ID | Task | Definition of done |
+|---|---|---|
+| C1 | `CapabilityRegistry` interface + per-platform capability **declarations** (data only — resolution is identity in M1) | Ships in Phase 1, so the SPI is capability-shaped from commit one |
+| C2 | Resolver + fallback chain + degradation diagnostics (§5.4 steps 1–4) | A plugin declaring an unsupported feature is rejected; degradation works end to end |
+| C3 | Diagnostics channel (§9): `NATIVE_NO_BACKEND`, `NATIVE_CAPABILITY_UNAVAILABLE`, `NATIVE_CAPABILITY_DEGRADED`, `NATIVE_MODULE_UNAVAILABLE`, `NATIVE_STYLE_UNSUPPORTED`, `NATIVE_COMMIT_FAILED` | One stream; dev overlay + CLI + CI reporter all consume it |
+| C4 | **First-party plugin ABI** (`NativeModule<T>`) — the guaranteed fallback if no RN runtime is present | A plugin in TypeScript + one platform implementation, no RN |
+| C5 | Native-module capability matrix — every entry either works or has a written reason it cannot. **"Not yet" is allowed; "silently absent" is not.** | Published matrix |
+
+### 3.5 Phase 5 — Devtools, CLI and docs
+
+| ID | Task | Definition of done |
+|---|---|---|
+| D1 | `nativeangular dev` — fast refresh (component edits keep state; framework/package edits restart) | <= 500 ms inner loop |
+| D2 | `nativeangular doctor` — SDKs, Node, Rust, Android SDK, Xcode, NDK | Exit 0 / 1 correctly, on Windows **and** Linux (the M0 review found the Windows path guard never matches) |
+| D3 | **Native tree inspector** — a self-contained HTML page: no CDN, no external script, no web font, no external URL of any kind. Reads the live host tree; does not re-render. | 0 external requests; the tree is the real one |
+| D4 | Devtools — inspect the native view tree and the signal graph from the desktop | Ships (spec moved it to v0.2; with no Chrome DevTools on QuickJS-ng, this becomes load-bearing) |
+| D5 | Tailwind transformer emitting the §5.6 style subset | A Tailwind app compiles to the supported subset |
+| D6 | Docs + starter templates + **scorecard update from artefacts only** | No score moves without a reproducible artefact |
+
+### 3.6 Phase 6 — Web (the free lane)
+
+| ID | Task | Definition of done |
+|---|---|---|
+| W1 | Web build target using `@angular/platform-browser` — **no Rust host, no native renderer** | The same component tree renders in a browser |
+| W2 | Shared-services repo: validation, state, API clients, business logic in one place, used by both the web build and the native build | One service, two runtimes |
+| W3 | **Proof sample**: the same services/validation run on web and on device | This is the artefact that moves the scorecard's "Code reuse 1/5 → 2/5" |
+| W4 | Publish the migration story: *"an existing Angular web team gets a native app without rewriting the app"* — with real numbers | A published case study with measured figures |
+
+---
+
+## 4. The keystone, stated plainly
+
+There is exactly one artefact that makes the RN→Rust switch cheap instead of catastrophic:
+
+> **A shared, mutation-tested conformance suite that the TypeScript fake backend and the Rust host
+> both pass — with identical fixtures.**
+
+Every other decision in this plan can be reversed later. That one cannot be un-built, and its
+absence turns every backend change into a rewrite with no detector. Schedule it early, give it
+teeth, and never let a backend land without it.
+
+---
+
+## 5. Verification pipeline, per commit (extends the spec's)
+
+```
+1. pnpm run check:toolchain      → Node >= 22.12, Angular == 22.2.5, TS == 6.0.3  (all three, checked)
+2. pnpm run compile:fixtures      → ngc AOT succeeds; artefact shows inputs:/consts:
+3. pnpm run build                → tsc -b exits 0, zero diagnostics
+4. pnpm test                     → every suite green, including the conformance suite
+5. node scripts/check-size-budget.mjs → <= 60 KB gzip; 0 B @angular/compiler, 0 B zone.js
+6. cargo test --workspace        → Rust unit tests
+7. cargo clippy --workspace --all-targets -- -D warnings
+8. mutation check                → inject the original defect; confirm the gate fails with its exact numbers
+9. cargo build --release --target <platform> && measure stripped+LTO size → <= 1 MB (D8's number)
+```
+
+---
+
+## 6. Risks this plan carries, with the mitigation already written in
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| The M1 tree is unrecoverable | High | P0.2 forces a decision before any code. Rebuild is possible — the TypeScript layer is ~10 tasks — but it must be a choice, not a drift. |
+| Losing the RN native-module ecosystem | High | C4's first-party ABI is the guaranteed path; C5's matrix makes every gap explicit and written-down. This is the real price of leaving RN. |
+| No device debugger (QuickJS-ng has no CDP) | Medium | D3 + D4 become load-bearing, not v0.2 nice-to-haves. Budget for them early. |
+| Rust core blows the 1 MB budget | Medium | R8 measures it *before* platform shells are built. The number decides, not ambition (spec D8). |
+| One engineer vs the breadth in §0 | High | Phases are ordered so a complete phase is shippable alone. Web + Android + iOS is the honest near-term surface; watch/TV/desktop follow. |
+| A stale "merged" claim becomes a silent dependency | High | Every status in this plan is written as VERIFIED / MISSING / DIVERGED, never CLAIMED. |
+
+---
+
+## 7. Decisions still needed from you (each blocks a specific task)
+
+| # | Decision | Default if you don't answer | Blocks |
+|---|---|---|---|
+| Q1 | Canonical identity: AngNative or NativeAngular? | AngNative | P0.1, T1, every package name |
+| Q2 | Is the M1 tree recoverable? | Assume yes until proven otherwise; re-scope if not | P0.2, T1–T9 |
+| Q3 | Rust-first confirmed, or Fabric for v0.1 with Rust after? | Rust-first (your stated direction) | The whole plan |
+| Q4 | Windows + Linux in scope, or macOS only for desktop? | macOS only; Windows/Linux via P3.5 later | P3.3–P3.5 |
+| Q5 | Engine: QuickJS-ng everywhere, or JSC on Apple? | JSC on Apple, QuickJS-ng elsewhere (saves 1 MB on iOS) | R5, P3.2 |
+| Q6 | Do you have an Android device / emulator with USB debugging, and an Apple device? | Assume emulator-only | P3.1, P3.6 |
+
+---
+
+## 8. What I need from you to start executing
+
+1. **The `angnative` repo** — attach it or push it to a location I can read. Right now I have the
+   *design spec* but not the *code*, so every task above is planned against the spec, not the tree.
+2. **P0.2's answer** — where the M1 tree lives, if it lives anywhere.
+3. **Q1 and Q3** — identity and backend direction, recorded once.
+
+With the repo in hand, Phase 1 (T1–T3a) starts immediately and is verifiable entirely in a
+sandbox, which means the first real evidence arrives without a device, an Android SDK, or Xcode.
+
+---
+
+## 9. Task distribution — 14 Nov 2026 (Kilo Code execution)
+
+Reviewed `research/TaskList.txt` (Rust-first AngNative plan). Toolchain available
+in this environment: git + node v26.13.1 only — **no cargo, no rustc, no pnpm**.
+Therefore Phase 0 file-level tasks were executed here; build-heavy tasks are
+delegated via prompt files for the user to run where the toolchain exists.
+
+### Taken by Kilo Code (main agent) — file-level / identity / hygiene
+- **P0.1** Canonical identity decided → `docs/identity.md` (AngNative, @angnative/*,
+  na-, MIT, Rust-first, taffy layout, engine-neutral, web via Angular DOM renderer).
+- **P0.3** Cargo.toml reconciled: licence `MIT OR Apache-2.0` → `MIT`; the six
+  non-existent workspace members commented out (only `angnative-core` exists),
+  so the workspace has no dead members.
+- **P0.4** D-8 (Rust-first) recorded as decided in `docs/identity.md`.
+- Research hygiene: deleted byte-identical duplicate
+  `research/m0-gap-analysis (1).md`; deleted older `nativeangular-tree (2/3/4).html`
+  duplicates, keeping `(5).html`.
+- Delegation prompt files created: `doc/angnative-kilo.md`, `doc/angnative-opencode.md`.
+
+### Delegated to Kilo Code CLI (run via `kilo run "$(cat doc/angnative-kilo.md)"`)
+- T2 — `createElementRenderer` (one renderer, above element-factory SPI)
+- T3 — shared conformance suite
+- T3a — 7 mutation "teeth" specs
+- D3 — native tree inspector (self-contained HTML page)
+
+### Delegated to OpenCode CLI (run via `opencode run "$(cat doc/angnative-opencode.md)"`)
+- T7 — size budget CI (terser-class DCE, <= 60 KB gzip gate)
+- T8 — dev server + incremental AOT (<= 200 ms/component)
+- D2 — `angnative doctor` (Windows + Linux path guard)
+
+### Left for the user / later (hardware or decision gated)
+- P0.2 (locate M1 tree), P3.1–P3.6 (platform shells, needs devices/SDKs),
+  T1 (contract), T4–T6 (fixture migration, CLI commands, dev server wiring),
+  T9 (router), R1–R9 (Rust host, needs cargo), C1–C5, W1–W4, Q1–Q6 decisions.
+
+### Verification performed here
+- File edits only; no build/test run (cargo/pnpm unavailable in this sandbox).
+- Cargo.toml is now a valid single-member workspace declaration.

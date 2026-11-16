@@ -1,0 +1,1122 @@
+react native ko angular native bana sakte hain
+11/11 19:09
+
+Processed 1m 7s
+Haan — kar sakte hain, lekin "React Native → Angular" ek direct conversion nahi hai. Aur "Angular Native" naam ka koi live official framework nahi hai (Ionic ka old Angular Native project 2019 mein NativeScript ke saath merge/deprecate ho chuka tha). Aaj ke do real raaste hain:
+
+Option	Kya hai	Kab choose karna hai
+Ionic + Angular + Capacitor (Ionic 9, Angular 18–22, Capacitor 7+)	Angular UI, native runtime Capacitor ke through	Agar app mostly screens/forms/lists hai, native features light hain. Sabse mature ecosystem + hiring easy
+NativeScript + Angular (NativeScript 9.1, @nativescript/angular)	Real native views, Angular + TypeScript code	Agar heavy native integration hai (custom SDK, BLE, background services, native animations). "Angular Native" ka closest modern equivalent
+Directly convert nahi, rewrite hoga. Kya salvage hota hai:
+
+Reusable: business logic (hooks → services me shift), API layer, TypeScript types, Redux → NgRx/Signals me map, design tokens/styles, backend contracts, test scenarios.
+Naya likhna padega: saare screens/components, navigation (React Navigation → Angular Router), state layer, native modules/plugins (RN module → Capacitor plugin ya NativeScript plugin), build pipeline, CI/CD, store signing/assets.
+Ek important trap: RN native modules ko "convert" nahi kar sakte — unhe target platform ke plugin me rewrite karna padta hai. Agar RN app me custom native code (koi custom SDK bridge, background service) hai, toh wahi sabse mehnga aur time-consuming hissa hota hai.
+
+Effort (approx, experienced Angular dev):
+
+Simple/CRUD app, no custom native code → ~4–8 weeks
+Medium app + third-party integrations → ~2–3 months
+Heavy native/custom modules → 3–6 months+
+Mera suggestion: agar motivation sirf "Angular team maintain kare", toh Ionic + Angular + Capacitor lein — ecosystem, docs, hiring aur plugin coverage NativeScript se kaafi better hai. NativeScript tabhi, jab real native UI/performance ya custom native code non-negotiable ho.
+
+Ek aur angle worth considering: agar RN app ko chhodna nahi hai aur sirf Angular stack chahiye, toh sabse sasta path yeh hai — RN app ko as-is rakhein, aur Angular team ke liye separate web dashboard bana dein (shared API). Full rewrite se 3–5 guna sasta.
+
+Agar aap repo ya feature list share karein, toh main actual migration assessment nikaal sakta hoon: module-by-module map, kya reuse hoga vs rewrite, native-module inventory, aur effort estimate.
+
+11/11 19:10
+nahin i feel we should have native framework for angular+ takay we should have great exceptional framework using angular hum naam bhi angular native rakhainge agar we can identify and check the framework support
+11/11 19:11
+
+Processed 4m 42s
+Research ho gaya — aur yeh aapke liye game-changing finding hai. Aapka idea already do live projects mein implement ho raha hai, aur dono ka architecture alag hai:
+
+Landscape (as of Nov 2026)
+Project	Architecture	Health	Platforms
+ng-native/ng-native
+ (
+ng-native.com
+)	Angular → React Native ka Fabric renderer (React render path mein hai hi nahi), Expo/Metro tooling, Tailwind, Angular Router, Signal Forms	622 stars, 1,038 commits, v0.6.0 (7 Oct), Nov 8 tak push — alpha but seriously active	iOS + Android
+Angular-Native/angular-native
+Rust core — UI tree + layout + mounting Rust mein, embedded JS engine, zoneless, AOT-only, no DOM/no WebView	2 stars, Sep 8 last push — ambitious but near-dormant	8 targets (iOS, Android, macOS, tvOS, visionOS, watchOS, Wear OS)
+nstudio/ng-native
+Angular → Fabric (same idea, NativeScript company ka experiment)	0 stars	—
+Framework support — kitna officially sanctioned hai
+Renderer2 + RendererFactory2 Angular ka public, documented extension point hai — API docs explicitly kehte hain "render to something other than DOM" ke liye banaya gaya hai. Yeh hack nahi, sanctioned seam hai. (
+angular.dev/api/core/Renderer2
+)
+NativeScript ka @nativescript/angular iska proven precedent hai — renderer + router integration + dialogs + list-view templates + bootstrap, aaj bhi shipping (Angular 18/20 versions).
+platform-browser ko avoid karna hi padega (DomAdapter, DomRendererFactory2, HTML sanitizer DOM assume karte hain) — apna platform dena padega, jaise Rust-core project karta hai.
+Zoneless Angular ab default hai (Angular 21+), signal forms aa gaye — iska matlab renderer-only integration aaj jitna feasible hai, zone.js era mein nahi tha.
+Hard constraint on naam: @ng-native/* npm scope already occupied hai (components, expo, analog, testing, migrate, fabric, nativescript, template), ng-native.com domain bhi, aur "@angular" scope + "Angular" trademark Google ke paas hain — toh literally "Angular Native" naam hum nahi rakh sakte, naam distinct hoga (positioning phir bhi "Angular Native" ho sakti hai).
+
+Ab ek sawaal jo saara architecture decide karta hai:
+
+
+Requested user confirmation
+
+11/11 19:16
+Q: Do live "Angular Native" projects already exist. Aapka core intent kya hai — fresh renderer banana, existing base par differentiate karna, ya koi aur layer?
+A: Others: B and A, i also want reactnative walay mera wala use karsakain due to rust base bahut powerful hogayega
+
+11/11 19:48
+
+Processed 23s
+A+B dono — yeh actually ek elegant architecture ban sakta hai, lekin ek important technical constraint pehle clear kar deta hoon:
+
+Shape jo aapki choice se nikal raha hai: Angular ka Renderer2/RendererFactory2 abstraction exactly pluggable seam deta hai → ek Angular surface, do native backends:
+
+Fabric backend → phones (iOS/Android), jahan RN ka pura native-module ecosystem (Expo modules, TurboModules) reuse hota hai
+Rust core backend → watchOS/tvOS/visionOS/macOS, jahan RN exist hi nahi karta aur WebView allowed nahi hai
+Do honest caveats:
+
+Rust wala project practically ek-person ka hai (2 stars, Sep ke baad push nahi) — code MIT hai, so reuse/port legal hai, par usme kuch "battle-tested" nahi hai. Uski asli value: architecture + Rust core ka design.
+"RN ecosystem free milega" tab tak valid hai jab app Expo ki runtime (Hermes) ke andar chalti hai — jo ng-native karta hai. Rust core wala path apna embedded JS engine use karta hai. Toh combined build = do alag JS runtimes + do alag bundlers (Metro vs custom) — shared cheez sirf Angular ka AOT output hoga.
+Ye sab manage ho sakta hai, par scope + timeline is par depend karta hai. Isliye ek sawaal:
+
+
+Requested user confirmation
+
+11/11 19:48
+Q: Is framework ka primary driver kya hai — isse aapka success kya define karega?
+A: Driver: public open-source framework — npm packages, docs, examples, CI, community (upstream ng-native/Rust-core ke saath contribute)
+
+11/11 19:49
+
+Processed 18s
+Driver clear: public OSS framework. Ab sabse important sawaal — kyunki A+B dono ke upar build karne ka matlab hai ki "hum kya alag banayenge". Uthne se pehle thesis fix karni padegi, warna scope bikhar jaata hai.
+
+Ek framing note jo OSS ke liye matter karta hai: upstream dono projects MIT licensed hain (Fabric wala 622 stars / active, Rust wala 2 stars / near-dormant) — toh legally dono ka code reuse ho sakta hai aur upstream contribute bhi. Isliye aapka real asset "code" nahi, "consistency + DX + ecosystem" hoga. Jo cheez dono projects dono me nahi karte — wahi aapka wedge hai.
+
+
+Requested user confirmation
+
+11/11 19:49
+Q: Hamara unique wedge kya hoga — kaunsa ek cheez dono existing projects nahi karte?
+A: Others: what do you suggest?
+
+11/11 19:50
+Processed 1m 10s
+
+Thinking process
+Mera suggestion clear hai — aur yeh dono existing projects ko compete nahi, consume karta hai, jo OSS me hi winning position hai.
+
+Recommended thesis: "One Angular API, every native target"
+Hum renderer nahi banayenge. Hum Angular-native ka convergence layer banayenge:
+
+Ek Angular codebase → har native target pe same component API, same plugin API, same DX. Renderer ke peeche ka backend pluggable hai: Fabric (phones) aur Rust core (watchOS/tvOS/visionOS/macOS).
+
+Humara owned value: unified component API + unified plugin API + DX layer (inspector, testing, codemods). Renderer upstream ka moat hai — wahan compete karna 2–3 saal ka lag hai aur 622-star active project haarayegi nahi.
+
+Kyun yeh, teen reasons
+Angular developer ka asli dard rendering mein nahi, tooling mein hai. Native Angular likhne wala aaj 3 alag stack choose karta hai — Ionic (WebView), NativeScript, Fabric — aur koi common component API, shared testing story, ya working
+11/11 19:51
+great
+11/11 19:51
+
+Processed 1m 6s
+Mera suggestion — ek line mein, phir architecture:
+
+Recommended thesis
+"Angular Native: ek Angular codebase, har native platform pe, ek hi component API." Wedge = capability-aware native runtime — component batata hai usko kya chahiye, platform batata hai kya available hai, framework adapt karta hai (graceful degradation), fork nahi karta.
+
+Kyun yeh, baaki sab se better hai:
+
+Aaj ka state	Humara wedge
+Ionic/Capacitor	WebView, real native nahi	—
+NativeScript Angular	Real native, par XML templates, zone-era DX, single host family	Modern Angular-native DX
+ng-native (622★)	Real native + shandar DX, par sirf phones	watch/TV/desktop tak same codebase
+Angular-Native (Rust, 2★)	8 platforms, par ecosystem zero	Angular-first DX + community + capability system
+Sabse important: aaj koi yeh nahi kar raha. Aapka naam ("Angular Native") naturally isi positioning mein fit hota hai — sirf product ka naam alag hoga (scope/@ng-native/* dono occupied hain).
+
+Aur jo ise long-term moat banata hai: capability registry. Component declare karta hai requires: ['nativeListView'], platform declare karta hai supports: { nativeListView: false } → framework runtime pe best implementation chunta hai ya graceful fallback deta hai. Yahi "exceptional" layer hai — renderer dono upstream ke paas hai, yeh nahi hai.
+
+3 raaste (trade-off ke saath)
+Unified multi-backend + capability registry ← mera pick. Architecture sahi, differentiation strong, lekin multi-year thesis → v0.1 ko Fabric-only constrain karna padega.
+DX-first wrapper on ng-native — fastest adoption, par ceiling low (copy ho sakta hai, "framework" nahi lagta).
+Rust-first full control — NativeScript 2.0; independence par max risk, bus-factor 1, ecosystem zero se.
+Design Section 1 — Architecture
+text
+
+
+┌──────────────────────────────────────────────────────┐
+│  App: Angular components · signals · DI · @angular/router │
+│  elements: <an-view> <an-text> <an-list> <an-input> …      │
+└───────────────────────┬──────────────────────────────┘
+                        │  Renderer2 / RendererFactory2 SPI
+┌───────────────────────▼──────────────────────────────┐
+│  Angular Native Core  (backend-agnostic, the IP)      │
+│  ① Element registry      ② Capability registry+resolver│
+│  ③ Style/layout contract ④ Typed native-module bridge │
+└────────┬──────────────────────────────┬───────────────┘
+         │ Fabric backend                │ Rust core backend
+         │ RN Fabric + Expo modules      │ Rust UI tree + layout
+         │ iOS / Android                 │ watchOS/tvOS/visionOS/macOS
+Chaar design decisions jo isko sustainable banate hain:
+
+Backend SPI, backend fork nahi — core ko Fabric/Rust ka pata hi nahi. Backend sirf RendererFactory2 implement karta hai + element mapping provide karta hai.
+Capability registry = asli IP — renderer dono ke paas hai; yeh nahi. Platform "kya kar sakta hai" declare karta hai, component "kya chahta hai" — resolver runtime pe resolve karta hai.
+an- prefixed elements — self-closing tags, no CUSTOM_ELEMENTS_SCHEMA, typed properties (typo compile-time pe fail).
+Ek Angular app, dono backends — same templates, per-platform backend selection, zero platform forks.
+Ek honest cost jo abhi se budget mein daalna zaroori hai: unified backend = do JS runtimes (Hermes/Expo vs embedded engine) + do bundlers (Metro vs custom). Solution: AOT output shared rakhte hain, bundler ko adapter interface (@an/bundler-metro, @an/bundler-embedded) banate hain. Rust backend ko v1 se hatane ka matlab hai yeh cost 6–12 months ki hai.
+
+Mera proposed v0.1 (narrow by design): Fabric backend + phones + SPI + capability registry + ~10 core elements + router bridge + Expo-module bridge + testing lib + CLI template. Rust backend baad mein API break kiye bina land karta hai.
+
+Section 1 (architecture) pe aapki approval chahiye design aage badhne se pehle — kuch adjust karna hai (scope, backend priority, ya capability model)? Aur ek parallel cheez bata dein: team me kaun hai (Angular + native iOS/Android + Rust)? Usse timeline aur v0.1 ka scope realistic adjust kar paunga.
+
+11/11 19:52
+jo behtar samjhain aap
+11/11 20:03
+
+Processed 6m 39s
+Spec likha, self-review kiya (types define kiye, phasing clarify ki, open questions ko defaults ke saath band kiya), aur commit kar diya — e8b19c1, 489 lines.
+
+Jo decide hua
+Thesis: One Angular codebase. Every native platform. — aur asli wedge capability-aware runtime hai, renderer nahi.
+
+Architecture: ek backend-agnostic core (@nativeangular/core) + do native backends:
+
+Fabric backend (v0.1) → iOS/Android, RN ka native-module ecosystem inherit karta hai
+Rust core backend (v0.2+) → watchOS/tvOS/visionOS/macOS, jahan RN exist nahi karta aur WebView forbidden hai
+Core Angular ke public Renderer2/RendererFactory2 SPI par baithta hai — koi private ɵ API nahi, @angular/platform-browser bilkul nahi, AOT-only + zoneless.
+
+IP jo dono existing projects se alag hai:
+
+Capability registry — platform batata hai kya kar sakta hai, component batata hai kya chahta hai, resolver runtime pe fallback choose karta hai. Data-driven, koi if (isWatch) nahi.
+Backend contract test suite — "one component API" ek slogan nahi, ek test suite hai jo har backend pass karega.
+Unified build — Fabric + Rust ke liye do JS runtimes/do bundlers ka cost explicitly budgeted hai (@nativeangular/bundler-metro / -embedded adapter interface se isolate).
+Name: NativeAngular — npm nativeangular, scope @nativeangular/*, GitHub org native-angular. Availability check ki: npm 404, GitHub 404, DNS pe koi A record nahi (registrar pe dobara verify karna hoga — DNS absence registration ka proof nahi).
+
+Jo maine aapke bina decide kiya (abhi challenge kar sakte ho)
+Decision	Kyun
+v0.1 scope	Sirf phones (Fabric). 8-platform claim v0.2 milestone hai, launch promise nahi	8 platforms ek saath = death spiral
+M0 kill criterion	Agar Angular ka Renderer2 SPI DOM APIs maange → NativeScript-style DOM shim fallback	Yehi ek cheez hai jo poora approach fail kar sakti hai — isliye M0 isi ka jawab dene ke liye hai
+Rust stack	taffy (flexbox/grid) + parley/fontdb (text) + QuickJS-ng (interpreter)	iOS JIT ban karta hai; QuickJS-ng ~1 MB aur console-proven; Boa pure-Rust fallback
+WebView escape hatch	v0.1 mein nahi — "no WebView" promise intact	Product decision, v0.2 mein opt-in package
+Effort	M0: 3–5 wks · M1: 8–12 wks · M2: 6–8 wks · M3: 16–24 wks	Assumption: 2–4 engineer, jismein ≥1 native iOS/Android. Team 1 Angular engineer hai toh M1 hi ceiling hai
+Spec review karo
+Mera suggestion: M0 spike ko hi pehla implementation plan banayein (repo skeleton + platform provider + SPI + Node mein fake backend se real Angular component render). Wo 3–5 weeks ka kaam hai aur sabse bada unknown — Renderer2 ka DOM-coupling — usi mein resolve ho jaata hai, bina device ya Rust touch kiye.
+
+Spec padho, changes bolo (scope, naam, ya koi assumption galat hai toh batao) — phir main writing-plans se M0 ka detailed implementation plan banaunga.
+
+2026-11-11-nativeangular-design.md
+MD
+
+Open file
+
+11/11 20:10
+sexy..
+11/11 20:49
+
+Processed 26m 42s
+M0 kill criterion: PASSED ✅
+Plan likhne se pehle maine assumption assume nahi ki — test ki. Result: Angular 22.2.5 ka AOT-compiled app, zero DOM, custom Renderer2 ke through Node me render ho gaya. Dono test green. Yaani framework ka sabse bada unknown (SPI se native views ban sakte hain ya nahi) ab closed hai.
+
+Jo measuring se nikla (ye assumptions nahi, facts hain)
+#	Angular actually karta hai	Native renderer ko kya chahiye
+F4	createRenderer(null, null)	null host aur null type tolerate karo
+F5	removeChild(**null**, child, …)	parent argument null hai — renderer khud parent resolve kare
+F6	element.textContent = ''	container clear karna children hatana hai
+F7	class setAttribute('class', …) se	class list attribute me rakhna, list derive karna
+F8	text setValue(node, v) → nodeValue	text node me nodeValue implement karo
+F9	parentNode/nextSibling padhta hai, destroy() call karta hai	teenon implement karo
+Do silent killers jo mile:
+
+removeChild(null, child) — DOM ki book-keeping assume karti hai ki parent argument milega. Native renderer me yeh crash hota tha. Fix: parent khud track karo.
+Signal inputs AOT-only hain — JIT me [label]="x" directive input pe route nahi hota, balki renderer.setProperty(host, 'label', v) pe girta hai. Web pe yeh DOM property likhta hai; native host pe kuch nahi hota — component khali render hota hai, koi error nahi. AOT me inputs: { label: [1,"label"] } compile hota hai.
+Isliye design rule ban gaya: unknown property write = error, not no-op. Aaj nahi, M0 se hi — warna yeh silent failure ek din device pe ship ho jaata.
+
+Platform recipe bhi verified hai (NativeScript ka production-proven approach): platformCore + createPlatformFactory + ɵinternalCreateApplication + ɵsetDocument(shim), aur ɵINJECTOR_SCOPE:'root' + ErrorHandler app providers me (platform me circular dependency aata hai — measured).
+
+Plan: 6 tasks, 47 steps, verified code ke saath
+M0 — Spike & Skeleton — repo skeleton → @nativeangular/core (SPI) → @nativeangular/platform (DOM-less platform) → @nativeangular/testing (fake backend) → AOT fixture pipeline + e2e proof → CI + governance + gap-analysis.
+
+Global constraints jo spike ne pakde: Angular 22.2.x exactly · TypeScript 6.0.x (7.0.2 install hi nahi hota — compiler-cli ka peer range >=6.0 <6.1) · Node >=22.12 hard, 22.22.3+ recommended (CI pins it) · AOT-only, zoneless-only · @angular/platform-browser runtime code me banned · sirf ek file me ɵ API (angular-internals.ts, har import documented).
+
+Execution mode chuno
+1. Subagent-Driven (recommended) — har task ke liye fresh subagent, task ke beech main review karunga. Parallelism + tight feedback loop.
+
+2. Inline Execution — isi session me, batch execution + checkpoints ke saath.
+
+Kaunsa? (Main M0 ko abhi start karke poora kar sakta hoon — repo real hoga, pnpm test green, CI wired.)
+
+2026-11-11-nativeangular-m0-spike.md
+MD
+
+Open file
+
+2026-11-11-nativeangular-design.md
+MD
+
+Open file
+
+11/11 21:16
+perfect
+11/11 21:24
+
+Processed 2h 34m 2s
+NativeAngular M0 milestone complete — kill criterion PASSED, poori branch review se guzar gayi (0 Critical, 7 Important → sab fix hue).
+
+Kya prove hua (sandbox me, assume nahi kiya)
+Real ngc-compiled Angular 22.2.5 component, DOM-less Renderer2 ke through, Node me render hua:
+
+text
+
+
+inputs: { label: [1, "label"] }      ← InputFlags.SignalBased (AOT proof)
+consts: [[1, "root", 3, "label"]]     ← static attribute compiler se aaya
+Signal input bind hua, zoneless re-render hua, aur compiled artefact me kahin bhi renderer.setProperty nahi — sirf ɵɵproperty("label", …).
+
+Final state
+Branch	feature/m0-spike @ 6f6f7cb — 29 commits, 60 files, +5607/−142
+Tests	9 spec files / 75 tests green
+Build	tsc -b exit 0
+Toolchain	@angular/core 22.2.5 ✓ · typescript 6.0.3 ✓ (Node22.19.0 sandbox me sirf warn — CI 22.22.3 pin karta hai)
+Review ne kya pakda (aur fix hua)
+Comment nodes text me mix ho rahe the → textOf() pollute ho jata tha. Ab FakeComment apna type hai, text APIs ignore karti hain.
+Teardown helper destroyed injector pe throw karta (NG0205) → ab appRef.destroyed pehle check hota hai.
+F10 ka rule real hai — unknown property write throw karta hai, warn/no-op nahi. Yehi wajah hai ki JIT component chup-chaap empty render nahi kar sakta.
+AOT-only constraint unguarded tha → ab scripts/constraints.spec.ts @angular/core/testing, @angular/compiler, zone.js, platform-browser aur ɵ-import (ek file ke bahar) par suite fail karta hai. Maine abhi inject karke verify kiya: 2 rules fire → revert → 7/7 green.
+Version pins ab machine-checked — check:toolchain installed Angular/TS ko constants se compare karta hai (mismatch → exit 1). "TypeScript 7 install nahi hoga" wala galat claim 4 jagah se hata diya gaya.
+Fake backend DOM-faithful — re-parent detach karta hai, non-member removal NotFoundError, aur insertBefore reference ko detach se pehle validate karta hai (DOM ka pre-insertion validity) — ye maine khud fix kiya, mutation-test ke saath (galat order pe test fail hota hai ✓).
+Do shipped documents galat the — design spec F4 row aur plan ka "three ɵ internals" (asli mein seven) → dono reconcile kiye.
+Jo jaan-boojh kar M1/M2 ke liye rakha (44 deferred minors ka triage)
+Packaging (exports → dist, specs dist me), scripts/ type-checking, DOM lib removal, aur email addresses (domain abhi registered nahi) — publish se pehle fix honge. Capability resolver M2 hai; ab README + gap analysis saaf-saaf kehte hain ki registry abhi declared hai, wired nahi.
+
+Position
+Ye spike hai, product nahi. Koi device backend nahi hai, koi element kind implement nahi hua. M1 ka kaam: pehla real backend (Fabric), contract suite, aur event binding. Native renderer upstream ka moat rahega — NativeAngular ka IP capability registry + resolver hai, aur wahi M2 me aayega.
+
+2026-11-11-nativeangular-m0-spike.md
+MD
+
+Open file
+
+2026-11-11-nativeangular-design.md
+MD
+
+Open file
+
+m0-gap-analysis.md
+MD
+
+Open file
+
+11/11 23:59
+Want smallest installer
+Want fastest development
+ye cheezain bhi dekh lain..
+11/12 02:06
+
+Processed 2m 50s
+Dekh liya — aur dono cheezon ko measure karke design spec me daal diya (guess nahi kiya).
+
+Measured baselines (is repo se, aaj)
+Metric	Measured
+JS payload, minified (dev mode)	363,901 B raw / 120,884 B gzip
+JS payload, production (ngDevMode=false → DCE)	273,878 B / 90,438 B gzip (−25%)
+@angular/core ka payload me hissa	349,758 B = 96.3%
+@angular/compiler (jo hum ship nahi karte)	1,222,744 B raw / 227,530 B gzip
+ngc AOT compile (2-component app)	5.05 s
+usi output ka esbuild bundle	0.24 s (21× faster)
+75 component tests (Node, no simulator)	251 ms of test time
+Char insights jo nikle
+1. AOT-only rule humein do kaam karwa rahi hai — size aur speed dono. JIT compiler 227 KB gzip hai jo RN/Metro-style dev bundle me device pe ship hoti hai. Hum use already rok chuke hain. Aur compiler device pe kabhi nahi chalaenge (D7: compile Node me) → dev me bhi device compiler-free → AOT-only rule tax nahi, speed ka enabler hai.
+
+2. Installer me humara cross-platform cost sirf JS payload hai. React Native ek cross-platform native runtime plus engine dono ship karta hai (~15–20 MB native code Android arm64 pe, ~25–35 MB iOS pe). Hum koi native runtime nahi ship karenge — UI platform ka apna (UIKit/android.view.View), engine OS ka apna (iOS/tvOS/watchOS pe JSC system image me = 0 KB, Android pe Hermes ~2.5 MB/ABI, jo unavoidable hai). Pure native floor 8–15 MB; RN floor 20–35 MB; humara floor = native app + JS payload.
+
+3. Optimization ka target saaf hai: 96% payload @angular/core hai, app code sirf 1,316 B. Toh size optimization ka kaam app code me nahi, bundler config me hai — ngDevMode=false + terser-class DCE se25% free mil gaya (measured).
+
+4. Dev loop ka asli villain ngc hai, 5.05 s. Real app me 30–60 s. Isliye pipeline incremental hona chahiye (per changed component ≤200 ms). Aur sabse tez loop humare paas already hai — fake backend: 75 component assertions, 251 ms, koi device/simulator/native toolchain nahi. Isliye M1 me device tooling se pehle contract suite banana highest-leverage hai.
+
+Spec me kya add hua
+G6 (smallest installer) aur G7 (fastest development) goals me — budgets ke saath: JS ≤ 60 KB gzip hello-world / ≤ 250 KB typical; hamara native code ≤ 500 KB/platform; inner loop ≤ 500 ms; Node-only test ≤ 300 ms
+§11.1 Delivery budgets — poora measured baseline + budget table + "why smaller than RN"
+D7 (compile Node me, device pe kabhi nahi) aur D8 (Rust core ka size gate — parity vs bytes, M3 kickoff pe measure)
+Appendix A me verification rows + commands
+Honest caveat
+60 KB budget abhi meet nahi ho raha — current esbuild-only pipeline 90 KB gzip deta hai. Budget ko reachable banane ke liye production bundler me terser-class DCE chahiye (M1 task). Maine budget aise set kiya hai ki current number ke upar ho, taaki ye aspiration nahi, enforceable target bane.
+
+M1 ke 4 concrete inputs (ledger me daal diye)
+Production bundler: ngDevMode=false + DCE → 60 KB budget
+CI me size-budget check (constraint guard ki tarah — bundle karo, gzip karo, fail karo)
+Incremental per-component compile (D7) — 5.05 s critical path se nikalna
+M3 se pehle stripped Rust core ka byte measurement (D8)
+Agar chaaho to main ab M1 ka plan in budgets ke saath likh doon, ya sirf size-budget CI check abhi bana deta hoon (woh 30-line script hai aur turant enforce hone lagega).
+
+2026-11-11-nativeangular-design.md
+MD
+
+Open file
+
+11/12 02:08
+pasted-text.txt
+TXT
+
+Processed 1m 27s
+Ye input absorb kar liya — aur ek jagah disagree bhi kar raha hoon. Spec update + ek naya instrument bana diya.
+
+Spec me kya badla
+Kahan	Kya
+§3	G8 (production-grade enterprise path) + audience order: Angular enterprise teams → OSS devs → RN devs (RN devs ko launch audience banana strategic mistake — sahi point)
+§5.7	RN interop ka promise bounded kar diya: top-20 Expo modules ka compatibility matrix (≤30 lines adapter ya published reason), aur M1 me M1.5 spike (3 representative modules)
+§5.9	Rust ko services core bana diya (capability resolver, offline sync, crypto, serialization, diagnostics, plugin contracts) — usable without Angular; renderer bas ek consumer hai
+§11.2	Performance acceptance gates — startup, 1000-item list @60fps, input latency, memory, crash-free; saath me "no lost acknowledged operation" aur "no critical crash" ko invariant maana, benchmark nahi
+§12	60/25/15 allocation + "next decisive milestone is adoption, not a feature"
+§15	Commercial model: core MIT aur uncrippled rahega; paisa capability gate se nahi, risk-hatane se aayega
+§16	D9 (na- prefix recommend), D10 (Rust services scope), D11 (RN inheritance — spike tak undecided)
+Naya instrument: readiness scorecard
+docs/architecture/readiness-scorecard.md — 14/100 aaj.
+
+Factor	Weight	Score	Evidence
+Angular-first DX	20%	1/5	platform chalta hai, CLI nahi
+Native module compat	20%	0/5	kuch nahi — spike bhi nahi
+Production reliability	20%	1/5	contract suite + strict rules; zero device hours
+Performance	15%	0/5	sirf JS payload measured; device pe kuch nahi
+Code reuse	10%	1/5	SPI neutral hai, web↔native sharing demo nahi
+Tooling & docs	10%	2/5	CI/docs/governance hain, CLI nahi
+Community adoption	5%	0/5	zero
+Har score ek artefact se bound hai — opinion se score nahi badalta. M1 ke targets bhi likhe hain (14 → ~28 ka realistic range).
+
+Jahan main disagree karta hoon
+1. "RN modules minimal adapters se consume ho jayenge" — underestimate hai. Ek RN TurboModule JSI host object hai jo RN runtime banata hai; Fabric component Fabric registry me register hota hai. Ye plain API nahi hain — inhe alag JS runtime se call karna genuine integration project hai (text khud yehi kehta hai). Isliye maine promise ko matrix tak bound kiya, M1.5 me3 modules pe spike rakha (simple + TurboModule + Fabric component), aur first-party plugin ABI ko guaranteed fallback rakha. Ye aapka sabse valuable differentiation bhi hai aur sabse risky bhi — ise pehle measure karna zaroori hai, commit nahi.
+
+2. Resource split: 15% → 10% Rust research. Advice khud kehti hai "jab tak Fabric device pe nahi chalta, Rust pe major investment premature hai" — main usi ko apply karta hoon. Scorecard ke do 20%-weight factors (DX, native module compat) dono 0/5 pe hain, aur dono M1 ka deliverable hain. 5% DX pe shift.
+
+3. Element naming: aapka illustrative <na-view>/<na-text>/<na-button (press)> vs hamara <an-view>/<an-pressable>. na- brand se match karta hai aur button woh naam hai jo developers reach karte hain. Abhi implement nahi hua → rename free hai (M0 fixture an- internal test name hi rahega). D9 me recommend kiya, apply nahi kiya — tum batao.
+
+4. Commercial model agree, ek caveat: managed build/release service CLI ko gate nahi karna chahiye, warna "core uncrippled" claim jhooth ho jayega.
+
+Sabse important observation
+Strategy ka 60% weight un factors pe hai jo abhi 0/5 hain — aur woh sab M1 ka kaam hain. M0 ne sirf sabse risky architectural assumption hataya (Angular → native views, DOM-less ✓). Uske baad agla decisive milestone architecture nahi, adoption validation hai — bahar ke Angular teams ke saath real app ship karna. Isi liye M1 ka plan likhte waqt priority: DX + device run + contract suite + RN interop spike — Rust baad me.
+
+Chalega to main ab M1 ka plan likh doon (in budgets, gates aur scorecard targets ke saath), ya pehle M1.5 RN interop spike ka plan?
+
+2026-11-11-nativeangular-design.md
+MD
+
+Open file
+
+readiness-scorecard.md
+MD
+
+Open file
+
+11/12 02:12
+ok
+11/12 02:16
+
+Processed 6m 29s
+M1 plan ready — docs/superpowers/plans/2026-11-12-nativeangular-m1-fabric-mvp.md (4118 lines, 10 tasks), commit 1847d86.
+
+Plan ka architectural spine
+Ek hi architectural decision poori M1 ko shape karti hai: one renderer, many backends.
+
+M0 me fake backend ka apna hand-written Renderer2 tha. Fabric backend ke liye doosra renderer likhna galat hota — backend sirf native element implementations hona chahiye. Isliye:
+
+@nativeangular/contract (naya package) — 10 element contracts, style property table, value parsers, aur transport-agnostic command protocol. Yehi "contract" hai jo Swift, Kotlin aur M3 ka Rust backend implement karenge.
+@nativeangular/core me createElementRenderer(registry, options) — Angular-facing renderer ek baar likha, element-factory SPI ke upar.
+Conformance suite — wahi cases har backend pass karega (re-parent detaches, insertion order, text/comment payload, style storage, dispose). M0 ka rule: "agar fake galat hai to case galat hai, case nahi."
+10 tasks
+#	Task	Sandbox me verifiable?
+1	Contract: elements, styles, values, command protocol	✅
+2	One renderer + conformance suite (fake passes)	✅
+3	M1.5 — RN/Expo interop spike (top-20 matrix, decision rule pehle likhi)	❌ RN toolchain + device
+4	CLI: doctor / create / test	✅
+5	Production bundle + size budget CI (GLOBAL_DEFS_FOR_TERSER_WITH_AOT)	✅
+6	Dev server + incremental AOT (NgtscProgram, 200ms budget)	✅
+7	Fabric backend — Swift + Kotlin, element mapping table	❌ Xcode / Android SDK
+8	@nativeangular/router — native navigation	✅
+9	Sample app + device run + perf gate table + golden screenshots	❌ device
+10	Docs, starters, scorecard update	✅
+Self-review ne9 cheezein pakdi (fix hue)
+Spec-coverage gaps (5): logical padding-inline/margin-block missing the style table me; box-shadow ka real value form nahi tha (ab parseShadow); view flattening (§5.5) aur G8 enterprise path ke liye reason ke saath "Carried into M2" me; §7.4 ke screenshot golden tests Task 9 me add.
+
+Code placeholders (4): Task 4 ke commands dummy the; Task 6 me createCompilerHost ke liye "guess mat karo" hedge tha (verified API se replace); Task 7 ka FabricElementFactory sirf described tha, implement nahi; Task 8 ka router bhi. Ab sab likha hua hai.
+
+Ek type-inconsistency bhi mila: import ts from 'typescript' galat tha (repo me esModuleInterop off hai) → namespace import correct kiya.
+
+Honest note
+3 tasks is sandbox me nahi chal sakte (RN toolchain, Xcode, Android SDK, device). Plan har task me ye clearly likhta hai — reviewer SDKs ke bina contract aur mapping table check kar sakta hai, par koi native verification ka claim nahi kar sakta.
+
+Execution mode
+Do options:
+
+Subagent-Driven (recommended) — har task ke liye fresh implementer + task review + fix round. M0 me yahi pattern6 tasks chala, har task pe3-4 review rounds nikle (jo asli bugs pakde — comment-node pollution, NG0205, F4 doc mismatch).
+Inline Execution — ek session me batch execution, checkpoints ke saath.
+Kaunsa? Aur kya main Task 3 (RN spike) ko yahan se skip karke baaki9 pe shuru karun — ya pehle wo (wo decide karta hai ki Fabric ka transport kya hoga, Task 7 uspe depend karta hai)?
+
+11/12 02:22
+hum kab tak ready hongay with this?
+11/12 02:18
+
+Processed 52s
+M0 ka measured throughput: 4.9 ghante, 31 commits, 75 tests, CI + governance + docs — poora milestone. Lekin M0 me native code, device loop, ya CI runner nahi tha. Seedha estimate nahi, task-by-task:
+
+M1 ka realistic timeline (solo founder + AI)
+Task	Kaam	Focus time	Calendar
+1 + 2	Contract + conformance suite (TS)	3–5 din	1–2 hafte
+4, 5, 6	CLI, size budget, dev server (TS)	4–7 din	2–3 hafte
+3	RN/Expo spike (toolchain + device chahiye)	3–5 din	1–2 hafte
+7	Fabric native (Swift + Kotlin, 10 elements × 2 platforms)	6–10 hafte	⚠️ yahi critical path hai
+8	Router bridge	3–5 din	1 hafta
+9	Sample app + device + perf gates	5–8 din	1–2 hafte
+10	Docs + scorecard	2–3 din	2–3 din
+M1 total: ~3–4 mahine (November 2026 → February/March 2027).
+
+"Ready" ka matlab alag-alag hai
+Ready ka matlab	Kab	Reality
+Demo — app ek codebase se device pe	~March 2027	M1 ka end
+Production-ready, ek platform (Android-first) + enterprise path + CI/releases	~June–July 2027	M1 + M2
+Full thesis — phone + watch + TV, Rust core, plugin ecosystem	~late 2027 / early 2028	M3 + M4
+Community traction	unpredictable	scorecard ka 5% weight, zero se shuru
+Jo cheez date bigaadegi (code nahi)
+1. Toolchain access hi asli blocker hai. Swift/Kotlin likhna AI ke liye easy hai, par Xcode + simulator + real device + Fabric integration nahi. Hum D1 me Expo runtime pe depend karte hain → EAS cloud builds se local Xcode ki zaroorat hi nahi padegi (Apple account chahiye bas). Ye sabse bada lever hai — bina iske Task 7/9 months khaa jayenge.
+
+2. Native ka "unknown unknowns" factor. Layout bugs, safe areas, keyboard avoidance, RTL, scroll physics — koi TS test ye nahi pakadta. Native time ka 2–3× multiplier yahan lagta hai. M0 ka 4.9 ghanta M1 ka promise nahi hai.
+
+3. Solo + job = calendar 2–3× focused hours.
+
+Jo date kam kar sakta hai
+Android-first → ek platform, ek native language, Xcode nahi → M1 ka ~35% kat
+EAS cloud builds → Xcode blocker gaya
+Task 3 (RN bridge) ko M2 me postpone → M1 = "one Angular API + real native views"; ecosystem promise late aayegi (honest, par #1 differentiator weak hoga)
+Element set 10 → 6 → native ka kaam proportional hai
+Meri recommendation — abhi kya karein
+Task 1 + 2 shuru karein (contract + conformance suite). Yehi project ka IP hai, device-independent hai, aur har baad ke task pe inhe depend karta hai. Mera throughput yahan sabse high hai (pure TS + verifiable).
+
+Aap parallel me: platform order decide karein (Android-first?) + Expo/EAS account + ek Android device. Ye Task 3/7/9 ka gate hai.
+
+Aur sabse important scheduling note: Task 7 ko Task 3 ke baad wait na karein — jo pehla native element device pe dikhega, wahi pehla real demo hai. Wo parallel chalna chahiye, sequence me nahi. warna M1 ka pehla demo 2 mahine late hoga.
+
+Bataiye — Task 1+2 subagent-driven shuru karun (M0 wala pattern), aur saath me Android-first/EAS wali taraf aap kya decide karte hain?
+
+11/12 02:23
+bhai March 2027 bahut door hai, week main nahin nimat sakta?
+11/12 02:28
+
+Processed 29s
+Sahi point hai — March 2027 ka commitment karna realistic nahi. Ek hafta pakka kya hoga, wo abhi bata deta hoon, aur kya nahi hoga wo bhi seedha.
+
+Ek hafte me jo possible nahi (aur kyun)
+Real native app device pe — Swift/Kotlin + Fabric + emulator/device loop. Native ka unknown-unknowns factor2–3× hai, wo ek hafte me nahi hota.
+M1 ka koi bhi "done" — M1 3–4 mahine hai, isme se hafte me ~15% hota hai.
+Ek hafte me jo possible hai — aur ye sirf formality nahi hai
+M0 ka measured data: 4.9 ghante, 31 commits, 75 tests — poora milestone. M0 me native code/device nahi the, isliye M0 ka throughput M1 ka promise nahi. Lekin TS-only ka kaam (Tasks 1, 2, 4) M0 jaisa hi throughput rakhta hai. Iska matlab:
+
+Din	Kya	Proof
+1–2	Task 1 — contract package (10 elements, style table, value parsers, command protocol)	tests green, tsc -b exit 0
+3–4	Task 2 — one renderer + conformance suite (fake backend usi suite se pass ho)	suite green + mutation-test
+5	Live native-tree inspector — real ngc-compiled Angular app → native element tree, browser me live	shareable link
+6	CLI (nativeangular doctor / create / build) + size budget	pnpm test green, budget CI me
+7	Publish-ready: npm packages (@nativeangular/core, @nativeangular/contract), README, landing page	npm pack dry-run
+Hafte ke end me aapke paas hoga: project ka actual IP (contract + conformance suite — yehi M3 ka Rust backend implement karega), ek live demo (native tree, real AOT output se), ek CLI, aur npm pe publishable packages.
+
+Aur ek cheez jo hafte ko "sirf foundation" se "real product" banati hai
+RN-Views compat backend — hamare element contract ko React Native ke apne <View>/<Text> pe map karna. Isme koi Swift/Kotlin nahi — Expo/EAS se APK 1–2 hafte me phone pe aa jata hai. Ye:
+
+poora Angular→device path real device pe validate karta hai (JS side hi asli kaam karti hai)
+Fabric backend ko "optimization/parity task" bana deta hai, "demo ka raasta" nahi
+spec ke D1 ke saath consistent hai (Expo runtime pe depend karte hain ✓)
+Isi ko D11 ke saath M1.5 spike ke saath combine karna hai — spike ka matlab hai bridge ka shape pata chal jaye.
+
+Ye aapke machine pe hoga (Expo account + Android device + eas build), mera kaam uske liye JS backend hai.
+
+Timeline is ke baad
+Week 1 ke baad: first real device demo ≈ 2–3 hafte (agar RN-Views path chala), Fabric native ≈ 6–8 hafte — March nahi, June. Kyunki sabse bada blocker code nahi, native track ka parallel start hai.
+
+Ek decision aapka chahiye:
+
+
+Requested user confirmation
+
+11/12 02:29
+Q: Is hafte ka scope kya rakhein?
+A: Others: hum kaam delegate bhi karsakte hain..
+
+11/12 02:30
+
+Processed 3m 54s
+3 tracks abhi parallel chal rahe hain — delegation ka setup:
+
+text
+
+
+/workspace/nt-a  feature/m1-track-a   Task 1 — contract package      [running]
+/workspace/nt-b  feature/m1-track-b   Task 4 — CLI (doctor/create/test) [running]
+/workspace/nt-c  feature/m1-track-c   Task 3 — RN/Expo interop spike  [running]
+Worktree alag kyun? Teenon agents ek hi repo me hote to packages/cli/, root package.json, tsconfig.json aur pnpm-lock.yaml pe fight karte — aur pnpm install lockfile race de deta. Ab har agent apni branch + apne worktree me hai, main merge + review karta hoon.
+
+Hafte ka wave schedule
+Wave	Parallel me	Depend
+1 (abhi)	Task 1 (contract) ∥ Task 4 (CLI) ∥ Task 3 (interop spike)	—
+2	Task 2 (renderer + conformance suite) ∥ Task 5 (bundle + size budget) ∥ Task 11 (inspector)	1, 4
+3	Task 6 (dev server + incremental AOT) ∥ Task 8 (router) ∥ publish + landing page	4
+4	Task 7 (native Swift/Kotlin) ∥ Task 9 (app + perf gates)	aapka device
+Task 11 abhi plan me add kar diya (4515 lines) — native tree inspector: real ngc-compiled app → native element tree → ek self-contained HTML page (no CDN, no script). Yehi "din 5" wala visible demo hai — 75 green tests "tree sahi hai" kehte hain, "yeh raha tree" nahi.
+
+Task 3 ko adapt kiya (device ke bina)
+Sandbox me RN toolchain/simulator/device nahi hai — to agent ko bola: source-level analysis karo. Network available hai, to wo expo-secure-store, expo-camera, react-native-svg ke published tarballs download karke padhega aur factually nikalega:
+
+kaun TurboModule hai, kaun legacy bridge, kaun Fabric component
+native view code hai ya sirf imperative methods
+JS→native boundary kya hai (JSI / legacy bridge)
+web fallback hai ya nahi (ye batata hai ki module mostly platform-API hai)
+Har claim ka file:line proof chahiye. Device verification aur D11 ka final decision honestly "open" mark honge — guess nahi.
+
+Aapse chahiye (parallel track ke liye)
+Android device (ya iPhone) — Task 9 ke liye
+Expo/EAS account (free tier) — cloud build, local Xcode ki zaroorat nahi
+Decide: Android-first? (M1 ka ~35% kat jata hai, aur Angular devs ka sabse bada mobile audience Android pe hai)
+Jab 3 agents wapas aayenge: main unka review karunga (spec + quality, M0 wale pattern se), fix rounds chalaunga, merge karunga, phir wave 2 dispatch hoga. Har merge ke baad pnpm test + pnpm run build green hona check hoga — koi bhi track suite todke land nahi hoga.
+
+Status update maangte raho — ya main jab wave 1 land ho jaye uska review report de doon?
+
+11/12 02:34
+kilo ko opencode ko codex ko prompt dain alag alag
+11/12 02:32
+Processed 6m 20s
+
+Thinking process
+Check karta hoon ye CLIs installed hain ya nahi:
+
+
+Thought 1 time(s), Ran 1 command(s)
+
+Koi bhi CLI installed nahi hai, keys bhi nahi. Pehle dekhta hoon kya credentials available hain:
+
+
+Read 1 skills, Thought 2 time(s), Ran 1 command(s)
+
+mcode-tools ka OAuth Connector ke liye hai — un CLIs ke liye key nahi. CLIs install karta hoon (network available hai) aur exact package names verify karta hoon:
+
+
+Thought 4 time(s), Ran 4 command(s)
+
+Teenon CLI installed ✓, headless modes ✓ (codex exec, opencode run, kilo run) — par koi credentials nahi. Pehle prompts + worktrees ready kar deta hoon:
+
+
+Thought 1 time(s), Ran 1 command(s)
+
+6 worktrees ready. Ab 3 alag-alag prompt files likhta hoon (ek per CLI):
+
+
+Edited 3 file(s), Performed 1 session actions, Thought 4 time(s)
+
+Task 1 (contract) land ho gaya. External CLIs ka status:
+
+
+Performed 1 session actions, Thought 3 time(s), Ran 2 command(s)
+
+Agent ne 3 API gaps pe ruk gaya (sahi kiya — par decision mere liye hai). Flex semantics CSS ke hisaab se theek karta hoon aur re-dispatch karta hoon:
+
+
+Performed 1 session actions, Thought 1 time(s), Ran 1 command(s)
+
+Superpowers ke hisaab se SDD skill load karta hoon (abhi review/merge phase aa raha hai):
+
+
+Edited 1 file(s), Performed 1 session actions, Read 1 skills
+
+Teen prompts ready hain, CLIs installed hain — bas ek cheez chahiye: credentials. Teeno CLIs ke paas 0 configured providers hain (codex login status → "Not logged in", opencode providers list / kilo auth list → 0 credentials).
+
+Ab tak ka board:
+
+Track	Task	Agent	Status
+A (/workspace/nt-a)	1 — contract package	mera subagent	retry running (3 API questions maine settle kar diye)
+B (/workspace/nt-b)	4 — CLI (doctor/create/test)	mera subagent	running
+C (/workspace/nt-c)	3 — RN/Expo interop spike	mera subagent	running
+D (/workspace/nt-d)	8 — @nativeangular/router	Codex	prompt ready, credential chahiye
+E (/workspace/nt-e)	5 — bundle + size budget + CI	OpenCode	prompt ready, credential chahiye
+F (/workspace/nt-f)	11 — native tree inspector	Kilo	prompt ready, credential chahiye
+Teeno prompts alag-alag hain aur har ek ke andar full context hai (worktree path, brief path, binding constraints — Angular 22.2.5 / TS 6.0.3 / AOT-only / zoneless / ɵ-confinement / MIT + trademark notice / strict-property-rule, RED→GREEN TDD evidence, report path). Har prompt mein do conflicts pre-solve kar diye hain: OpenCode aur Kilo ko packages/cli/src/commands.ts chhedne nahi hai (main merge pe wire karunga), aur Kilo ko @nativeangular/contract import nahi karna (woh abhi banta hai) — taaki 6 tracks ek saath collide na karein.
+
+Commit: b6d1f61 docs: separate prompts for Codex, OpenCode and Kilo Code — teeno files docs/prompts/m1-{codex,opencode,kilo}.md mein, aap apni machine pe bhi copy-paste chala sakte hain (codex exec, opencode run, kilo run — teeno headless modes yahan installed aur verified hain).
+
+
+Request user confirmation (Failed)
+
+11/12 02:40
+chalain background task laga dain.. main subah main dekhta hon then..
+11/12 02:35
+
+Processed 3m 12s
+Raat ka background poora chalu hai — subah aapko yeh milega:
+
+Landing (review in progress):
+
+Task 1 — contract package 4c47353 — @nativeangular/contract (10 element contracts, style table, value parsers, command protocol), 36 naye tests → 111 green, tsc -b exit 0. RED→GREEN + parser mutation-check dono prove kiye. 5 decisions implementer ne khud liye (2 published-type changes: FlexValue widened, StyleValueKind mein 'string' — reviewer adjudicate kar raha hai).
+Task 4 — CLI c4f034d — doctor / create / test, 14 naye tests → 89 green. 3 brief-bugs theek kiye (cwd bug, doctor vs check-toolchain disagreement, EISDIR template bug).
+Plan fix 2c1e1d8 — flex shorthand ab CSS-exact (flex: 1 = 1 1 0%, flex: 0 = 0 1 0%).
+Abhi background mein chal rahe hain (6 agents):
+
+Task	Track	Kaam
+1 + 4	A, B	reviewers chal rahe hain
+3	C	RN/Expo interop spike
+5	E	production bundle + 60 KB size budget + CI size job
+8	D	@nativeangular/router (native navigation stack)
+11	F	native tree inspector (self-contained HTML page — "visible proof")
+Har agent apne worktree mein hai, pnpm test green rakhkar commit karega; phir main review → fix → merge karunga. Ledger (survives compaction): /workspace/nativeangular/.superpowers/sdd/2026-11-12-nativeangular-m1-fabric-mvp/progress.md.
+
+Kilo/OpenCode/Codex ke baare mein: teenon CLIs install ho chuke hain (codex 0.167.1, opencode 1.19.5, kilocode 7.8.27), headless modes verify hain (codex exec, opencode run, kilo run) — par 0 credentials hain, isliye raat ko wahi teen kaam mere apne subagents ne pick kiye hain (same worktrees, same briefs). Prompts repo mein committed hain, so aap subah apni machine par bhi chala sakte hain — branches ready hain.
+
+Subah aapse 3 cheezein chahiye honi: (1) ek API key (agar teeno CLI yahin chalane hain — OpenRouter/OpenAI/MiniMax, teeno compatible hain), (2) ek Android phone ya iPhone (real Fabric build ke liye), (3) Android-first vs iOS-first ka faisla (M1 timeline ka sabse bada lever).
+
+m1-codex.md
+MD
+
+Open file
+
+m1-opencode.md
+MD
+
+Open file
+
+m1-kilo.md
+MD
+
+Open file
+
+11/12 02:44
+
+Processed 56s
+Task 3 (RN/Expo interop spike) land ho gaya — yeh raat ka sabse important finding hai:
+
+Spike ka answer: ek NativeAngular host jo React Native runtime nahi chalata, usse RN/Expo ecosystem ka kuch bhi consumable nahi hai — adapter chhota hai (3–22 lines), lekin asli cost runtime dependency hai.
+
+Measured module shapes (56 citations script-verified):
+
+expo-secure-store@58.0.3 — sirf imperative module, koi view nahi; handle ek JSI host object hai Expo runtime se bound → adapter ~15 lines par runtime chahiye hi chahiye
+expo-camera@58.0.14 — module plus view (iOS pe Fabric view, imperative API view-scoped) → adapter ~22 lines, do handles chahiye
+react-native-svg@15.16.1 — 29 Fabric components + 3 TurboModules → adapter ~3 lines par 29 components register karne hain
+Iska matlab: matrix ki row 1 "consumable" pe fail, row 2 "simple yes" pe fail → row 3 sahi hai. D11 (RN inheritance) jaan-boojh kar undecided rakha gaya — spec ko chhua nahi gaya, "RN runtime embed karna" ek open possibility ke roop mein likha gaya hai.
+
+Spec pe asar: §5.7 ka promise abhi "top-20 matrix, ≤30-line adapters" bolta hai — measurement ke baad woh galat framing hai (adapter sasta hai, runtime mehnga). Review ke baad §5.7 + D11 ko teen asli options ke around rewrite karna hai (RN runtime embed / first-party plugin ABI / har module natively dobara implement karna) aur M1.5 spike row ko yeh batana hoga ki ab usse kya prove karna hai.
+
+Baaki board ab: Task 1 (contract) + Task 4 (CLI) ke reviewers chal rahe hain, Task 5 (bundle + size budget), Task 8 (router), Task 11 (inspector) implement kar rahe hain, aur Task 3 ka reviewer ab fire hua.
+
+Ek cheez main flag kar raha hoon: Task 3 ne spike code packages/cli/src/expo/** mein rakha aur root build script badli — dono CLI track se merge pe collide karenge. Main merge time pe spike ko CLI package se bahar nikal dunga (reviewer isi par rule dega). Ledger sab record kar raha hai, subah ka board ek jagah milega.
+
+11/12 02:46
+
+Processed 2m 28s
+Raat ka loop chal raha hai — dono reviews aa gaye, dono ke 2-2 Important findings mile, fix rounds chal rahe hain.
+
+Task 1 — contract (4c47353): reviewer ne do asli precision-bugs pakde —
+
+flex: 1 1 ≠ flex: 1 — CSS dono ko 0% basis deta hai, code auto de raha tha (device par visible layout difference, aur koi test us form ko cover hi nahi karta tha)
+rotate ka kind length tha, par vocabulary mein angle unit hi nahi tha — backend rotate: 45deg express hi nahi kar sakta tha
+Mera decision: rotate hatane ke bajaye angle vocabulary add karo (Angle/ResolvedAngle/parseAngle(), deg+rad, StyleValueKind mein 'angle') — design spec §5.6 mein rotate v0.1 Transform group mein hai, toh property rehti hai, vocabulary missing thi.
+
+Task 4 — CLI (c4f034d): nativeangular test clean checkout par fail hota tha (AOT fixtures compile nahi hote, out/ gitignore hai) aur doctor/create galat directory resolve karte the (pnpm --filter ke baad cwd packages/cli ho jaata hai) → dono fix ho rahe hain.
+
+Ek reviewer finding galat tha — maine khud verify kiya: reviewer ne report kiya ki Task 4 ka commit plan se Task 11 ka 397-line section delete kar deta hai. Galat — mera diff base galat diya tha; git diff --stat 1847d86..feature/m1-track-b -- docs/superpowers/plans/ empty hai, commit ne plan ko chhua hi nahi. Fix brief mein ye fact likh diya hai taaki koi non-issue "fix" na kare.
+
+Plan sync (0a64b02): flex ka CSS-exact basis + uska spec case, angle vocabulary, StyleValueKind ke naye members, aur CLI ka test command — sab plan mein daal diye, taaki baaki tasks ye bugs wapas introduce na karein.
+
+Board ab: Task 1 + Task 4 → fix round 1 (parallel), Task 3 ka review chal raha hai, Task 5 (bundle + size budget), Task 8 (router), Task 11 (inspector) implement kar rahe hain. Sab ledger mein recorded hai — subah ek hi jagah poora board milega.
+
+11/12 02:49
+
+Processed 1m 41s
+Teen kaam raat ke andar land hue — do important, ek strategic.
+
+Task 11 — native tree inspector (ae09f02): visible proof ban gaya. Headless Chromium mein page sach mein render hota hai — an-root (ng-version "22.2.5") → an-view (class "root") → span (class "label") → text hello, aur browser ka request log mein sirf ek entry — page ka apna file:// URL (koi CDN, koi external script nahi). 93 tests green.
+
+The generated native tree inspector page
+
+Task 5 — production bundle + size budget (6d6162f): G6 ka seedha sawaal. Measured payload 90,210 B gzip hai, budget 60 KB ka — +46.8% over. Implementer ne budget move nahi kiya (check RED chhod diya, jo discipline hai). Number design spec ke apne baseline (90,438 B) ko 0.3% ke andar reproduce karta hai.
+
+Mera decision (reviewer ko bhi independent answer maanga hai, dono reconcile honge):
+
+60 KB reachable nahi hai — payload ka 95.3% @angular/core hai (199 KB Angular ka Ivy runtime), hum control nahi karte, aur koi supported slim-core build nahi hai
+Terser production bundle mein lo — spec pehle se "terser-class DCE" maangta hai, aur yeh esbuild ke upar −11.7% laata hai (79,696 B vs 90,210 B gzip)
+§11.1 ka hello-world budget 60 KB → 85 KB gzip re-baseline karo (measured 79.7 KB, ~6% headroom); ≤250 KB typical-app aur ≤500 KB native-code targets waise hi rehte hain. CI gate ab 85 KB enforce karega → permanently red nahi, par regression pakdega
+Yeh decision spec + plan dono mein measurement ke saath jaayega, aur subah board mein prominently rahega — aap override kar sakte hain.
+
+Baaki board: Task 1 + Task 4 fix rounds chal rahe hain, Task 5 + Task 11 ke reviewers chal rahe hain, Task 8 (router) implement kar raha hai, Task 3 (RN spike) ka review pending hai.
+
+nativeangular-tree.png
+nativeangular-tree.html
+HTML
+
+Open file
+
+11/12 02:52
+
+Processed 2m 30s
+Teen fix rounds + Task 8 ka review chal rahe hain. Raat ka status:
+
+Fix round 1 land ho gaya — Task 1 (contract) acc39c9:
+
+Flex basis ab CSS-exact (flex: 1 1 ≡ flex: 1 → 0%), naya spec case + mutation proof (basis unit wapas revert karne par exactly 1 test fail hota hai)
+Angle vocabulary add: Angle/ResolvedAngle/parseAngle (deg/rad), rotate ab kind: 'angle'
+FlexValue mein ${number}, NativeCommand par per-op semantics (backend ko ab pata chalega create + parentId attach karta hai, remove = detach-but-alive vs dispose = release), aur table guards (har defaultStyle key styleProperty() se resolve hona chahiye, 10/10 tag mappings pinned — flexDirectionn aur na-slotty par mutation-tested)
+116 tests green, tsc -b exit 0
+Task 4 (CLI) bb45b17: nativeangular test ab clean checkout par chalta hai — proof: fixtures/out delete karke pnpm vitest run fail (AOT fixtures are missing) vs pnpm nativeangular test compile karke 94/94 pass. INIT_CWD fallback dono commands mein (/tmp se create chala kar prove kiya), process.exitCode (pipe truncation fix), fileURLToPath.
+
+Task 8 (router) 4340008: 97 tests green. Concern: repo ke test pipeline mein Angular linker nahi hai, toh @angular/router runtime par load nahi hota — spec base class stub karta hai (API compatibility tsc -b enforce karta hai), aur provideNativeRouter ka DI-level runtime test nahi hai. Brief ka API text installed package ke against adapt kiya gaya (getState(), historyGo() added, canGoBack() override nahi hai kyunki installed LocationStrategy mein member hi nahi). Reviewer ko bola hai: yeh acceptable strategy hai ya nahi, aur koi test gap chahiye toh kaunsa.
+
+Task 3 review ne ek important pakda: matrix mein react-native-svg ke liye galat claim tha ("there is no module to call") — jabki package ke paas 3 TurboModules hain with 10 callable methods, aur woh khud ke deliverable se 17 lines door contradict kar raha tha. Headline verdict (row 3) sahi hai, par published matrix ka ek row galat tha. Fix round mein: claim theek, top-20 scope sentence theek (pool expo-* subset hai, 7 bundled packages absent hain), camera ki dual requirement model (expo-runtime aur fabric-registry — abhi sirf ek check tha, toh host ko galat signal jaata), aur citation-audit claim reproducible banaya.
+
+Mera structural decision: spike ab packages/cli/src/expo/ se nikal kar apne package mein jayega (packages/spike/expo-interop/) — warna CLI track land hone par wahi files do baar type-check hongi aur CLI package ka output emit karegi.
+
+Ledger ab saaf, poora aur 8 tasks ka state ek jagah — subah board isi se banega.
+
+11/12 02:57
+
+Processed 2m 52s
+Raat ka main kaam merge ho gaya — aur ek important correction bhi hua.
+
+M1 Task 1 (contract) aur Task 4 (CLI) — dono COMPLETE, merged (a35432c, c94f3e3). Dono ke re-review clean aaye: flex ka basis case load-bearing hai (revert karte hi exactly wahi test fail hota hai), angle vocabulary aur table guards asli guards hain (tautology nahi), CLI ka exit code propagate karta hai, pnpm test ki && short-circuit se fixture compile failure bhi fail karti hai. Merged tree: 17 spec files / 135 tests green, tsc -b exit 0.
+
+Mera budget decision REVERSED ho gaya — aur sahi tareeke se. Maine pehle kaha tha "60 KB impossible hai, 85 KB re-baseline kar do, terser lo". Task 5 ke reviewer ne ek experiment chalaaya jo sab badal deta hai:
+
+entry point	@angular/core bytes	gzip
+import { signal }	259,877	89,927
+import { InjectionToken }	259,877	89,923
+import { ElementRef }	259,877	89,971
+Payload app ke use par react nahi karta — pipeline framework runtime ko tree-shake hi nahi kar rahi. Aur reference: Angular 19 ka apna production build (router+http+forms — hamse zyada app) 56.74 KB gzip hai. Toh 90 KB koi Angular floor nahi, pipeline defect hai — missing linker + optimizer, jo §11.1 mein likha hi hai.
+
+Naya decision: 60 KB target rehta hai (reachable hai), bundle tree-shaking laao (acceptance test: do alag entry points → alag @angular/core contribution, warna task done nahi), CI gate ratchet banega (baseline 90,210 B, 2026-11-11, 92 KB enforce + continue-on-error is milestone mein), aur §11.1 gap ko "pipeline defect" label karega. Agar tree-shaken bundle 60 KB ke andar aaya, gate wahi tighten ho jayega. Mere pehle wale proposal mein G6 chupke se retire ho raha tha — yeh sahi catch hai.
+
+Task 11 ke review ne 3 Important pakde: commit ke baad bhi koi entry point page bana hi nahi sakta (inspectApp exists, par koi call nahi karta — wiring mein tsconfig project reference bhi chahiye, sirf dependency nahi), self-containment test sirf http:///https:// rokta hai (external stylesheet ya web font pass ho jayega), aur page ka elements fact galat hai (1 dikha raha hai, tree mein 3 hain). Teeno fix round mein ja rahe hain, saath mein inspect command bhi add hoga.
+
+Ab chal raha hai: Task 5 ka tree-shaking round, Task 11 ka inspect round, Task 3 ka matrix-fix round, Task 8 ka review. Ledger saaf hai — 8 tasks ka poora state ek jagah, do complete+merged, do fix round mein, do review mein.
+
+11/12 03:00
+agy --conversation=dbc9d07b-32f0-4396-a565-9618c5fd8f3a
+11/12 03:05
+
+Processed 2m 2s
+agy ki baat clear kar deta hoon: woh command is environment mein exist hi nahi karta — agy binary PATH par nahi hai, aur dbc9d07b-32f0-4396-a565-9618c5fd8f3a is platform mein kisi session ya drive file se match nahi karta (session not found + drive ne bhi reject kiya). Mera apna session 462247151624595 hai; subagent sessions ke alag UUIDs hain (jaise Task 8 ka fix round 3f774944-0b30-40d3-b0e8-29dc0cbaae6d hai). Agar aap kisi specific conversation ka content dekhna chahte hain, toh uska id ya title batayein — main us session ko padh sakta hoon. Ya agar agy se koi kaam karwana tha, toh batayein kya karna hai, main yahin kar dunga.
+
+Ab raat ka poora board:
+
+Complete + merged (integration branch feature/m1-fabric-mvp):
+
+Task 1 — @nativeangular/contract (merged a35432c): 10 element contracts, style table, value parsers (CSS-exact flex, naya angle vocabulary), command protocol with per-op semantics, table guards. 41 contract tests.
+Task 4 — @nativeangular/cli (merged c94f3e3): doctor/create/test, clean-checkout-safe, caller-directory-aware.
+Merged tree: 17 spec files / 135 tests green, tsc -b exit 0.
+Fix round mein chal rahe hain (4):
+
+Task 5 (bundle) — tree-shaking ka kaam: linker/optimizer pipeline, aur acceptance test = do alag entry points → alag @angular/core contribution (abhi identical hai, isliye payload app ke use par react nahi karta). CI gate ratchet banega (baseline 90,210 B, 92 KB enforce, continue-on-error is milestone mein), 60 KB target rehta hai.
+Task 11 (inspector) — inspect command + tsconfig reference + strong self-containment guards + sahi elements count.
+Task 3 (RN spike) — matrix ka galat react-native-svg row theek, scope sentence theek, camera ki dual requirement model, spike apne package mein.
+Task 8 (router) — abhi dispatch kiya: DI seam ka test (provider order galat hua to suite laal ho), native command rejections ka error sink, aur platform ka appProviders hook (reviewer ne pakda ki aaj provideNativeRouter ke providers install hi nahi ho sakte — router package bina uske inert hai).
+Baaki pending (subah ka next wave): Task 2 (renderer + conformance suite — M1 ka asli keystone), Task 6 (dev server + incremental AOT), Task 7 (Swift/Kotlin Fabric), Task 9 (sample app + perf gates), Task 10 (publish-ready packages).
+
+Aapse 3 decisions abhi chahiye:
+
+Budget — mera purana call (85 KB re-baseline) ulta ho gaya, reviewer ke evidence se. Ab: 60 KB target + pipeline fix + ratchet. Aap override karna chahein toh bataiye.
+Android-first vs iOS-first — Task 7 ka order ispe tay hota hai (timeline ka sabse bada lever, ~−35% time).
+API key (teeno CLI chalaane ke liye) + ek real device (Fabric build + perf gates ke liye).
+11/12 03:08
+
+Processed 1m 37s
+Teen fix rounds ab complete hain — do re-review chal rahe hain.
+
+Task 11 — inspector (63ec86d): ab page khud bana sakta hai. pnpm nativeangular inspect end-to-end kaam karta hai — ek self-contained nativeangular-tree.html (2,354 bytes), aur maine khud verify kiya: file mein 0 occurrences of http ✓. Page dikhata hai an-root → an-view → span → "hello", aur elements fact ab sahi hai — 3 (pehle 1 galat tha).
+
+Self-containment ab enforced hai, sirf claim nahi: assertSelfContained / findSelfContainmentViolations export hote hain aur inspectApp likhne se pehle chalate hain — paanch rule classes reject hote hain (external resource tags, CSS url(/@import/@font-face, src=/href=, absolute URL, protocol-relative URL), aur negative case (CDN stylesheet + web font + image) test mein daala hai, saath hi compiled AOT fixture par naya e2e spec.
+
+NativeAngular native tree inspector — elements 3
+
+Task 3 — RN spike (e2be5ed): galat row theek — react-native-svg ke paas 29 Fabric components aur 3 RN TurboModules hain (10 methods), "nothing to call" hat gaya, adapter size ab "not measured for the callable surface" (3 lines sirf component registration ke hain). Headline verdict aur D11 unchanged ✓. Camera ki dual requirement model hui, top-20 scope sentence theek, citation checker ab commit hai: 68 citations resolved, 0 unresolved. Spike apne package mein (packages/spike/expo-interop/), one build path (tsc -b), guard ne planted @angular/platform-browser import par fail prove kiya.
+
+Do wiring gaps jo main fix karunga (flatten decision): spike nested hai toh pnpm workspace glob (packages/*) use include nahi karta, aur root vitest.config.ts packages/*/*/src tak nahi pahunchta — matlab bare pnpm vitest run par spike ke tests chalti hi nahi. Spike ko packages/spike/ par flatten karunga: ek workspace glob, ek vitest project, ek guard glob, aur root test script wapas single vitest run (jo Task 5 ke root-package.json edit se conflict bhi kam karega).
+
+Board: Task 5 (tree-shaking) aur Task 8 (router DI seam) fix rounds chal rahe hain, Task 3 + Task 11 ke re-reviews chal rahe hain. Merged tree abhi 135 tests green hai (contract + CLI merged); spike, inspector, router, bundle merge hone se yeh badhega.
+
+11/12 03:12
+
+Processed 1m 4s
+Task 3 ka re-review clean tha — sab findings addressed, reviewer ne khud citation checker dobara chalaya (68 resolved, 0 unresolved) aur guard ka planted-import failure bhi reproduce kiya.
+
+Jo bacha tha woh structural tha, aur maine usse "ek jagah" wala shape diya. Spike do level deep tha (packages/spike/expo-interop/), isliye teen divergences the: pnpm workspace glob use include nahi karta tha (spike installed member hi nahi tha), root vitest config packages/*/*/src tak nahi pahunchta tha (matlab bare pnpm vitest run par spike ke 25 tests chalti hi nahi the), aur root test script ko do vitest projects chalane ke liye badalna pada tha — jo Task 5 ke root-package.json edit se merge pe collide karega.
+
+Fix round 2 ab chal raha hai: spike ko packages/spike/ par flatten kar raha hoon → workspace glob bina badle use cover karega (real installed member banega), vitest include bina badle specs cover karega (ek vitest project, sab tests), root test script wapas single vitest run (merge conflict khatam), aur guard glob packages/*/src par wapas. Saath mein teen substantive minors: spike ka tsconfig spec files dist/ mein compile kar raha tha (theek kiya jayega), matrix ki omission sentence kam bol rahi thi (sab seven omitted packages rows 18–20 se upar hain, aur react-dom SDK-58 bundle mein #1 hota — sentence theek ho rahi hai), aur Transport ka legacy-bridge member sirf synthetic test mein use ho raha tha.
+
+Maine plan bhi sync kar diya (bc5017b) — ab woh stale packages/cli/src/expo/ path aur purana "Consumable?" column nahi dikhata.
+
+Board: Task 5 (tree-shaking) + Task 8 (router DI seam) fix rounds chal rahe hain, Task 11 ka re-review chal raha hai, Task 3 ka round 2 chal raha hai. Task 3 aur Task 11 ke re-review clean aane par main unhe merge karunga, phir Task 2 (renderer + conformance suite) launch hoga — M1 ka asli keystone, kyunki contract ab ready hai.
+
+11/12 03:15
+
+Processed 1m 1s
+Task 11 ka re-review bhi clean — sab findings addressed, reviewer ne khud guard ko real page (CLEAN) aur 5 attack shapes par (sab rejected) chalaya, inspect command ko /tmp se chalaya (cwd-independent ✓), aur elements 3 confirmed.
+
+Do cheezein ab meri hain (integration ka kaam):
+
+CLI README mein inspect row + build row + stale "the build and dev commands ship with the bundler" sentence — dono tracks merge ke baad ek integration task mein fix hoga.
+Merge conflict predict ho gaya: Task 5 build ko same array-end par append karta hai jahan Task 11 ne inspect kiya, wahi assertion line rewrite karta hai, aur packages/cli/tsconfig.json ka wahi include line — teen files conflict, aur merged assertion hoga ['doctor','create','test','build','inspect']. Main ye merge khud resolve karunga (integration ka kaam hai, fix nahi).
+Ek latent trap fix karwa raha hoon (round 2): guard poora document scan karta hai, toh jis node ka text mein https://… ho (ya attribute mein href="#id" / data: URI), inspectApp throw karke koi page hi nahi likhta. Ye M1 ke flagship feature ka asli khatra hai — real apps mein URLs hote hain, aur escaped text toh inert hai hi. Naya rule: guard markup aur CSS ko police karega (external tags, bahar point karne wale resource attributes, CSS url(/@import/@font-face, absolute/protocol-relative URLs markup aur CSS positions mein), aur escaped text, fragments aur data: URIs ko chhod dega — par fail closed rahega (asli external resource wala page reject hoga, file nahi likhi jayegi). Saath hi missing fixture par raw stack trace ki jagah actionable message.
+
+Board: Task 5 (tree-shaking), Task 8 (router DI seam) fix rounds + Task 3 (flatten), Task 11 (guard) round 2 — chaaron parallel chal rahe hain. Jaise hi ye land honge: merge → integration task (CLI README + merged command table) → Task 2: renderer + conformance suite (M1 ka asli keystone, contract ab ready hai).
+
+11/12 03:16
+
+Processed 1m 14s
+Yehi raat ki sabse badi win hai. Bundle fix ne size ko 90,210 B → 14,831 B gzip kar diya — 6.1× chhota, aur 60 KB budget ka sirf 24%:
+
+pehle	ab
+total raw	272,798 B	41,735 B
+total gzip	90,210 B	14,831 B
+@angular/core	259,877 B	41,046 B
+rxjs	10,995 B	0 B
+Aur sabse important: payload ab app ke use par react karta hai — signal → 10,827 B, InjectionToken → 8,497 B, ElementRef → 10,485 B. Pehle teeno byte-identical 259,877 B the (yahi wo invariant tha jo reviewer ne pakda tha, aur isi ne task ko rok diya tha). Naya acceptance test purane bundler par fail hota hai (expected 259877 not to be 259877) ✓ — gate asal mein load-bearing hai.
+
+Root cause ab record mein hai: @angular/core ke fesm2022 top-level statements "pure" marked nahi hote, toh esbuild poora Ivy runtime retain kar leta hai; fix hai Angular ka apna transformer (linker + advanced optimizations) ek esbuild plugin ke through.
+
+Iska matlab: G6 ka JS payload ab comfortably met hai — 92 KB ratchet ki zaroorat hi nahi, gate asli 60 KB target enforce karega. §11.1 mein naya number (14,831 B, dated) aur "90 KB pipeline defect tha, Angular floor nahi" ka note jayega.
+
+Round 2 mein teen decisions: (1) continue-on-error: true hatao — ab gate ko sach mein block karna chahiye; (2) supported build path prefer karo — public @angular/compiler-cli/linker/babel + terser, aur @angular/build/private (jo Angular "not supported for external use" kehta hai) sirf tab rakho jab public path shake na reproduce kare — us case mein risk documented + ek test jo import resolve na ho toh loudly fail kare; (3) heavy dependency (@angular/build → vite/sass/rolldown/piscina) lazily import ho, taaki doctor/create/inspect uska weight na uthayein.
+
+Board: Task 5 round 2, Task 8 round 1, Task 3 round 2 (flatten), Task 11 round 2 (guard) — chaaron parallel. Ye chaar land hote hi merge + integration (CLI README + merged command table) + Task 2: renderer + conformance suite.
+
+11/12 03:18
+
+Processed 1m 3s
+Do aur tracks land — dono ke re-review chal rahe hain.
+
+Task 3 — spike flatten (29a3331): ab packages/spike/ par hai aur wo installed workspace member ban gaya (pnpm install --frozen-lockfile → "Scope: all 5 workspace projects", lockfile me packages/spike: {}) — pnpm-workspace.yaml aur root vitest.config.ts ko chhua hi nahi. Ab ek hi vitest project sab chalata hai: 11 files / 100 tests (spike ke 25 ab root project ke andar hain) — toh bare pnpm vitest run bhi unhe chala deta hai, aur root test script CLI track se collide nahi karti. Guard glob packages/*/src par wapas, planted @angular/platform-browser import par fail prove kiya ✓. Spec files ab dist/ me emit nahi hotin (tsconfig.spec.json + noEmit ke saath type-check hoti hain) ✓.
+
+Task 8 — router DI seam (e50a99b): ab wo gap band hai jo reviewer ne sabse important bataya tha. Ek assertion poori bridge pin karti hai: injector.get(LocationStrategy) → NativeLocationStrategy instance ✓ — aur wo load-bearing hai: hamara provider provideRouter ke aage shift karte hi test fail hota hai (expected StubPathLocationStrategy{} to be an instance of NativeLocationStrategy, 1 failed / 17 passed), order restore karte hi pass ✓. Saath hi platform ka appProviders hook bana — router ab sach mein install ho sakta hai (do platform tests: plain provider + EnvironmentProviders, dono appRef.injector se resolve hote hain), aur one-platform-per-realm rule chhua nahi gaya. 109 tests green.
+
+Maine plan bhi sync kiya (d1ab209) — spike ka path ab plan aur code dono mein ek jaisa hai.
+
+Board: Task 5 round 2 (supported build path + blocking gate) aur Task 11 round 2 (guard narrowing) implement ho rahe hain, Task 3 aur Task 8 ke re-reviews chal rahe hain. Ye chaar land hote hi: merge + integration task (CLI README, platform README ka stale line, merged command table ['doctor','create','test','build','inspect']) → phir Task 2: renderer + conformance suite — M1 ka asli keystone, contract ab fully ready hai.
+
+11/12 03:22
+
+Processed 34s
+Task 11 ka round 2 land — guard ab sahi jagah police karta hai, aur wo load-bearing hai.
+
+Pehle: guard poora document scan karta tha → kisi bhi text node mein https:// hone par page banta hi nahi tha. Ab: guard page ko markup / CSS / text regions mein scan karta hai —
+
+accept karta hai: escaped text mein URL, href="#fragment", data: URI
+reject karta hai: external resource tags (capitalised <IMG SRC=…> samet), bahar point karne wale resource attributes, CSS url(/@import/@font-face (<style> block aur inline style dono mein), markup/CSS positions mein absolute aur protocol-relative URLs
+Proof: purana guard naye tests mein se 3 ko fail karta hai, aur paanchon rules mein se ek-ek disable karne par uska negative test fail ho jaata hai — yaani har rule asal mein gate karta hai. Fail closed bhi confirmed: inspectApp ab writeInspectorPage() se likhta hai jo file banane se pehle assertSelfContained chalata hai → reject hua page toh file bhi nahi banti.
+
+Missing fixture par ab raw stack trace ki jagah: No compiled AOT fixture at <abs path> + Build it first: pnpm run compile:fixtures, exit 1 ✓. 109 tests green, page abhi bhi 2,354 bytes aur elements 3 ✓.
+
+Board: 4 background agents chal rahe hain — Task 5 round 2 (supported build path + blocking gate), aur Task 3 round 2, Task 8 round 1, Task 11 round 2 ke re-reviews. Ye teen re-review clean aate hi main Task 3, 8, 11 merge kar dunga, phir Task 5 ke baad integration task (merged command table ['doctor','create','test','build','inspect'], CLI README ke rows, platform README ka stale line, CLI error-message ka test) — aur uske baad Task 2: renderer + conformance suite, jo M1 ka asli keystone hai.
+
+11/12 03:23
+
+Processed 45s
+Task 8 ka re-review sab findings par clean tha — par usne ek baat pakdi jo maine turant fix karwana shuru kiya, aur yeh isi review loop ki asli value hai:
+
+Test ek fictional scenario test kar raha tha. Reviewer ne installed package ke against verify kiya: provideRouter@22.2.5 toh LocationStrategy contribute hi nahi karta (_router_module-chunk.mjs:1622-1639). Jo shape PathLocationStrategy deta hai wo hai RouterModule.forRoot / withHashLocation(). Iska matlab do cheezein galat thin:
+
+Code comment ka reason galat tha ("provideRouter Angular ka PathLocationStrategy install karta hai…") — asli competitor hai @angular/common ka root-scoped LocationStrategy jo parent injector mein hota hai
+Test order ko ek fiction ke against prove kar raha tha — mock ek contribution banata jo real provideRouter kabhi nahi karta, aur uska parent injector (Injector.create({providers: []})) scopes ke bina hai toh real root-scoped provider ko dekh bhi nahi sakta
+Production me hamara provider jeetta hai — lekin alag wajah se: platform ka application injector root-scoped hai (providers.ts:46-48 → angular-internals.ts:53-55), toh Location wahin banti hai aur parent root ka LocationStrategy resolve hi nahi hota.
+
+Round 2 me: test ab asli competition model karega — parent injector root scope par LocationStrategy de, child environment injector apna de, child jeete, aur parent ka resolution stub hi rahe. Load-bearing proof bhi badal gaya: ab "hamara provider child se hata do ⇒ parent wala jeete" (order-shuffle nahi). Code comment aur README ka injector table dono reason ke saath theek honge.
+
+Teen consistency fixes bhi: fire() Promise maanta hai (bridge ke undefined return par ab synchronous TypeError — tolerate karo), README ka provideNativeAngular(backend) row galat hai (wo EnvironmentProviders deta hai jo app application level par install kar sakta hai, platform ka DOCUMENT/RendererFactory2 shadow kar sakta hai — bilkul ulta claim tha), aur Location.forward() abhi bhi current URL push karta hai (wahi duplicate-page behaviour jo round 1 ne historyGo(+n) se hataya tha).
+
+Board: Task 5 round 2 + Task 8 round 2 implement ho rahe hain; Task 3 round 2 aur Task 11 round 2 ke re-reviews chal rahe hain. Ye clean aate hi merge + integration + Task 2 (renderer + conformance suite).
+
+11/12 03:26
+
+Processed 3m 21s
+Task 3 complete aur merged (c6cba46). Re-review ne har cheez khud verify ki — throwaway copy me, checkout ko haath nahi lagaya: pnpm list -r → 5 workspace projects (spike ab sach me installed member hai), bare npx vitest run → 11 files / 100 tests (spike ke 25 bhi andar ✓), narrowed guard ab bhi bite karta hai (planted @angular/platform-browser import → exit 1 ✓), spec project program me hai (tsc -b --dry lists it), dist/ me koi spec artefact nahi, aur planted const wrong: string = 42 par tsc -b exit 2 deta hai — yaani specs check hoti hain, emit nahi hoti ✓.
+
+Merged tree ab: 19 spec files / 160 tests green, tsc -b exit 0, citation checker green. Sirf ek conflict tha — root tsconfig.json ka references array — dono sides ka union resolve kiya (core, contract, platform, testing, cli, spike, spike/tsconfig.spec.json).
+
+Board: Task 5 round 2 (supported build path + blocking gate) aur Task 8 round 2 (asli seam test) implement ho rahe hain, Task 11 round 2 ka re-review chal raha hai. Task 11 clean aate hi wo merge hoga, phir Task 5 ke baad integration task — merged command table ['doctor','create','test','build','inspect'], CLI README ke rows, platform README ka stale line, CLI error-message ka test — aur uske turant baad Task 2: renderer + conformance suite (M1 ka asli keystone; contract, platform aur testing teeno ab ready hain).
+
+Raat ka net: 3 tasks complete + merged (contract, CLI, RN spike), 3 tasks fix rounds ke last stage par (bundle, router, inspector) — aur bundle ka size result (90 KB → 14.8 KB gzip) G6 ko comfortably andar le aaya.
+
+11/12 03:30
+
+Processed 1m 53s
+Teenon fix rounds land, Task 11 complete + merged (8f3fe28) — merged tree ab 22 spec files / 180 tests green, tsc -b exit 0.
+
+Task 5 — public path test hua, aur fail hua (sahi tarike se). Maine kaha tha "public linker prefer karo" — implementer ne actually try kiya: @angular/compiler-cli/linker/babel + esbuild + terser → sirf 227,926 B / 75,299 B gzip (budget se +22.6% over). Yaani public path shake reproduce hi nahi kar sakta — "advanced optimizations" private hain. Toh ship hua @angular/build/private (exactly 22.2.5 par pinned), wahi 41,735 B / 14,831 B gzip, aur unsupported-path ka risk documented + ek loud test jo import resolve na ho to fail karega. Gate ab blocking hai — continue-on-error hata diya; budget cross / bundle missing / metafile me @angular/compiler ya zone.js → exit 1 ✓. Aur heavy toolchain lazy: module-trace proof ke saath doctor ab ~215 ms mein start hota hai (pehle ~3.6 s).
+
+Task 11 ka re-review: 35 crafted pages chala kar — text URL///host/#frag/data: → ACCEPT; uppercase/unquoted/whitespace <IMG SRC=…>, <link href="//cdn…">, CSS url()/@import/@font-face (dono <style> aur inline style) → REJECT. Har bypass attempt pakda gaya (case, src = "…", quotes, unquoted, <img/src=…>, newline, &#104;ttps://, srcset, xlink:href, unterminated quote) ✓. Do residuals park kiye: data: exemption scheme-prefix only hai (inert until click, aur page attributes ko escaped text chips ki tarah render karta hai), aur URL rules har attribute value par lagte hain (conservative).
+
+Task 8 — seam test ab sach model karta hai: parent injector me @angular/common ka root-scoped browser LocationStrategy, child me hamara NativeLocationStrategy → child jeeta, parent ka resolution stub hi raha ✓. Load-bearing proof: child se hamara provider hatate hi test fail (expected StubRootLocationStrategy{} to be an instance of NativeLocationStrategy) ✓. Reason bhi theek ho gaya (code + README dono). Saath fire() non-Promise tolerate karta hai, forward() ab go(1) se replay karta hai (duplicate push nahi), README ka provideNativeAngular(backend) row corrected.
+
+Ab chal raha hai: Task 5 aur Task 8 ke round-2 re-reviews. Wo clean aate hi Task 5 merge → integration task (merged command table, CLI README ke rows + 28 MB install cost, platform README ka stale line, CLI error-message ka test) → Task 2: renderer + conformance suite.
+
+11/12 03:35
+
+Processed 1m 14s
+Task 5 ka round 2 goal met — aur usne mere "public path prefer karo" decision ko evidence ke against confirm kiya, jo main chahta tha (decision guess nahi, measure):
+
+Public path fail kyun hota hai (deep chain): @angular/compiler-cli@22.2.5 mein kahin advancedOptimizations symbol nahi hai — PURE annotations @angular/build/src/tools/oxc/oxc-transform.js mein hain. Matlab linker framework ke top-level statements ko pure mark hi nahi kar sakta, toh terser sirf retained runtime ko compress kar sakta hai (227,926 B raw vs 41,735 B shipped = bilkul "runtime not shaken" ka signature). Aur jo package historically yeh pass hold karta tha (@angular-devkit/build-optimizer) wo deprecated hai ("should not be used", last published 0.1302.1) aur store mein hai hi nahi → Angular 22 ke liye koi maintained public route exist hi nahi karta. Toh pinned private path sahi call hai — risk documented, exact pin asserted, aur ek loud test jo export resolve na ho to fail karega (Angular ka apna "not supported for external use" quote uske private.d.ts se).
+
+Gate ab sach mein blocking ✓: continue-on-error job aur step dono level par nahi; missing bundle / missing metafile / forbidden @angular/compiler/zone.js input / over budget → chaaron exit 1; budget ka single source of truth packages/cli/src/budgets.json (CLI aur gate dono padhte hain) ✓.
+
+Par ek naya regression mila — aur maine turant round 3 bheja: async factory !transformer check karke await import(...) pe yield karti hai, aur esbuild onLoad ko concurrently call karta hai → har first-wave call guard se guzar ke apna JavaScriptTransformer banata hai (har ek apna Piscina pool). Measured: 14 concurrent files → 14 instances (round 1 ke synchronous shape mein 1 tha). Bundle bytes aur gate safe hain, par build time 3.9 s → 11.8 s. Fix: in-flight promise ko memoize karna (resolved value ko nahi) → ek instance, ek pool, aur load-bearing test (14 concurrent calls → 1 construction). Saath hi ek nit: startup spec repo root mein scratch dir likhta tha → ab OS temp dir.
+
+Board: Task 5 round 3 + Task 8 round 2 ka re-review chal rahe hain. Task 5 merge hote hi → integration task (merged command table ['doctor','create','test','build','inspect'], CLI README mein build row + 28 MB install cost + lazy-loading promise, platform README ka stale line, CLI error-message ka test) → Task 2: renderer + conformance suite.
+
+11/12 03:44
+
+Processed 49s
+Task 5 ka round 3 regression band gaya, aur numbers saaf hain:
+
+pehle (14 transformers)	ab (1 transformer)
+14 concurrent files → instances	14	1
+build time (same 14 files)	11.7 s	3.9 s
+bundle size	41,735 / 14,831	unchanged ✓
+Memoization ab in-flight promise par hai (resolved value par nahi) — toh esbuild ke concurrent onLoad calls ek hi construction aur ek hi Piscina pool share karte hain. Test load-bearing hai: purana !transformer + await shape wapas daalne par 14 aur 13 instances ke saath fail hota hai ✓. Nait bhi fix hua — startup spec ab repo root nahi, os.tmpdir() likhta hai (cleanup finally me) ✓. 117 tests green, tsc -b/bundle:fixtures/gate sab exit 0 ✓.
+
+Ab: Task 5 round 3 ka re-review + Task 8 round 2 ka re-review chal rahe hain. Dono clean aate hi → Task 5 + Task 8 merge → integration task (merged command table ['doctor','create','test','build','inspect'], CLI README ke rows + 28 MB install cost + lazy-loading promise, platform README ka stale line, CLI error-message ka test) → phir Task 2: renderer + conformance suite, jo M1 ka asli keystone hai — contract, platform, testing, CLI teeno ab merged aur tested hain.
+
+Raat ka shape: 3 tasks merged (contract, CLI, RN spike), inspector merged (4th), bundle aur router final re-review par. Ek baat worth noting: is poore loop mein har "green" merge ke peeche ek measurable proof tha — 68 citations resolve, 14 vs 1 transformer, 14,831 B gzip, 35 crafted pages, 160→180 tests — koi bhi cheez "lagta hai theek hai" par ship nahi hui.
+
+11/12 03:53
+
+Processed 4m 49s
+Task 5 complete + merged (c839f55) — aur merge ne ek cheez pakdi jo kisi bhi alag track ko nahi dikh sakti thi.
+
+Merge-resolution correction: startup spec ka forbidden-module pattern @angular/compiler ke liye pnpm ke peer-suffix directory name ko match kar raha tha (.pnpm/@angular+core@22.2.5_@angular+compiler@22.2.5_…) — yaani inspect command ke add hote hi wo @angular/core ke apne path par false-positive fail ho gaya. Pattern ab package directory ko match karta hai, aur integration task uska positive/negative control test bhi likh raha hai.
+
+Merged tree ab: 27 spec files / 208 tests green, tsc -b exit 0, gate exit 0 → 41,735 B raw / 14,831 B gzip (budget 61,440 B, rxjs 0 B), aur @angular/compiler/zone.js 0 B in the bundle ✓.
+
+Round 3 ka re-review bhi deep tha: memoization mein koi await guard aur assignment ke beech nahi hai (koi doosra caller guard cross nahi kar sakta), rejection handler consumers ke reaction se pehle register hota hai (toh failed construction cache se clear hota hai aur next build retry karta hai, rejection inherit nahi karta), test new Set(instances).size === 1 se distinct instances dekhta hai (counter nahi — drift ho hi nahi sakta), aur build-time premise installed source se confirm hua (JavaScriptTransformer constructor eagerly WorkerPool extends Piscina banata hai → 14 pools CPU oversubscribe karte the). Teen LOW findings ledger me parked (counter accuracy + test seam jo production export hai).
+
+Ab: Task 12 (integration) merged tree par chal raha hai — CLI README ke paanch commands + 28 MB install cost + lazy-loading + budget enforcement, platform README ka stale line, missing-fixture message ka CLI-level test, aur pattern ka self-test. Task 8 ka round-2 re-review bhi chal raha hai; wo clean aate hi router merge hoga.
+
+Raat ka net ab: 5 tracks merged (contract, CLI, RN spike, inspector, bundle), router bas ek re-review door, integration task chal raha hai. Uske baad Task 2: renderer + conformance suite — M1 ka asli keystone.
+
+11/12 03:59
+
+Processed 1m 24s
+Task 8 bhi complete — aur uska rationale ab installed packages ke against verify ho chuka hai: LocationStrategy ɵprov providedIn:'root' hai, provideRouter sirf ROUTES/ActivatedRoute/APP_BOOTSTRAP_LISTENER deta hai (koi LocationStrategy nahi), PathLocationStrategy sirf RouterModule.forRoot/withHashLocation se aata hai, aur platform ka application injector root-scoped hai — toh Location wahan banti hai aur strategy wahan se inject hoti hai, jahan hamari explicit record jeetti hai. Reviewer ne mutant khud reproduce kiya (child se hamara provider hatate hi parent ka stub jeetta) ✓.
+
+Ek residual limitation park ki, wajah ke saath: test ab "child-explicit beats parent-explicit" prove karta hai, "explicit beats root-def inside one root-scoped injector" nahi — woh modelling ɵ API maangti (jo sirf platform ki ek file me allowed hai) aur Angular linker (jo test pipeline me abhi nahi hai). Reviewer ne ise mitigated judge kiya (mock ab real provideRouter jaisa hai, hierarchy production jaisi hai) aur implementation khud sahi hai. Ye M2 me linker aate hi band ho sakta hai.
+
+Ek operational lesson: Task 8 ka merge refuse ho gaya kyunki integration task usi worktree me chal raha tha (meri galti — use integration worktree diya tha). Git ne sahi kiya: kaam overwrite nahi kiya, index me sirf Task 12 ka staged work tha, router ka koi hissa nahi. Merge Task 12 ke commit ke baad karega.
+
+Board ab: Task 12 (integration) chal raha hai — usne CLI README ke paanch commands + install cost + lazy-loading + budget enforcement likhe, platform README fix kiya, missing-fixture ka CLI test add kiya, startup spec ke pattern ka self-test add kiya, aur packages/platform/src/bootstrap.ts bhi badla hai (mere brief me nahi tha — report me dekhunga; brief ke mutabik use "defect mile to report karo, fix mat karo" bola tha). Task 8 ka merge uske baad. Phir Task 2: renderer + conformance suite — M1 ka asli keystone, jiske liye contract + platform + testing + CLI chaaron ab merged aur tested hain.
+
+11/12 04:08
+
+Processed 4m 12s
+Task 8 merged (70a7ad8) — router ab M1 ka hissa hai. Merged tree: 28 spec files / 234 tests green, tsc -b exit 0.
+
+Task 12 (integration) ne ek bohot sahi judgement liya: uska brief kehta tha "platform README fix karo — appProviders document karo", par merged tree par appProviders exist hi nahi karta tha (wo router track mein hi tha, abhi merge nahi hua tha). Agent ne README me ek naamumkin option likh diya hota toh README jhooth bolta. Uski choice: wo exactly wahi already-authorised change apply kiya jo router track ki thi (byte-identical → baad ka merge un files ke liye no-op) + uske do tests. Reviewer is deviation par rule de raha hai.
+
+Do defects mile aur park hue (sahi): create directory name sanitize nahi karta, aur app template abhi bhi nativeangular dev / build android|ios / @nativeangular/fabric refer karta hai — jo abhi exist nahi karte (baad ke tasks hain).
+
+Ab sabse important: Task 2 dispatch ho gaya — renderer + conformance suite (M1 ka keystone). Brief 845 lines, 11 steps: SPI extend → failing renderer spec → element renderer → conformance suite → fake backend ka factory SPI → suite ko fake pe chalana → suite ke "danton" ko prove karna (mutation-test) → export → commit. Dispatch me maine implementer ko bataya ki plan pehle ke tracks se likha gaya hai, toh jaha disagree kare shipped code jeeta — aur list kiya kya kya ship ho chuka hai (contract ke exports, CSS-exact flex, angle vocabulary, SPI ke text/comment handles, measured F4–F10 renderer contract, na- prefix). Aur sabse important: conformance suite ka "teeth" proof — fake backend ki 5 galtiyan inject karke dikhana ki suite har ek par fail hoti hai. Yehi cheez har backend (Swift/Kotlin M1, Rust M3) ko guarantee degi.
+
+Board: 6 tracks merged hain (contract, CLI, RN spike, inspector, bundle, router) + integration task review me; Task 2 implement ho raha hai. Bache: Task 6 (dev server + incremental AOT), Task 7 (Swift/Kotlin Fabric — device chahiye), Task 9 (sample app + perf gates), Task 10 (publish-ready). Aapse abhi bhi wahi 3 decisions chahiye: budget (60 KB raha hai, pipeline fix ho gaya — override karna ho toh bataiye), Android-first vs iOS-first, aur API key + ek real device.
+
+11/12 04:12
+
+Processed 2m 7s
+Task 12 Approved — 0 Critical, 0 Important, 6 Minor. Reviewer ne har README claim ko us code se cross-check kiya (command behaviours, budget numbers, CI ke teeno blocking conditions, single-source budget file, trademark notice), aur missing-fixture test ka "condition banata hai, simulate nahi karta" confirm kiya.
+
+Deviation bhi sahi nikla: reviewer ne byte-identity git blob indices se verify ki (dono review packages me bootstrap.ts ke blob 8546a30..318e948 same) — blob index content hash hai, toh post-image track-D se byte-identical hai, aur router merge un files ke liye sach me no-op tha ✓.
+
+6 minors ko park nahi kiya — Task 13 bana diya, kyunki sab shipped CLI surface ki accuracy problems hain (README aur help string code se zyada claim karte hain), aur ek behaviour bug bhi mila: inspect output process.cwd() se resolve karta tha jabki baaki chaaron commands INIT_CWD ?? process.cwd() use karte hain → ab inspect bhi caller-directory rule pe align hoga, aur ek test prove karega. Baaki: lazy-loading promise test pe vite-free claim karta hai (wo vitest spawn karta hai → vite@7.3.8 load hota hai) — claim sahi kiya ja raha hai; @angular/build ka headline ≈28 MB kabhi nahi likha tha (sirf 210 MB ka poora tree); NA_AOT_FIXTURE override undocumented tha; startup spec ka "real pnpm layout" hardcoded string tha (drift ka wahi class jisne original false positive paida kiya) → ab installed store se derive hoga.
+
+Ab do agents parallel chal rahe hain:
+
+Task 2 — renderer + conformance suite (/workspace/nt-g) — M1 ka keystone: SPI extend → failing renderer spec → createElementRenderer → conformance suite → fake backend ka factory SPI → suite ko fake pe chalana → suite ke "daant" ka proof (5 galtiyan inject karke dikhana ki suite har ek par fail hoti hai) → export → commit. Iska BASE 70a7ad8 record kar liya (review package isi se banega).
+Task 13 — CLI polish (integration worktree) — chhota, 6 fixes.
+Merged tree abhi: 28 spec files / 234 tests green, tsc -b exit 0, bundle 41,735 B raw / 14,831 B gzip (budget 61,440 ka sirf 24%), @angular/compiler/zone.js 0 B.
+
+Bache 4 tasks: Task 6 (dev server + incremental AOT), Task 7 (Swift/Kotlin Fabric — device chahiye), Task 9 (sample app + perf gates + golden screenshots), Task 10 (publish-ready packages). In sab ka critical path Task 7 hai.
+
+Aapse chahiye (teeno ek hi message me): budget — 60 KB rakhna hai ya 90 KB? (pipeline fix ho gaya hai, evidence ke saath 60 KB hi sahi lagta hai), Android-first ya iOS-first (≈35% time ka lever), aur ek real device + ek API key (Codex/OpenCode/Kilo in-sandbox chalane ke liye — teeno OpenAI-compatible hain).
+
+11/12 04:20
+
+Processed 2m 50s
+Task 13 implement ho gaya (c140bd6, 237 tests green, bundle unchanged) — par usne ek honest disclosure ki jo maine apne measurement se confirm kiya:
+
+"≈28 MB" galat tha. Mera apna measurement (pnpm virtual store closure, dono methods):
+
+@angular/build ka poora closure = 172 packages → 151.3 MB disk / 129.6 MB apparent
+poora node_modules = 245.8 MB disk / 202.7 MB apparent → README ka "about 210 MB" apparent-size measure se sahi hai ✓
+par "@angular/build's own tree is ≈28 MB — that is the price of build alone" dono measure se match nahi karta (wo sirf table ke chhhe packages ka total hai, ≈29 MB) → real cost ka ~4.5× understatement
+aur table ka "sass-embedded 1.3 MB" JS wrapper hai; asli platform-native binary alag package hai (sass-embedded-linux-x64, yahan 10.4 MB)
+Ye numbers platform-specific hain (bulk = native binaries: rolldown binding 19 MB, colorjs.io 15 MB, lmdb 14.9 MB, sass-embedded 10.4 MB, lightningcss 9.6 MB) — isliye bina platform ke figure dena ambiguous hai. Ye sab ledger me facts ke saath likh diya hai, aur Task 13 ka review ab khud measure kar raha hai (mujhe pre-judge nahi karne dena chahiye tha — reviewer ko apna measurement khud karne diya).
+
+Task 6 bhi dispatch: dev server + incremental AOT (/workspace/nt-h) — G7 ka core: device pe kabhi compiler nahi, Node me compile, ek component badalne par ≤200 ms rebuild (abhi full ngc = 5.05 s). Dispatch me do khaas baatein pin ki: (1) existing bundling pipeline reuse karo, doosra bundler mat banao (public linker route test ho chuka hai aur tree-shaking reproduce nahi karta), (2) size budget sirf production bundle pe lagta hai (dev bundle 363,901 B raw / 120,884 B gzip hai, usse budget check me mat ghusaao). Ye task usi loop ko band karta hai jis pe app template aaj bhi nativeangular dev point kar raha hai — jo abhi exist nahi karta.
+
+Ab 3 agents parallel: Task 2 (renderer + conformance suite, abhi bhi chal raha hai — 845-line brief, sabse bada), Task 13 review, Task 6. Review aate hi Task 13 ka fix round 1 (same implementer, resume) dispatch karunga jisme measured figures seed honge — taaki agla review pakka saaf nikle.
+
+11/12 04:28
+
+Processed 50s
+M1 ka keystone — Task 2 — DONE ✓ commit 36ae31c, 268 tests green (234 → 268, +34), tsc -b exit 0, bundle unchanged.
+
+Naya surface:
+
+packages/core/src/renderer/element-renderer.ts (253 lines) — createElementRenderer, element-factory SPI ke upar, F4–F10 enforce karta hai
+packages/contract/src/conformance.ts (396 lines) — backend-agnostic conformance suite, us package me jisme har backend depend karta hai
+packages/core/src/spi/element-factory.ts — extended, removeStyle added
+packages/testing/src/{fake-backend,fake-node}.ts — fake backend ka factory SPI (suite ke liye jis pe chalna hai)
+Aur sabse important: teeth — 7 mutations inject, 7 pakde (5 conformance suite ne, 2 M0 regression suite ne).
+
+Paanch concerns disclose hue, sab review ke saamne:
+
+F6 SPI ki vocabulary ke bahar hai — duck-typed textContent = '' (SPI me iska naam nahi hai) → Fabric backend ko ek bina naam ke property honor karni padegi. Yehi wo "backend author implement kare aur held to ho" wala point hai.
+F10 shared renderer (core) me hai, backend me nahi → backend-side mutation bhi catch hoti hai ✓
+Brief ka renderer factory.setStyle kabhi call hi nahi karta tha → styles kabhi backend tak nahi pahunchte, aur SPI me style remove karne ka rasta bhi nahi tha. Implementer ne dono fix kiya. Ye decision har future backend ko bind karta hai — isliye review se adjudicate karwaya.
+destroy() ab renderer ke banaye elements release karta hai — SPI ke dispose ka ek hi caller; Task 7 (Fabric) ko confirm karna hoga.
+Fake backend abhi bhi Angular ko M0 ka renderer deta hai (fixture an- internal tags use karta hai; shipped convention na- hai).
+Ab 3 agents: Task 2 ka review (milestone ka sabse important gate — 79 KB diff, 5 concerns adjudicate karne hain, teeth ka verification), Task 13 ka review (install-cost numbers khud measure kar raha hai), aur Task 6 (dev server).
+
+Aapke pending decisions pe maine kuch nahi badla hai — budget 60 KB (pipeline fix ho chuki hai, 14,831 B = budget ka 24%), Android-first vs iOS-first (≈35% time ka lever), aur API key + ek real device.
+
+11/12 04:32
+
+Processed 1m 3s
+Task 13 ka review: "Needs fixes" — 3 Important (sab install-cost numbers ke baare me), 4 Minor. Baaki sab approved ✓.
+
+Reviewer ne khud measure kiya, dono methods ke saath:
+
+disk (du -sk)	apparent (du -sb)
+@angular/build closure (232 packages, peer deps samet)	226.9 MiB	194.5 MiB
+repo ke apne pins minus	187.8 MiB	156.4 MiB
+marginal (repo jo khud pull karta hai uske upar)	88.9 MiB	71.7 MiB
+table ke chhhe packages	29.24 MiB	28.43 MiB
+Mera measurement 172 packages deta hai (peer deps chhod kar) — ** dono defendable hain, bas closure ki definition alag hai**, isliye fix round ko kaha: ek definition chuno, method + platform ke saath quote karo, aur marginal figure sabse zyada decision-relevant hai.
+
+Bune hue theek kiye: "≈28 MB … the price of build alone" = 2.7×–8.5× understatement (wo sirf chhhe packages ka apparent sum hai, aur closure 232 packages ka hai, chhhe ka nahi); "sass-embedded 1.3 MB" JS wrapper hai (native alag package, 10.45 MiB); "oxc-parser 1.5 MB" me 2.03 MiB ka native half gayab; aur section methods mix karta hai (rows = disk, "210 MB" = apparent) + platform qualifier nahi hai, jabki bulk platform-native binaries hai.
+
+Approved bhi hua (ye achha kaam tha): lazy-loading ka split ("CLI process light rehta hai" vs "test runner ka process vite load karta hai"), inspect ka callerDirectory() helper use karna, do inspect tests (do alag temp dirs, real binary apne process me, koi process.cwd() mutation nahi, null sentinel se inherited INIT_CWD hatana), aur pnpm layout ka genuinely derived hona + naya test jo layout change par loudly fail karta hai.
+
+Fix round 1 chal raha hai (same implementer, resume): 3 Important + 4 Minor (do inspect tests repo fixture par depend na karein; NA_MODULE_TRACE ka subject "trace recorder" ho; prose me saathva forbidden package @angular/compiler bhi aaye; build bhi callerDirectory() use kare).
+
+Aur ek cheez scheduled kar di (park nahi): scaffolded template ke package.json me nativeangular dev / build android / build ios likha hai jabki ye commands exist hi nahi karte → scaffolded app teen aise commands advertise karta hai jo chal nahi sakte. Task 6 dev laayega, Task 7 build android|ios → template Task 7 ke end tak theek hona chahiye, aur Task 10 me re-check.
+
+Ab 3 agents: Task 2 ka review (keystone gate), Task 13 fix round 1, Task 6 (dev server).
+
+11/12 04:33
+
+Processed 1m 26s
+Task 2 ka review: "Needs fixes" — 5 Important, 7 Minor, 0 Critical. Architecture sahi maana gaya (named SPI ke upar ek renderer, suite sahi package me, tag-table ka cycle avoid + drift-guard spec, dependency direction theek, testing → contract edge package.json + tsconfig + lockfile teeno me). Saare 7 mutations statically verify hue — har ek sach me assertion trip karta hai ✓ — sirf accounting galat thi (6 suite ne pakde, 5 nahi).
+
+5 Important:
+
+F6 SPI me hai hi nahi — handle { id, kind } hai, requirement sirf duck-typed write hai suite me. Reviewer ne Angular 22.2.5 ka source padha: clearElementContents(rElement) { rElement.textContent = ''; } seedha element object pe likhta hai, Renderer2 ko bypass karke ⇒ handle ko ye expose karna hi padega, aur wo ek hi artifact hai jo backend author implement karta hai. Faithful backend aise fail hota hai jiska koi reason kisi ne bataya hi nahi.
+disposes an element case fail hi nahi ho sakta — element detached banta hai, toh parentOf(element) === null dispose se pehle hi true hai; no-op dispose pass ho jata hai. dispose SPI ka sirf resource-release operation hai aur destroy() uska sirf caller ⇒ suite kuch guarantee nahi karta par guarantee karne ka nam le raha hai.
+Teeth sirf report me hain, tree me nahi — koi mutation spec commit nahi; aur finding 2 exactly wahi rot hai jo aisi guard pakdti.
+F10 case cross-element acceptance pin karta hai — fake ka pehla declared property ('label') ek textInput element pe accept assert hota hai, jabki gate ek flat list use karta hai ⇒ suite backend author ko bol raha hai "ek element pe declare karo, sab pe legal ho jayega" — wohi silent no-op jo F10 rokne ke liye hai.
+Suite na onEvent gate karta hai, na removeAttribute — Angular renderer.removeAttribute(element,'class') call karta hai jab class binding khali hoti hai; toh broken event plumbing wala backend bhi pass ho jayega.
+8 Minors bhi fix round me (leak hone wale live arrays, setValue ka unconditional cast jabki Angular ka ngReflect debug path comment node pe setValue call karta hai, selectRootElement selector ignore karta hai, style key space unnamed, destroy() root bhi dispose karta hai, NativeBackend me registry/knownProperties nahi, per-kind SPI shape me 'view' factory ki requirement likhi nahi, teen stale README).
+
+Aur ek alag task banaya — Task 2b: reviewer ne nikala ki shared renderer ne Angular 22 ke neeche kabhi chala hi nahi — fake abhi bhi M0 ka FakeRendererFactory deta hai, aur shared renderer current fixture ko host hi nahi kar sakta (an- tags pe throw, root selector ignore). Toh "one renderer" ka claim Angular ke against unproven hai, aur bundle numbers isliye unchanged hain kyunki shared renderer bundle path pe hai hi nahi. Mera ruling: fixture ab na- vocabulary pe migrate hoga (woh M0-era decision tha jab contract exist hi nahi karta tha; D9 kehta hai na-) aur shared renderer ke through chalega — ye keystone ka proof hai aur Task 7 ka wait nahi kar sakta, kyunki Task 7 ko hi enforceable contract chahiye. Fix round ko kaha hai: sirf contract holes, fixture migration mat chhed.
+
+Ab 3 agents: Task 2 fix round 1, Task 13 fix round 1, Task 6 (dev server).
+
+11/12 04:38
+Processed 2s
+42212:Token Plan usage limit reached: Upgrade your Token Plan or purchase Credits for more usage. (2056)
+
+11/12 04:41
+42212:Token Plan usage limit reached: Upgrade your Token Plan or purchase Credits for more usage. (2056)
+
+11/12 04:41
+42212:Token Plan usage limit reached: Upgrade your Token Plan or purchase Credits for more usage. (2056)

@@ -1,0 +1,5 @@
+# AngNative monorepo — workspace members
+packages:
+  - 'packages/*'
+apps:
+  - 'apps/*'

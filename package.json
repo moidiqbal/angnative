@@ -1,0 +1,37 @@
+{
+  "name": "angnative-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "High-performance Angular Native cross-platform application framework powered by Rust",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/cli/tsconfig.json",
+    "test": "vitest run",
+    "lint": "pnpm --recursive run lint",
+    "check:toolchain": "node scripts/check-toolchain.mjs",
+    "compile:fixtures": "node scripts/compile-fixtures.mjs",
+    "bundle:fixtures": "node -e \"import('./packages/cli/dist/bundle.js').then(m => m.bundleApp('packages/testing/fixtures/out/app.js', 'packages/testing/fixtures/out/bundle.js'))\"",
+    "start": "pnpm --filter @angnative/demo-app run start"
+  },
+  "keywords": [
+    "angular",
+    "native",
+    "rust",
+    "cross-platform",
+    "android",
+    "desktop",
+    "web"
+  ],
+  "author": "AngNative Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@angular/core": "22.2.5",
+    "@angular/compiler-cli": "22.2.5",
+    "@types/node": "22.19.0",
+    "typescript": "6.0.3",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NativeAngular — native tree</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 32px; background: #0b0f14; color: #e6edf3;
+         font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: #8b949e; margin: 0 0 24px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+  .fact { border: 1px solid #21262d; border-radius: 8px; padding: 8px 12px; background: #11161c; }
+  .fact span { color: #8b949e; margin-right: 8px; }
+  ul { list-style: none; margin: 0; padding-left: 18px; border-left: 1px solid #21262d; }
+  .node { padding: 4px 0; }
+  .kind { color: #7ee787; font-weight: 600; }
+  .text { color: #e6edf3; }
+  .text::before { content: '"'; color: #8b949e; }
+  .text::after { content: '"'; color: #8b949e; }
+  .chip { display: inline-block; margin: 2px 6px 2px 0; padding: 1px 8px; border-radius: 999px;
+          border: 1px solid #30363d; background: #161b22; color: #79c0ff; font-size: 12px; }
+  .chip.attr { color: #d2a8ff; }
+  .comment .kind { color: #8b949e; }
+</style>
+</head>
+<body>
+  <h1>NativeAngular</h1>
+  <p class="sub">The native element tree an AOT-compiled Angular app produces — no DOM, no WebView.</p>
+  <div class="facts">
+      <div class="fact"><span>render path</span><b>DOM-less Renderer2</b></div>
+      <div class="fact"><span>compiler</span><b>ngc (AOT)</b></div>
+      <div class="fact"><span>elements</span><b>1</b></div>
+  </div>
+  <ul>
+  <li class="node element">
+    <span class="kind">an-root</span>
+    <span class="chip attr"><b>ng-version</b> "22.2.5"</span>
+    <ul>
+    <li class="node element">
+      <span class="kind">an-view</span>
+      <span class="chip attr"><b>class</b> "root"</span>
+      <ul>
+      <li class="node element">
+        <span class="kind">span</span>
+        <span class="chip attr"><b>class</b> "label"</span>
+        <ul>
+        <li class="node text">
+          <span class="kind">text</span> <span class="text">hello</span>
+          
+
+        </li>
+        </ul>
+      </li>
+      </ul>
+    </li>
+    </ul>
+  </li>
+    </ul>
+</body>
+</html>

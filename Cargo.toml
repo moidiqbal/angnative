@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/angnative-core",
+    # The crates below are planned (TaskList.txt Phase 2/3) but not yet created.
+    # They will be added here as they are implemented — one at a time, verified.
+    # "crates/angnative-layout",
+    # "crates/angnative-compiler",
+    # "crates/angnative-runtime",
+    # "crates/angnative-desktop",
+    # "crates/angnative-android",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["AngNative Team"]
+license = "MIT"
+repository = "https://github.com/angnative/angnative"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+log = "0.4"
+taffy = "0.4"
+oxc_parser = "0.14"
+oxc_allocator = "0.14"
+oxc_span = "0.14"
+oxc_ast = "0.14"
+rquickjs = { version = "0.5", features = ["classes", "chrono"] }
+winit = "0.29"
+raw-window-handle = "0.6"
+jni = { version = "0.21", default-features = false }

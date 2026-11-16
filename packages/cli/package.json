@@ -1,0 +1,21 @@
+{
+  "name": "@angnative/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "AngNative CLI — doctor, create, test, build, dev",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "angnative": "dist/cli.js"
+  },
+  "files": ["dist/**"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

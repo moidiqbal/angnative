@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.x'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.34.9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Check toolchain
+        run: pnpm run check:toolchain
+
+      - name: Compile AOT fixtures
+        run: pnpm run compile:fixtures
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Run tests
+        run: pnpm test
+
+  size:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.x'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.34.9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Compile AOT fixtures
+        run: pnpm run compile:fixtures
+
+      - name: Build production bundle
+        run: pnpm run bundle:fixtures
+
+      - name: Check size budget (gate)
+        run: node scripts/check-size-budget.mjs

@@ -1,0 +1,184 @@
+================================================================================
+NATIVEANGULAR — COMPREHENSIVE STATUS & TASK LIST FOR 14 NOV 2026
+================================================================================
+Date: 14 November 2026
+Prepared by: Google Gemini / Antigravity
+Analyzed Location: ./research (and repo context)
+Project: NativeAngular — "One Angular codebase. Every native platform."
+Output File: research/date 14nov2026_google.txt
+
+================================================================================
+1. EXECUTIVE AUDIT & REALITY CHECK (WHAT REALLY HAPPENED)
+================================================================================
+
+A previous draft file ("date 14nov2026.txt") assumed that M1 sandbox tasks
+(Tasks 1, 2, 4, 5, 8, 11) were entirely pending. 
+
+A forensic audit of `./research/1 - minimaxresearch.txt` (1,122 lines),
+`task-5-report.md`, and `task-12-integration-report.md` proves that massive
+progress has already landed and been merged before the token limit was hit:
+
+  • M0 (Spike & Skeleton): 100% COMPLETE. Angular 22.2.5 bootstrapped in Node
+    without DOM via custom Renderer2 SPI. 75 tests green.
+  • M1 Landed & Merged Tracks:
+    - Task 1: Contract package (@nativeangular/contract) — MERGED.
+    - Task 3: RN Spike Flatten (@nativeangular/spike) — MERGED (commit c6cba46).
+    - Task 4: CLI Core (doctor, create, test) — MERGED.
+    - Task 5: Production Bundle & Size Budget CI — MERGED (commit c839f55).
+      CRITICAL ACHIEVEMENT: Bundle payload slashed from 90,210 B to 14,831 B gzip
+      (raw 41,735 B), taking only 24% of the 60 KB budget. Blocking CI gate active.
+    - Task 8: @nativeangular/router — MERGED (commit 70a7ad8).
+      NativeLocationStrategy root DI seam verified, 28 spec files / 234 tests green.
+    - Task 11: Native Tree Inspector — MERGED (commit 8f3fe28).
+      Self-contained HTML inspector with security guard blocking external URLs.
+    - Task 12: Merged Tree Integration — APPROVED.
+      CLI README 5 commands, platform README appProviders, test seams (NA_AOT_FIXTURE),
+      and pnpm compiler pattern controls.
+
+  • In-Flight / Stopped at Token Limit (04:41 AM):
+    - Task 13: CLI Polish & Accurate Reporting — Commit c140bd6, Fix Round 1 needed
+      (reporting @angular/build closure size accurately, aligning callerDirectory).
+    - Task 2: One Renderer + Conformance Suite (M1 Keystone) — Commit 36ae31c
+      (268 tests), Fix Round 1 required for 5 Important review findings.
+    - Task 2b: Fixture Migration (an- -> na- vocabulary) — Needed to prove shared
+      renderer on real AOT components under Angular 22.2.5.
+    - Task 6: Dev Server + Incremental AOT — Dispatched to /workspace/nt-h (target: <=200ms).
+
+Current Readiness Scorecard: Baseline 14/100 (ready to move towards 35-40/100 upon
+completing Task 2, Task 6, and Fabric device demo).
+
+================================================================================
+2. NON-NEGOTIABLE BINDING CONSTRAINTS
+================================================================================
+  1. Angular pinned EXACTLY 22.2.5; TypeScript pinned EXACTLY 6.0.3.
+  2. Node hard floor >= 22.12 (CI pins 22.22.3); pnpm pinned 10.34.9.
+  3. AOT ONLY: Never import @angular/compiler in runtime or test bundles.
+     No TestBed, no @angular/core/testing.
+  4. Zoneless ONLY: Zero zone.js anywhere.
+  5. Angular private (ɵ) APIs restricted to exactly ONE file:
+     packages/platform/src/angular-internals.ts.
+  6. Strict Renderer Property Rule (F10): Unknown property writes MUST throw.
+  7. Production Size Budget (G6): <= 60 KB gzip for hello-world (measured: 14.8 KB).
+  8. License: MIT; Scope: @nativeangular/* (never ng-native or @angular/*).
+
+================================================================================
+3. IMMEDIATE ACTIONABLE TASK LIST — 14 NOV 2026
+================================================================================
+
+PHASE 1: REPOSITORY HEALTH & LOCAL BASELINE SYNCHRONIZATION
+--------------------------------------------------------------------------------
+[T1.1] Sync Local Repository with M1 Merged Trees
+       • Merge in or import branches feature/m1-fabric-mvp, feature/m1-track-d,
+         feature/m1-track-e, and feature/m1-track-f if working locally.
+       • Run: pnpm install --frozen-lockfile
+       • Verify toolchain: pnpm run check:toolchain
+       • Verify build: pnpm run build (tsc -b must exit 0)
+       • Verify tests: pnpm test (expect >= 234 tests green)
+       • Verify size budget gate: node scripts/check-size-budget.mjs (14.8 KB gzip)
+
+[T1.2] Clean up Research Redundancies
+       • Delete duplicate research/m0-gap-analysis (1).md (byte-identical to m0-gap-analysis.md).
+       • Keep latest tree visualizer: research/nativeangular-tree (5).html.
+
+--------------------------------------------------------------------------------
+PHASE 2: RESOLVE IN-FLIGHT REVIEWS & COMPLETE M1 KEYSTONES
+--------------------------------------------------------------------------------
+[T2.1] Task 13 (CLI Polish & Truth in Reporting) — Fix Round 1
+       • Accurate Install Cost: In packages/cli/README.md, clarify that @angular/build
+         virtual store closure is 151-226 MiB (depending on disk vs apparent size)
+         rather than the misleading "≈28 MB" which was only 6 packages.
+       • Caller Directory Alignment: Update `inspect` and `build` commands to use
+         INIT_CWD ?? process.cwd() so executions from any subdirectory output correctly.
+       • Decouple inspect tests from repository fixture (use scratch directory).
+       • Document NA_AOT_FIXTURE environment variable seam.
+       • Verification: pnpm vitest run packages/cli/src/
+
+[T2.2] Task 2 (One Renderer + Conformance Suite) — Fix Round 1
+       • F6 SPI Gap: Angular 22.2.5's `clearElementContents` writes `rElement.textContent = ''`
+         directly. Ensure native element handle exposes this contract explicitly so
+         backends aren't broken by undocumented duck-typing.
+       • Fix Tautological Test: Fix `disposes an element` spec (previously passed on a
+         no-op because detached elements have parent === null prior to disposal).
+       • Commit "Teeth" (Mutation Specs): Ensure the 7 mutation tests that prove the
+         conformance suite catches backend flaws are committed in the test suite,
+         not just documented in reports.
+       • F10 Property Scoping: Assert property declarations per-element-kind rather
+         than a permissive flat global list.
+       • Add missing conformance assertions for `onEvent` listener attachment and
+         `removeAttribute` (e.g. clearing classes).
+       • Verification: pnpm vitest run packages/contract/src/conformance.spec.ts
+
+[T2.3] Task 2b (Fixture Migration & End-to-End Keystone Proof)
+       • Migrate fixture components in `packages/testing/fixtures` from legacy `an-`
+         tags to standard `na-` vocabulary (`na-view`, `na-text`, etc.).
+       • Wire the unified `createElementRenderer` into `bootstrapNativeAngular`.
+       • Run `pnpm run compile:fixtures && pnpm test` to confirm real Angular 22 AOT
+         signal inputs and bindings render through the final shared renderer.
+
+[T2.4] Task 6 (Dev Server & Incremental AOT) — Complete & Review
+       • Pick up dispatched work from /workspace/nt-h.
+       • Reuse the existing esbuild + oxc-transform pipeline (do NOT create a secondary bundler).
+       • Enforce target: <= 200 ms rebuild time on single-component changes.
+       • Ensure dev server bundles are isolated from production size budget CI checks.
+
+--------------------------------------------------------------------------------
+PHASE 3: STRATEGIC DECISIONS & HARDWARE PREREQUISITES (BLOCKERS FOR PHASE 4)
+--------------------------------------------------------------------------------
+[T3.1] User Decision: Platform Priority Order
+       • RECOMMENDATION: Choose Android-First.
+         - Avoids immediate requirement for macOS and local Xcode installation.
+         - Android build tooling (Gradle / Android SDK / Hermes) runs cleanly in
+           standard Linux/Windows CI environments.
+         - Cuts M1 execution time by ~35%.
+       • iOS-First Alternative: Requires macOS runner, Xcode 16+, iOS simulator/device.
+
+[T3.2] User Decision: Enforce 60 KB Production Gzip Budget
+       • Status: SOLVED. Shipped pipeline achieved 14,831 B gzip.
+       • Action: Formally ratify 60 KB as the hard gate (no need to raise to 90 KB).
+
+[T3.3] Environment Credentials & Hardware Setup
+       • Setup Expo / EAS free account for cloud-assisted native builds.
+       • Prepare one physical Android device (or emulator) with USB debugging enabled.
+       • (Optional) Provide OpenRouter / OpenAI API keys if external sub-agent runners
+         (Codex / Kilo / OpenCode) are to be executed directly.
+
+--------------------------------------------------------------------------------
+PHASE 4: THE PHYSICAL NATIVE FRONTIER (TASKS 7, 9 & 10)
+--------------------------------------------------------------------------------
+[T4.1] Task 7: Fabric Native Backend (@nativeangular/fabric)
+       • Map `na-view`, `na-text`, `na-scroll`, `na-input` to React Native Fabric
+         component descriptors in Kotlin (Android) and Swift (iOS).
+       • Wire the Hermes JS runtime to execute NativeAngular's AOT bundle.
+       • Validate against the conformance suite built in Task 2.
+
+[T4.2] Task 9: Sample Application & Performance Gates
+       • Build demo app using `@nativeangular/router` and `@nativeangular/core`.
+       • Verify hardware back button handling on Android and swipe-back on iOS.
+       • Measure performance against G7 criteria:
+         - Startup time to first interactive native view: < 400 ms.
+         - 60 FPS smooth scrolling on native lists.
+         - Memory footprint.
+
+[T4.3] Task 10: Documentation Site Skeleton & Scorecard Promotion
+       • Publish starter templates (`create-nativeangular`).
+       • Write developer documentation covering Zoneless Signals + Native Views.
+       • Update `research/readiness-scorecard.md`:
+         - DX: 1/5 -> 3/5
+         - Tooling & Docs: 2/5 -> 3/5
+         - Production Reliability: 1/5 -> 2/5
+         - Performance: 0/5 -> 1/5
+         - Weighted Score: 14/100 -> ~36/100.
+
+================================================================================
+4. VERIFICATION PIPELINE PER COMMIT
+================================================================================
+Every task and fix MUST pass this sequence before committing:
+  1. `pnpm run check:toolchain`  -> Node >= 22.12, Angular 22.2.5, TS 6.0.3
+  2. `pnpm run compile:fixtures` -> ngc AOT compilation succeeds
+  3. `pnpm run build`            -> tsc -b exits 0 with zero diagnostic errors
+  4. `pnpm test`                 -> All spec suites pass green
+  5. `node scripts/check-size-budget.mjs` -> Bundle <= 60 KB gzip, 0 B compiler/zone.js
+
+================================================================================
+END OF TASK LIST — 14 NOV 2026 (GOOGLE GEMINI EDITION)
+================================================================================
