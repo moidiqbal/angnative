@@ -30,6 +30,9 @@ local.properties
 # Local Research & Chat Logs
 research/
 post.txt
+date 14nov2026_google.txt
+*14nov*.txt
+*nov2026*.txt
 
 # IDE & OS
 .idea/
