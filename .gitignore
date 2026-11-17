@@ -27,6 +27,10 @@ local.properties
 *.dSYM/
 .swiftpm/
 
+# Local Research & Chat Logs
+research/
+post.txt
+
 # IDE & OS
 .idea/
 .vscode/

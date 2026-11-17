@@ -1,43 +1,48 @@
-# AngNative Engineering Roadmap
+# 🗺️ AngNative Project Roadmap
 
-This roadmap breaks down the development of AngNative into concrete, orchestratable phases.
-
----
-
-## Phase 1: Core Architecture & Native Layout Foundation (Current)
-- [x] Monorepo workspace setup (Rust Cargo Workspace + TypeScript Packages).
-- [x] System Architecture & Specification (`docs/ARCHITECTURE.md`).
-- [ ] Implement `angnative-core` (Node tree, View mutations, serialization protocol).
-- [ ] Implement `angnative-layout` (Taffy Flexbox bindings, node styling, layout computation).
-- [ ] Implement `@angnative/core` (Angular custom `RendererFactory2` / `Renderer2`).
-- [ ] Implement `@angnative/common` (Native primitive elements: `<native-view>`, `<native-text>`, `<native-button>`).
+**Status:** Active  
+**License:** MIT
 
 ---
 
-## Phase 2: Rust TypeScript Compiler & Embedded Runtime
-- [ ] Implement `angnative-compiler` (Rust-based TypeScript parser and transformer via OXC/SWC).
-- [ ] Implement `angnative-runtime` (QuickJS/Deno embedded JS runtime bridge).
-- [ ] Bidirectional FFI bridge between Angular JS context and Rust Native ViewManager.
-- [ ] Native event loop and asynchronous event dispatching.
+## Phase 0: Foundations & Architecture Spike ✅
+- [x] Establish canonical identity, repository structure, and MIT licensing.
+- [x] Prove custom Angular `Renderer2` feasibility without DOM (`@angnative/core`).
+- [x] Validate Taffy layout engine integration in Rust (`angnative-host-layout`).
+- [x] Prototype zero-copy JNI bridge on Android (`platforms/android`).
 
 ---
 
-## Phase 3: Desktop Shell (Windows, macOS, Linux)
-- [ ] Implement `angnative-desktop` using `winit` for window lifecycle & input handling.
-- [ ] WGPU rendering canvas or native widget mapping.
-- [ ] Hot module reloading / live reload development harness for Desktop.
+## Phase 1: Core Engine & Android Shell ✅
+- [x] Implement complete mutation protocol (`CreateNode`, `SetProps`, `SetText`, `InsertChild`, `RemoveChild`).
+- [x] Build core UI primitive set (`<na-view>`, `<na-text>`, `<na-button>`, `<na-text-input>`, `<na-scroll-view>`, `<na-image>`, `<na-pressable>`).
+- [x] Integrate QuickJS embedded JavaScript runtime (`angnative-host-engine`).
+- [x] Verify on Android 17 emulator with interactive event synchronization and bounce animations.
+- [x] Enforce size budgets with `check-rust-size.mjs` and R8/Proguard optimizations.
 
 ---
 
-## Phase 4: Mobile Platform (Android NDK & Views)
-- [ ] Implement `angnative-android` JNI bridge.
-- [ ] Android Gradle harness & AAR build pipeline.
-- [ ] Android Native ViewManager mapping layout geometry to `android.view.View`.
-- [ ] Touch input, gestures, and lifecycle synchronization.
+## Phase 2: iOS Shell & Cross-Compilation 🟡
+- [x] Install Darwin SDK and Swift 6 toolchain on Linux/WSL via `xtool`.
+- [x] Build native Mach-O `arm64-apple-ios` static libraries and executable.
+- [x] Package standalone iOS IPA (`TestApp.ipa`).
+- [x] Verify physical iPhone 14 Plus USB pairing and developer mode handshake.
+- [ ] Complete UIKit native view mapping (`UIView`, `UILabel`, `UIButton`).
+- [ ] Implement iOS touch event responder and scroll coordinator.
 
 ---
 
-## Phase 5: Web Adapter & Demo Application
-- [ ] Implement `@angnative/web` (HTML5/CSS fallback renderer).
-- [ ] Create `apps/demo-app` demonstrating cross-platform counter, list, and form with Angular Signals.
-- [ ] End-to-end integration tests across Desktop, Android, and Web.
+## Phase 3: Desktop & Developer Tooling 🟡
+- [x] Implement CLI scaffolding (`@angnative/cli create`).
+- [x] Implement dev server and doctor commands (`angnative doctor`).
+- [ ] Complete native desktop shell via `winit` and `wgpu` (`angnative-desktop`).
+- [ ] Cross-platform Hot Module Replacement (HMR) daemon.
+- [ ] Standalone component testing harness in Node.js without device emulator.
+
+---
+
+## Phase 4: Enterprise Services & Ecosystem 🟢
+- [ ] Offline data sync and SQLite/KV storage engine.
+- [ ] Hardware capability plugins (Camera, Biometrics, Geolocation, Push Notifications).
+- [ ] High-level Material 3 & Cupertino component design system.
+- [ ] Production showcase and public documentation portal.

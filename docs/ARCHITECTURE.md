@@ -1,102 +1,140 @@
-# AngNative Architecture Blueprint
+# 🏗️ AngNative Architecture & System Design
 
-## 1. Executive Summary
+**Status:** Canonical Reference (v1.0)  
+**License:** MIT  
+**Ecosystem Scope:** `@angnative/*` (TypeScript) · `angnative-*` (Rust)
 
-**AngNative** is a high-performance cross-platform native framework that pairs the developer ergonomics of **Angular** (declarative templates, Signals, Dependency Injection, and reactive state) with the safety, raw speed, and memory efficiency of **Rust**.
+---
 
-Unlike hybrid Web-wrapping technologies (such as Cordova or Capacitor) which execute inside a mobile or desktop WebView, AngNative operates on the architectural principles pioneered by React Native and Flutter:
-1. **The application logic** runs in an embedded JavaScript/TypeScript engine.
-2. **The view hierarchy** is decoupled from browser DOM and expressed as a typed Native Shadow Tree.
-3. **The layout calculation** (Flexbox/Grid) runs asynchronously in a high-performance Rust core using [Taffy](https://github.com/DioxusLabs/taffy).
-4. **The final rendering** maps directly to native platform surfaces (Android Native Views / SurfaceView, Desktop native windows via Winit & WGPU, and Web semantic DOM).
+## 1. Executive Overview
+
+**AngNative** is an open-source, high-performance cross-platform application framework designed to render **modern Angular applications as true native UI widgets** (Android `View`s, iOS `UIView`s, Desktop native surfaces) with **zero WebViews**.
+
+AngNative decouples the Angular application layer from the browser DOM by providing a custom `Renderer2` implementation. Instead of mutating HTML elements, template mutations are serialized into an efficient binary/JSON command buffer and dispatched across a zero-copy FFI boundary into a high-speed **Rust Host Engine**.
+
+Layout calculation is handled asynchronously in Rust via **Taffy** (W3C Flexbox and CSS Grid), and the resulting layout rectangles are mounted onto native platform views.
 
 ---
 
 ## 2. High-Level Architecture Diagram
 
 ```
-+------------------------------------------------------------------------+
-|                      Angular Application Layer                         |
-|     Standalone Components, Signals (signal(), computed(), effect())     |
-|             Templates (<native-view>, <native-text>, etc.)             |
-+------------------------------------------------------------------------+
-                                   |
-                                   v
-+------------------------------------------------------------------------+
-|                     @angnative/core (TypeScript)                       |
-|           AngNativeRendererFactory2 & AngNativeRenderer2               |
-|      Maintains NativeElement Tree & batches ViewMutation records        |
-+------------------------------------------------------------------------+
-                                   |
-           (Direct In-Memory FFI / High-Speed Message Queue)
-                                   v
-+------------------------------------------------------------------------+
-|                        Rust Core Runtime Engine                        |
-|                                                                        |
-|  +-----------------------+  +---------------------------------------+  |
-|  |   angnative-compiler  |  |           angnative-layout            |  |
-|  |  Rust-based TS/AST    |  |     Taffy Flexbox & CSS Grid          |  |
-|  |  Parser (OXC / SWC)   |  |   Asynchronous Layout Calculation     |  |
-|  +-----------------------+  +---------------------------------------+  |
-|                                                                        |
-|  +-----------------------+  +---------------------------------------+  |
-|  |    angnative-core     |  |           angnative-runtime           |  |
-|  | Shadow Tree Diffing   |  | Embedded JS/TS Engine (QuickJS/Deno)  |  |
-|  | Batch Mutation Queue  |  |    Direct Rust-JS Memory Mapping      |  |
-|  +-----------------------+  +---------------------------------------+  |
-+------------------------------------------------------------------------+
-                                   |
-                                   v
-+------------------------------------------------------------------------+
-|                       Platform Output Adapters                         |
-|                                                                        |
-|   +-------------------+  +-------------------+  +------------------+   |
-|   |   Android NDK     |  |   Desktop Host    |  |     Web DOM      |   |
-|   |  (JNI / Native    |  |  (Windows, macOS, |  |  (@angnative/web |   |
-|   |   Views / Surface)|  |   Linux via WGPU) |  |   HTML5 Adapter) |   |
-|   +-------------------+  +-------------------+  +------------------+   |
-+------------------------------------------------------------------------+
++-------------------------------------------------------------------------+
+|                        Angular 19+ Application                          |
+|         Standalone Components, Reactive Signals, Zoneless Runtime       |
+|      Templates (<na-view>, <na-text>, <na-button>, <na-scroll-view>)    |
++-------------------------------------------------------------------------+
+                                    |
+                                    v
++-------------------------------------------------------------------------+
+|                      @angnative/core (TypeScript)                       |
+|         AngNativeRendererFactory2 & Custom Angular Renderer2            |
+|         DOM-Free NativeElement Tree & Mutation Command Batcher          |
++-------------------------------------------------------------------------+
+                                    |
+          (High-Performance Batch Buffer over JNI / C-FFI Boundary)
+                                    v
++-------------------------------------------------------------------------+
+|                        Rust Host Core Engine                            |
+|                                                                         |
+|  +------------------------------+     +------------------------------+  |
+|  |    angnative-host-core       |     |     angnative-host-layout    |  |
+|  |  Shadow Tree Management      |     |  Taffy 0.5.2 Layout Adapter  |  |
+|  |  Mutation Protocol & Diffs   |     |  Text Measurer & Flex Cache  |  |
+|  +------------------------------+     +------------------------------+  |
+|                                                                         |
+|  +------------------------------+     +------------------------------+  |
+|  |    angnative-host-engine     |     |     angnative-host-ffi       |  |
+|  |  QuickJS Runtime Integration |     |  C-ABI & JNI Export Headers  |  |
+|  |  Event Loop & Dispatcher     |     |  Zero-Copy Buffer Bridge     |  |
+|  +------------------------------+     +------------------------------+  |
+|                                                                         |
+|  +------------------------------+     +------------------------------+  |
+|  |    angnative-host-view       |     |   angnative-services-core    |  |
+|  |  View Tree & Op Emitter      |     |  Diagnostics, Capability,    |  |
+|  |  Platform Command Generation |     |  Crypto, State Sync Engine   |  |
+|  +------------------------------+     +------------------------------+  |
++-------------------------------------------------------------------------+
+                                    |
+          +-------------------------+-------------------------+
+          | Zero-Copy JNI                                     | Direct C-ABI
+          v                                                   v
++-----------------------------+                     +-----------------------------+
+|    Android Platform Shell   |                     |     iOS Platform Shell      |
+|  (Kotlin / Material 3)      |                     |   (Swift / UIKit / Metal)   |
+|  - JNI Native Bridge        |                     |   - xtool SwiftPM Harness   |
+|  - Android View Hierarchy   |                     |   - Mach-O arm64 Runtime    |
+|  - Spring & Bounce Physics  |                     |   - Direct View Mounting    |
++-----------------------------+                     +-----------------------------+
 ```
 
 ---
 
-## 3. Core Subsystems
+## 3. Subsystem Breakdown
 
-### 3.1 Angular Custom Renderer (`@angnative/core`)
-Angular's architecture cleanly separates the framework's change detection and template reconciliation from DOM operations via `Renderer2` and `RendererFactory2`.
+### 3.1 Angular Layer & DOM-Free Renderer (`@angnative/core`)
+Angular is uniquely suited for non-DOM environments because its core architecture strictly decouples change detection and dependency injection from rendering via the `Renderer2` and `RendererFactory2` SPI.
 
-AngNative provides `AngNativeRenderer`:
-- `createElement(name: string)`: Instantiates a `NativeElement` with a unique 64-bit integer ID (`node_id`).
-- `appendChild(parent: NativeElement, child: NativeElement)`: Records an `InsertChild` mutation.
-- `removeChild(parent: NativeElement, child: NativeElement)`: Records a `RemoveChild` mutation.
-- `setProperty(el: NativeElement, name: string, value: any)`: Records an `UpdateProp` mutation.
-- `listen(target, eventName, callback)`: Binds a native event subscription.
+- **No `@angular/platform-browser`**: Browser-specific classes (`DomAdapter`, `DomRendererFactory2`, HTML sanitizer) are excluded, preventing DOM leakage.
+- **`NativeElement`**: Lightweight in-memory virtual nodes identified by a 64-bit integer (`node_id`).
+- **Mutation Batching**: When Angular completes a change detection pass, all `CreateNode`, `SetProps`, `SetText`, `InsertChild`, and `RemoveChild` operations are compressed into a single mutation buffer and flushed to Rust.
 
-At the end of Angular's change detection tick, batched mutations are flushed to the Rust engine in a single FFI call.
+### 3.2 Rust Host Engine (`crates/angnative-host-*`)
+The Rust engine serves as the single source of truth for the UI shadow tree and layout computation:
 
-### 3.2 Rust-Based Layout Engine (`angnative-layout`)
-- Uses **Taffy**, the fastest W3C-compliant layout engine written in pure Rust.
-- Calculates Flexbox (`flex-direction`, `justify-content`, `align-items`, `flex-grow`, `gap`) and Grid systems.
-- Decoupled from the UI rendering thread: runs on a high-priority background thread, avoiding UI jank.
+1. **`angnative-host-core`**:
+   - Manages the canonical UI tree and node lifecycle.
+   - Parses the mutation protocol with zero allocations.
+   - Enforces element schema and property types.
+2. **`angnative-host-layout`**:
+   - Adapts [Taffy 0.5.2](https://github.com/DioxusLabs/taffy) for Flexbox and CSS Grid calculations.
+   - Maintains an asynchronous text-measuring cache so complex text wraps without blocking the main UI thread.
+3. **`angnative-host-ffi`**:
+   - Exposes clean C-ABI functions defined in `angnative_host_ffi.h`.
+   - On Android: provides fast JNI methods (`Java_com_angnative_app_JniBridge_*`).
+   - On iOS / Desktop: links directly as a static library (`libangnative_host_ffi.a`).
+4. **`angnative-host-engine`**:
+   - Embeds QuickJS for standalone JavaScript execution loops and zoneless event dispatching.
+5. **`angnative-services-core`**:
+   - Capability-aware degradation: detects platform features (biometrics, crypto, haptics) and provides standard fallbacks if a platform lacks support.
 
-### 3.3 TypeScript Compiler in Rust (`angnative-compiler`)
-- Integrates a native Rust TypeScript parser and transformer (based on OXC/SWC).
-- Provides instant incremental transpilation of Angular TypeScript code without Node.js overhead.
-- Generates optimized JavaScript byte arrays or bundles for the embedded runtime.
+### 3.3 Android Platform Shell (`platforms/android`)
+- **Native Views**: Maps `<na-view>` to `ViewGroup` / `FrameLayout`, `<na-text>` to `TextView`, `<na-button>` to `MaterialButton`.
+- **High-Speed JNI**: Dispatches layout bounds and receives touch events (`press`, `change`, `scroll`) in sub-millisecond roundtrips.
+- **R8 / Proguard Optimization**: Minified Kotlin codebase with an aggressive size budget (< 15 MB standalone APK).
 
-### 3.4 Embedded Runtime (`angnative-runtime`)
-- Houses an embedded JavaScript engine (QuickJS for ultra-lightweight mobile/desktop deployments, or Deno Core/V8 for high-throughput environments).
-- Exposes native Rust functions to the JS environment via zero-copy bindings.
+### 3.4 iOS Platform Shell (`platforms/ios`)
+- **Direct C-ABI**: Swift interacts with `angnative_host_ffi.h` with zero JNI overhead.
+- **Cross-Platform Compilation**: Built via `xtool` with Darwin SDK and Swift 6 toolchain directly on Linux/WSL without requiring macOS hardware for compilation.
+- **Native UIKit Rendering**: Maps nodes to `UIView`, `UILabel`, `UIButton`, and `UIScrollView`.
 
-### 3.5 Desktop Shell (`angnative-desktop`)
-- Implemented in Rust using `winit` for cross-platform window management across Windows, macOS, and Linux.
-- Supports GPU accelerated drawing via `wgpu` or direct native platform widgets.
+---
 
-### 3.6 Android Native Shell (`angnative-android`)
-- Crate configured as a `cdylib` generating `libangnative.so`.
-- Integrates with Android NDK using JNI.
-- Dispatches calculated layout rectangles to Android `ViewGroup` hierarchy or renders directly onto an Android `SurfaceView`.
+## 4. Concurrency & Threading Model
 
-### 3.7 Web Adapter (`@angnative/web`)
-- Provides Web compatibility by mapping `<native-view>` to `<div>`, `<native-text>` to `<span>`, and native flex styles to standard CSS.
-- Enables complete code sharing between Mobile, Desktop, and Web.
+```
++------------------+         +-------------------+         +------------------+
+| Angular/JS Thread|         |  Rust Host Worker |         | Platform UI Main |
++------------------+         +-------------------+         +------------------+
+         |                             |                            |
+         |-- Flush Mutation Batch ---->|                            |
+         |                             |-- Taffy Layout Compute --->|
+         |                             |<-- Text Measurement -------|
+         |                             |                            |
+         |                             |-- Emit Platform Ops ------>|
+         |                             |                            |-- Mount Views
+         |                             |                            |-- Render Frame (60-120fps)
+         |<--------- Dispatch Event (Touch/Click) ------------------|
+```
+
+1. **Angular / JS Thread**: Runs change detection, updates signals, and serializes mutation batches.
+2. **Rust Background Worker**: Computes layout geometry, diffs shadow trees, and emits minimum draw operations.
+3. **Platform UI Thread**: Pure rendering and direct user touch handling. Never blocked by JavaScript execution.
+
+---
+
+## 5. Security & Isolation Model
+
+- **No Web Inspector vulnerabilities**: Since there is no browser environment or WebView, DOM injection (XSS) attacks are eliminated.
+- **Memory Safety**: The core engine is written in safe Rust with strictly validated FFI boundaries.
+- **Sandbox Compliance**: Compatible with Android SELinux policies and iOS App Sandbox requirements.
