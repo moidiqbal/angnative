@@ -1,11 +1,11 @@
 # 🚀 AngNative
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/moidiqbal/angnative/master/docs/assets/banner.png" alt="AngNative Banner" width="100%" onerror="this.style.display='none'"/>
+  <img src="docs/assets/banner.svg" alt="AngNative Banner" width="100%"/>
 </p>
 
 <p align="center">
-  <b>The High-Performance Native Mobile & Desktop Framework for Angular.</b><br/>
+  <b>The High-Performance Native Mobile & Desktop Runtime for Angular.</b><br/>
   <i>True Native UI widgets. Zero WebViews. Powered by an ultra-fast Rust Host Engine & Taffy Layout.</i>
 </p>
 
@@ -27,6 +27,37 @@ For over a decade, **Angular** has been the enterprise gold standard for web app
 **AngNative eliminates the compromise.**
 
 AngNative executes your Angular components and reactive signals on an embedded JS runtime, synchronizes a high-throughput shadow tree inside an ultra-fast **Rust Host Engine**, computes Flexbox/Grid layouts via **Taffy**, and renders **100% native platform UI widgets** (`android.widget.*`, `UIKit.*`) via zero-copy C-FFI / JNI bridges.
+
+---
+
+## 📸 Live Demo Showcase
+
+Here is AngNative running on a physical **Android 17 (API 35)** device/emulator showcasing sub-millisecond event synchronization, top-aligned Material 3 views, and bounce animations:
+
+<p align="center">
+  <table align="center">
+    <tr>
+      <th align="center"><b>1. Initial View (Rendered via Rust &amp; Taffy)</b></th>
+      <th align="center"><b>2. Button Tap (Synced with Rust Host Shadow Tree)</b></th>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="docs/assets/demo-initial.png" width="360" alt="Initial Screen"/>
+        <br/>
+        <i>Top-aligned Material 3 card, Native text, and Action button</i>
+      </td>
+      <td align="center">
+        <img src="docs/assets/demo-clicked.png" width="360" alt="Clicked State Screen"/>
+        <br/>
+        <i>Interactive bounce animation, click counter &amp; event sync badge</i>
+      </td>
+    </tr>
+  </table>
+</p>
+
+---
+
+## 🏛️ System Architecture
 
 ```
 +-------------------------------------------------------------+
@@ -57,7 +88,7 @@ AngNative executes your Angular components and reactive signals on an embedded J
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
 - 🎯 **Pure Native Widgets (No WebViews)**: Buttons are real `android.widget.Button` / `UIButton`. Text is real `android.widget.TextView` / `UILabel`. 60–120 FPS buttery smooth scrolling.
 - 🦀 **Rust Core Engine**: Ultra-low memory footprint, lightning-fast mutation batching, and strict memory safety.
@@ -172,7 +203,7 @@ cd platforms/android
 
 ---
 
-## 🗺️ Roadmap & Platform Matrix
+## 🗺️ Platform Support Matrix
 
 | Platform | Target Runtime | Layout Engine | Status |
 | :--- | :--- | :--- | :--- |
@@ -180,6 +211,18 @@ cd platforms/android
 | **iOS** | Swift + UIKit / Metal | Rust Taffy + C-FFI | 🟡 Toolchain & Mach-O arm64 Ready |
 | **Desktop** | Win32 / AppKit / Wayland | Rust Taffy + Winit | 🟡 In Development |
 | **Web** | Standard DOM / HTML5 Fallback | CSS Flexbox | 🟢 Planned |
+
+---
+
+## 📖 In-Depth Documentation
+
+Explore the official engineering documentation in the [`docs/`](docs/) directory:
+- [Architecture Blueprint](docs/ARCHITECTURE.md) — Comprehensive technical design & FFI specifications
+- [Requirements & SLAs](docs/REQUIREMENTS.md) — Functional/non-functional requirements & performance SLAs
+- [Technical Specifications](docs/SPECIFICATIONS.md) — Mutation protocol opcodes & supported Taffy CSS styles
+- [Android Build Guide](docs/ANDROID-BUILD.md) — Detailed NDK, JNI, and Gradle build instructions
+- [Size Budget Policy](docs/R8-SIZE-BUDGET.md) — R8, Proguard, and stripped native binary budgets
+- [Project Roadmap](docs/ROADMAP.md) — Phased delivery plan
 
 ---
 

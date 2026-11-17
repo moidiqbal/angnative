@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A0F1D"/>
+      <stop offset="50%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E1B4B"/>
+    </linearGradient>
+
+    <!-- Accent Gradient -->
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E11D48"/>
+      <stop offset="40%" stop-color="#F43F5E"/>
+      <stop offset="70%" stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+
+    <!-- Rust / Layout Gradient -->
+    <linearGradient id="rustGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF5722"/>
+      <stop offset="100%" stop-color="#F43F5E"/>
+    </linearGradient>
+
+    <!-- Card Background -->
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.07)"/>
+      <stop offset="100%" stop-color="rgba(255, 255, 255, 0.02)"/>
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="30" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="420" rx="16" fill="url(#bg)"/>
+
+  <!-- Subtle Grid Lines -->
+  <g opacity="0.06" stroke="#FFFFFF" stroke-width="1">
+    <line x1="100" y1="0" x2="100" y2="420"/>
+    <line x1="300" y1="0" x2="300" y2="420"/>
+    <line x1="500" y1="0" x2="500" y2="420"/>
+    <line x1="700" y1="0" x2="700" y2="420"/>
+    <line x1="900" y1="0" x2="900" y2="420"/>
+    <line x1="1100" y1="0" x2="1100" y2="420"/>
+    <line x1="0" y1="80" x2="1200" y2="80"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/>
+    <line x1="0" y1="280" x2="1200" y2="280"/>
+    <line x1="0" y1="360" x2="1200" y2="360"/>
+  </g>
+
+  <!-- Glowing Orbs in background -->
+  <circle cx="180" cy="120" r="140" fill="#E11D48" opacity="0.18" filter="url(#glow)"/>
+  <circle cx="1020" cy="300" r="160" fill="#6366F1" opacity="0.15" filter="url(#glow)"/>
+  <circle cx="600" cy="210" r="120" fill="#FB923C" opacity="0.12" filter="url(#glow)"/>
+
+  <!-- Logo Icon: Angular Shield + Rust Gear Motif -->
+  <g transform="translate(100, 110)">
+    <!-- Shield Outline -->
+    <polygon points="60,0 120,22 100,105 60,135 20,105 0,22" fill="url(#primaryGrad)" filter="url(#glow)" opacity="0.9"/>
+    <polygon points="60,6 114,26 96,101 60,129 24,101 6,26" fill="#0F172A"/>
+    <!-- Stylized Angular 'A' + Native Beam -->
+    <path d="M 60,24 L 92,94 L 78,94 L 71,78 L 49,78 L 42,94 L 28,94 Z M 54,64 L 66,64 L 60,46 Z" fill="url(#primaryGrad)"/>
+    <circle cx="60" cy="48" r="4" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Typography -->
+  <text x="250" y="175" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="64" font-weight="900" fill="#FFFFFF" letter-spacing="-1">
+    ANG<tspan fill="url(#primaryGrad)">NATIVE</tspan>
+  </text>
+
+  <text x="252" y="218" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="500" fill="#94A3B8">
+    The High-Performance Native Mobile &amp; Desktop Runtime for Angular
+  </text>
+
+  <text x="252" y="250" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#64748B">
+    Pure Native Platform Widgets • Zero WebViews • Rust Core • Taffy Layout • 60-120 FPS
+  </text>
+
+  <!-- Feature Pill Cards -->
+  <g transform="translate(100, 310)">
+    <!-- Pill 1: Pure Native -->
+    <rect x="0" y="0" width="220" height="52" rx="12" fill="url(#cardBg)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <text x="20" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="700" fill="#F43F5E">📱 Pure Native UI</text>
+    <text x="145" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12" font-weight="500" fill="#94A3B8">No WebViews</text>
+
+    <!-- Pill 2: Rust Core Engine -->
+    <rect x="240" y="0" width="220" height="52" rx="12" fill="url(#cardBg)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <text x="260" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="700" fill="#FB923C">🦀 Rust Engine</text>
+    <text x="375" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12" font-weight="500" fill="#94A3B8">Zero-Copy FFI</text>
+
+    <!-- Pill 3: Taffy Layout -->
+    <rect x="480" y="0" width="230" height="52" rx="12" fill="url(#cardBg)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <text x="500" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="700" fill="#38BDF8">📐 Taffy Layout</text>
+    <text x="620" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12" font-weight="500" fill="#94A3B8">Flexbox &amp; Grid</text>
+
+    <!-- Pill 4: Angular Signals -->
+    <rect x="730" y="0" width="270" height="52" rx="12" fill="url(#cardBg)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <text x="750" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="700" fill="#A855F7">⚡ Angular 19+ Ready</text>
+    <text x="920" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12" font-weight="500" fill="#94A3B8">Signals &amp; DI</text>
+  </g>
+</svg>
