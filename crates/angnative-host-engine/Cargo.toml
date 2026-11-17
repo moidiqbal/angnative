@@ -1,0 +1,15 @@
+[package]
+name = "angnative-host-engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+log.workspace = true
+rquickjs.workspace = true
+angnative-host-core = { path = "../angnative-host-core" }

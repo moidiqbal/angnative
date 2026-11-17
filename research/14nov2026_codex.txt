@@ -5,6 +5,23 @@ Date: 14 November 2026
 Analysed: ./research plus the current repository root
 Prepared by: Codex
 
+UPDATE — 17 NOV 2026 (verified against current source)
+The workspace has since advanced: the TypeScript packages and Rust host crates
+are now present (branch `master`, commit `bc1b336`, with additional local
+changes). Re-evaluate status against the current tree before treating the
+14-Nov recovery blocker below as current. Current verification supersedes
+those older claims:
+  - `angnative-host-layout` now builds on Taffy 0.15.1. Cargo.lock resolves
+    0.15.1, and latest published docs/source checked on 17-Nov-2026 identify
+    0.15.1 as current. Taffy is isolated behind `taffy_adapter.rs`.
+  - `packages/platform/package.json` still lacks `@angular/platform-browser`,
+    while bootstrap source imports `bootstrapApplication` from `@angular/core`.
+    Verify and repair that Angular platform boundary separately; the DOM-less
+    native renderer must remain independent of browser providers.
+  - Rust fmt/check/test/Clippy gates pass; targeted TypeScript
+    contract/conformance suites pass. Full `pnpm test` still reports separate
+    renderer setup, platform package resolution, and bundler filesystem issues.
+
 ================================================================================
 0. EXECUTIVE FINDING — RESOLVE THE REPOSITORY MISMATCH FIRST
 ================================================================================
@@ -13,10 +30,12 @@ The research describes a mature TypeScript monorepo named NativeAngular with
 packages under @nativeangular/*, several merged M1 commits, 234–268 passing
 tests, and feature worktrees such as /workspace/nt-g and /workspace/nt-h.
 
-The repository currently open at:
+At the time this file was first prepared, the repository open at:
   C:\Users\Moid Iqbal\Projects\angnative
 
-does NOT contain that tree:
+did NOT contain that tree. The workspace now has packages and a Rust host, so
+the old snapshot below is historical rather than a description of today's
+checkout:
   - Git branch is `master`, with no commits yet.
   - Every visible project file is untracked.
   - There is no packages/ directory, pnpm-lock.yaml, tsconfig.json, or M1 code.
@@ -26,10 +45,10 @@ does NOT contain that tree:
   - The README claims Angular 19+, while research pins Angular exactly 22.2.5.
   - Root licence metadata says MIT OR Apache-2.0; research requires MIT.
 
-Therefore the reported M1 commits and test counts cannot be verified or
-continued in this checkout. Do not implement Task 2/6/7 here until the intended
-source tree is recovered or the user explicitly chooses this Rust skeleton as
-the canonical project.
+Recheck current Git history and files before using that recovery conclusion.
+The active direction is Rust-first AngNative. Host-layout hardening on Taffy
+0.15.1 is complete; remaining work includes fixing the Angular
+platform-browser boundary and unrelated full TypeScript suite failures.
 
 ================================================================================
 1. RESEARCH STATE AT THE LAST RELIABLE CHECKPOINT
@@ -149,6 +168,23 @@ P2 — PROVE THE KEYSTONE AND FINISH THE DEV LOOP
            until those commands exist.
          - Sanitize the created directory name as well as the package name.
 
+[ ] P2.4 Align the Rust host layout with the pinned Taffy 0.4 API:
+         - Replace legacy dimension/available-space types and calls with the
+           Taffy 0.4 equivalents throughout styles.rs and layout_engine.rs.
+         - Connect text measurement through Taffy's 0.4 measure callback for
+           leaf text nodes; the current measurer is stored but unused.
+         - Preserve CSS-subset semantics for auto, points, percentages, flex,
+           gaps, margins, padding, positioning, and constraints.
+         - Build against the lockfile's Taffy 0.4 version and cover row/column,
+           gap, percentage, auto sizing, and measured text cases.
+
+[ ] P2.5 Complete the Angular browser platform path:
+         - Add `@angular/platform-browser` to the web adapter/build target at
+           the pinned Angular version and use Angular's browser renderer there.
+         - Keep it out of `@angnative/platform`'s DOM-less native runtime bundle.
+         - Prove target-specific bootstraps for the same Angular component on
+           web and through the native renderer.
+
 P3 — NATIVE DEVICE CRITICAL PATH
 --------------------------------------------------------------------------------
 
@@ -185,6 +221,10 @@ P4 — RELEASE TRUTH, DOCUMENTATION, AND SCORECARD
          - m0-gap-analysis.md vs m0-gap-analysis (1).md
          - multiple nativeangular-tree HTML snapshots
          Preserve evidence/history before deleting anything.
+
+[ ] P4.5 Update architecture/task docs: R2 must say Taffy 0.4 (not 0.15),
+         and W1 must name `@angular/platform-browser` as the web target's
+         dependency while explicitly excluding the native runtime.
 
 ================================================================================
 3. NON-NEGOTIABLES IF THE RESEARCH/M1 TREE IS CANONICAL

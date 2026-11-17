@@ -1,0 +1,34 @@
+{
+  "name": "@angnative/testing",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "license": "MIT",
+  "description": "AngNative shared conformance suite + fake backend (the keystone: TS and Rust both pass identical fixtures)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist/**", "fixtures/**"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@angnative/core": "0.1.0",
+    "@angnative/contract": "0.1.0"
+  },
+  "devDependencies": {
+    "@angnative/core": "0.1.0",
+    "@angnative/contract": "0.1.0",
+    "vitest": "3.2.4"
+  },
+  "dependencies": {
+    "@angnative/core": "0.1.0",
+    "@angnative/contract": "0.1.0"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@angnative/platform",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "license": "MIT",
+  "description": "AngNative Angular platform — DOM-less bootstrap and native renderer providers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "files": ["dist/**"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@angular/core": "22.2.5",
+    "@angular/common": "22.2.5",
+    "@angular/platform-browser": "22.2.5",
+    "@angnative/core": "0.1.0",
+    "@angnative/contract": "0.1.0"
+  },
+  "devDependencies": {
+    "@angular/core": "22.2.5",
+    "@angular/common": "22.2.5",
+    "@angular/platform-browser": "22.2.5",
+    "vitest": "3.2.4"
+  },
+  "dependencies": {
+    "@angnative/core": "0.1.0",
+    "@angnative/contract": "0.1.0"
+  }
+}

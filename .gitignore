@@ -16,8 +16,16 @@ pnpm-debug.log*
 # Android
 .gradle/
 build/
+.cxx/
+local.properties
 *.aar
 *.apk
+
+# iOS
+*.ipa
+*.xcarchive
+*.dSYM/
+.swiftpm/
 
 # IDE & OS
 .idea/

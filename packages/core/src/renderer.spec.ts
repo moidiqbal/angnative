@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import {
   AngNativeRenderer,
   AngNativeRendererFactory2,
@@ -42,7 +42,8 @@ describe('AngNativeRenderer mutation batching', () => {
   });
 
   function lastBatch(): any {
-    return JSON.parse(flushes[flushes.length - 1]);
+    renderer.flushBatch();
+    return JSON.parse(flushes[flushes.length - 1]!);
   }
 
   it('emits CreateNode + InsertChild on createElement with parent', () => {
@@ -62,7 +63,7 @@ describe('AngNativeRenderer mutation batching', () => {
 
   it('rejects unknown elements loudly (§5.3 analogue)', () => {
     expect(() => renderer.createElement(null, 'na-ghost')).toThrow(/Unknown/);
-    expect(() => renderer.createElement(null, 'div')).not.toThrow(); // legacy alias allowed
+    expect(() => renderer.createElement(null, 'div')).not.toThrow(); // normalized legacy alias
   });
 
   it('setStyle validates against the style table', () => {
@@ -95,6 +96,26 @@ describe('AngNativeRenderer mutation batching', () => {
     expect(setProp.value).toBe(true);
   });
 
+  it('registers JSON-safe event listeners and dispatches them by stable listener id', () => {
+    const el = renderer.createElement(null, 'na-button');
+    let received: unknown;
+    const unlisten = renderer.listen(el, 'press', (event) => {
+      received = event;
+    });
+
+    const batch = lastBatch();
+    const listener = batch.commands.find(
+      (command: any) => command.kind === 'SetProperty' && command.key.startsWith('listener:press:'),
+    );
+    expect(listener.value).toEqual({ eventName: 'press', listenerId: 1 });
+    const event = { source: 'native' };
+    renderer.dispatchEvent(listener.value.listenerId, event);
+    expect(received).toBe(event);
+
+    unlisten();
+    expect(renderer.dispatchEvent(listener.value.listenerId, event)).toBeUndefined();
+  });
+
   it('appendChild / removeChild record mutations', () => {
     const parent = renderer.createElement(null, 'na-view');
     const child = renderer.createElement(null, 'na-view');
@@ -122,7 +143,7 @@ describe('AngNativeRenderer mutation batching', () => {
     const noFlush = new AngNativeRenderer({});
     const el = noFlush.createElement(null, 'na-view');
     noFlush.setStyle(el, 'width', '100');
-    expect(noFlush.pendingCount()).toBe(1);
+    expect(noFlush.pendingCount()).toBe(2); // CreateNode + SetStyle
     expect(() => noFlush.flushBatch()).not.toThrow();
   });
 });
@@ -137,7 +158,7 @@ describe('AngNativeRendererFactory2', () => {
     const r2 = factory.createRenderer(null, null);
     expect(r1).toBe(r2); // singleton
 
-    const el = r1.createElement(null, 'na-view');
+    const el = r1.createElement('na-view');
     r1.setStyle(el, 'height', '50');
     factory.end();
     expect(flushes.length).toBe(1);
@@ -149,11 +170,11 @@ describe('AngNativeRendererFactory2', () => {
       onFlush: (json) => flushes.push(json),
     });
     const renderer = factory.createRenderer(null, null);
-    const el = renderer.createElement(null, 'na-text');
+    const el = renderer.createElement('na-text');
     renderer.setValue(el, 'hi');
     factory.end();
     expect(flushes.length).toBe(1);
-    const batch = JSON.parse(flushes[0]);
+    const batch = JSON.parse(flushes[0]!);
     const setText = batch.commands.find((c: any) => c.kind === 'SetTextContent');
     expect(setText.text).toBe('hi');
   });

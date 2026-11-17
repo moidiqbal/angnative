@@ -4,7 +4,7 @@
  *
  * Commands:
  *   doctor   Check the toolchain (Node, Angular, TS, Rust, Android SDK, Xcode, NDK)
- *   create   Scaffold a new app (stub — full scaffolding in a later task)
+ *   create   Scaffold a new app (see create.ts)
  *   test     Run the repository test suite
  *   build    Bundle the app for production + size report
  *   dev      Start the dev server with incremental AOT + fast refresh
@@ -17,6 +17,7 @@
 import { doctorMain } from './doctor';
 import { devMain } from './dev';
 import { bundleApp } from './bundle';
+import { createApp } from './create';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -38,7 +39,7 @@ Usage:
 
 Commands:
   doctor   Check the toolchain and the pinned package versions
-  create   Scaffold a new app
+  create <app-name>  Scaffold a new AngNative app
   test     Run the contract suite
   inspect  Render the native element tree of the AOT fixture as a self-contained page
   build    Bundle the app for production and report its size
@@ -72,9 +73,29 @@ async function runDev(): Promise<number> {
   return 0;
 }
 
-function runCreate(): number {
-  console.log('[angnative create] scaffolding is not yet implemented in this track.');
-  console.log('  See Task T6 (CLI create command) for full scaffolding.');
+function runCreate(argv: string[]): number {
+  const [appName] = argv;
+
+  if (!appName) {
+    console.error('error: app name is required');
+    console.log('  Usage: angnative create <app-name>');
+    return 1;
+  }
+
+  try {
+    const dir = createApp(appName);
+    console.log(`[angnative create] scaffolded ${appName} at ${dir}`);
+    console.log(`  Next: cd ${appName} && pnpm install`);
+    return 0;
+  } catch (err) {
+    console.error(`error: create failed: ${err instanceof Error ? err.message : String(err)}`);
+    return 1;
+  }
+}
+
+function runInspect(): number {
+  console.log('[angnative inspect] open packages/cli/src/inspector.html in a browser.');
+  console.log('  The page reads a host-tree JSON snapshot and renders it; no network requests.');
   return 0;
 }
 
@@ -90,7 +111,9 @@ async function main(argv: string[]): Promise<number> {
     case 'doctor':
       return doctorMain();
     case 'create':
-      return runCreate();
+      return runCreate(rest);
+    case 'inspect':
+      return runInspect();
     case 'test':
       return runTest();
     case 'build':

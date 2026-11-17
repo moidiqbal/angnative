@@ -1,0 +1,12 @@
+{
+  "name": "multiple-listeners-per-event",
+  "description": "Multiple listeners can be registered for the same event on one node.",
+  "commands": [
+    { "kind": "CreateNode", "id": 1, "nodeType": "View" },
+    { "kind": "SetProperty", "id": 1, "key": "listener:press:1", "value": { "eventName": "press", "callback": "fn1" } },
+    { "kind": "SetProperty", "id": 1, "key": "listener:press:2", "value": { "eventName": "press", "callback": "fn2" } }
+  ],
+  "expect": {
+    "node1": { "hasListenerPress1": true, "hasListenerPress2": true }
+  }
+}

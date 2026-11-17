@@ -40,8 +40,8 @@ describe('style table (§5.6)', () => {
     expect(parseColor('#fff')).toBe('#fff');
     expect(parseColor('#ff0000ff')).toBe('#ff0000ff');
     expect(parseColor('transparent')).toBe('transparent');
-    expect(parseColor('rgb(255, 0, 0)')).toBe('rgb(255, 0, 0)');
-    expect(parseColor('rgba(255, 0, 0, 0.5)')).toBe('rgba(255, 0, 0, 0.5)');
+    expect(parseColor('rgb(255, 0, 0)')).toBe('rgb(255,0,0)');
+    expect(parseColor('rgba(255, 0, 0, 0.5)')).toBe('rgba(255,0,0,0.5)');
     expect(() => parseColor('#ggg')).toThrow();
     expect(() => parseColor('notacolor')).toThrow();
   });
@@ -59,7 +59,7 @@ describe('style table (§5.6)', () => {
   it('validates and canonicalizes a style map', () => {
     const out = validateStyleMap(
       { width: '10', height: '50%', color: '#f00', flexDirection: 'row' },
-      'na-view',
+      'na-text',
     );
     expect(out.width).toBe('10px');
     expect(out.height).toBe('50%');

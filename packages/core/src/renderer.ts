@@ -18,9 +18,8 @@
 import {
   Renderer2,
   RendererFactory2,
-  RenderDebugInfo,
   RendererStyleFlags2,
-  RendererType2,
+  type RendererType2,
 } from '@angular/core';
 import type { ElementContract } from '@angnative/contract/elements';
 import { ELEMENT_TAGS, getContract, isKnownElement } from '@angnative/contract/elements';
@@ -30,8 +29,8 @@ import type { Command } from '@angnative/contract/protocol';
 import { createBatch, encodeBatch } from '@angnative/contract/protocol';
 import {
   NativeElement,
-  NativeNodeType,
-  NodeId,
+  type NativeNodeType,
+  type NodeId,
   ElementRegistry,
 } from './native-element';
 
@@ -89,6 +88,35 @@ export function tagToNodeType(tag: string): NativeNodeType {
   }
 }
 
+function canonicalElementTag(tag: string): string {
+  switch (tag.toLowerCase()) {
+    case 'native-view':
+    case 'view':
+    case 'div':
+      return ELEMENT_TAGS.view;
+    case 'native-text':
+    case 'text':
+    case 'span':
+      return ELEMENT_TAGS.text;
+    case 'native-image':
+    case 'image':
+    case 'img':
+      return ELEMENT_TAGS.image;
+    case 'native-scroll-view':
+    case 'scroll-view':
+      return ELEMENT_TAGS.scrollView;
+    case 'native-text-input':
+    case 'text-input':
+      return ELEMENT_TAGS.textInput;
+    case 'na-button':
+    case 'native-button':
+    case 'button':
+      return ELEMENT_TAGS.pressable;
+    default:
+      return tag;
+  }
+}
+
 /**
  * AngNative's custom `Renderer2`. Translates Angular template operations
  * into native view mutations and batches them for flush.
@@ -97,8 +125,11 @@ export class AngNativeRenderer implements Renderer2 {
   private readonly registry: ElementRegistry;
   private readonly flush: FlushHandler | null;
   private readonly mutations: Command[] = [];
+  private readonly listeners = new Map<number, (event: any) => boolean | void>();
+  private nextListenerId = 1;
+  readonly data: { [key: string]: any } = {};
+  destroyNode: ((node: any) => void) | null = (node) => this.destroyNativeNode(node);
   private frameId = 0;
-  private flushed = false;
 
   constructor(private readonly options: AngNativeRendererOptions = {}) {
     this.registry = new ElementRegistry();
@@ -109,28 +140,34 @@ export class AngNativeRenderer implements Renderer2 {
 
   destroy(): void {
     this.mutations.length = 0;
+    this.listeners.clear();
     this.frameId = 0;
-    this.flushed = false;
   }
 
   /* ---------- creation ---------- */
 
-  createElement(
-    parent: any,
-    name: string,
-    _debugInfo?: RenderDebugInfo,
-  ): any {
-    if (!isKnownElement(name)) {
+  createElement(name: string, namespace?: string | null): any;
+  /** Legacy AngNative overload; Angular itself calls the Renderer2 signature above. */
+  createElement(parent: any, name: string): any;
+  createElement(nameOrParent: any, nameOrNamespace?: string | null): any {
+    const legacyParent = typeof nameOrParent === 'string' ? null : nameOrParent;
+    const name = typeof nameOrParent === 'string' ? nameOrParent : nameOrNamespace;
+    if (typeof name !== 'string') {
+      throw new TypeError('createElement requires an element name');
+    }
+    const parent = legacyParent;
+    const canonicalTag = canonicalElementTag(name);
+    if (!isKnownElement(canonicalTag)) {
       throw new Error(
         `Unknown element "${name}". Use a canonical na-* tag (e.g. na-view, na-text).`,
       );
     }
 
-    const contract = getContract(name)!;
+    const contract = getContract(canonicalTag)!;
     const nodeType = tagToNodeType(name);
     const id = this.registry.allocateId();
 
-    const element = new NativeElement(id, name, nodeType);
+    const element = new NativeElement(id, canonicalTag, nodeType);
     element.applyDefaults(contract.defaultStyles);
     this.registry.register(element);
 
@@ -158,11 +195,10 @@ export class AngNativeRenderer implements Renderer2 {
       });
     }
 
-    this.maybeFlush();
     return element;
   }
 
-  createComment(value: string, _debugInfo?: RenderDebugInfo): any {
+  createComment(value: string): any {
     // Comments are not native nodes; return a lightweight marker node.
     const id = this.registry.allocateId();
     const element = new NativeElement(id, '#comment', 'Custom');
@@ -174,11 +210,10 @@ export class AngNativeRenderer implements Renderer2 {
       nodeType: 'Custom',
     });
     this.recordMutation({ kind: 'SetTextContent', id, text: value });
-    this.maybeFlush();
     return element;
   }
 
-  createText(value: string, _debugInfo?: RenderDebugInfo): any {
+  createText(value: string): any {
     const id = this.registry.allocateId();
     const element = new NativeElement(id, '#text', 'Text');
     element.setTextContent(value);
@@ -189,7 +224,6 @@ export class AngNativeRenderer implements Renderer2 {
       nodeType: 'Text',
     });
     this.recordMutation({ kind: 'SetTextContent', id, text: value });
-    this.maybeFlush();
     return element;
   }
 
@@ -220,7 +254,6 @@ export class AngNativeRenderer implements Renderer2 {
       index: parentEl.children.length - 1,
     });
 
-    this.maybeFlush();
   }
 
   insertBefore(parent: any, newChild: any, refChild: any): void {
@@ -253,7 +286,6 @@ export class AngNativeRenderer implements Renderer2 {
       index: idx < 0 ? parentEl.children.length - 1 : idx,
     });
 
-    this.maybeFlush();
   }
 
   removeChild(parent: any, oldChild: any): void {
@@ -275,17 +307,25 @@ export class AngNativeRenderer implements Renderer2 {
       childId: childEl.id,
     });
 
-    this.maybeFlush();
   }
 
   selectRootElement(
     selectorOrNode: string | any,
     preserveContent = false,
   ): any {
-    // No DOM in native mode. Treat the passed node as the root, or create a
-    // default root na-view when given a selector string.
+    // No DOM in native mode. If a NativeElement is passed, use it as the root.
+    if (selectorOrNode && typeof selectorOrNode === 'object' && 'id' in selectorOrNode) {
+      return selectorOrNode;
+    }
+    // If a selector string is given (e.g. the component selector), create a
+    // generic native root container for it. Unknown tags become `Custom` nodes
+    // so bootstrap can proceed without a DOM host element.
     if (typeof selectorOrNode === 'string') {
-      return this.createElement(null, selectorOrNode);
+      const id = this.registry.allocateId();
+      const element = new NativeElement(id, selectorOrNode, 'Custom');
+      this.registry.register(element);
+      this.recordMutation({ kind: 'CreateNode', id, nodeType: 'Custom' });
+      return element;
     }
     return selectorOrNode;
   }
@@ -302,7 +342,8 @@ export class AngNativeRenderer implements Renderer2 {
     const parent = this.registry.get(el.parentId);
     const idx = parent.children.indexOf(el.id);
     if (idx < 0 || idx === parent.children.length - 1) return null;
-    return this.registry.get(parent.children[idx + 1]);
+    const nextId = parent.children[idx + 1];
+    return nextId === undefined ? null : this.registry.get(nextId);
   }
 
   /* ---------- attributes / classes / styles ---------- */
@@ -316,7 +357,6 @@ export class AngNativeRenderer implements Renderer2 {
       key: `attr:${name}`,
       value,
     });
-    this.maybeFlush();
   }
 
   removeAttribute(el: any, name: string, _namespace?: string): void {
@@ -328,7 +368,6 @@ export class AngNativeRenderer implements Renderer2 {
       key: `attr:${name}`,
       value: null,
     });
-    this.maybeFlush();
   }
 
   addClass(el: any, name: string): void {
@@ -344,7 +383,6 @@ export class AngNativeRenderer implements Renderer2 {
         key: 'class',
         value: classes.join(' '),
       });
-      this.maybeFlush();
     }
   }
 
@@ -360,7 +398,6 @@ export class AngNativeRenderer implements Renderer2 {
       key: 'class',
       value: filtered.join(' '),
     });
-    this.maybeFlush();
   }
 
   setStyle(
@@ -379,7 +416,6 @@ export class AngNativeRenderer implements Renderer2 {
       key: style,
       value: canonical,
     });
-    this.maybeFlush();
   }
 
   removeStyle(el: any, style: string, _flags?: RendererStyleFlags2): void {
@@ -391,7 +427,6 @@ export class AngNativeRenderer implements Renderer2 {
       key: style,
       value: '',
     });
-    this.maybeFlush();
   }
 
   /* ---------- properties / text ---------- */
@@ -405,7 +440,6 @@ export class AngNativeRenderer implements Renderer2 {
       key: name,
       value,
     });
-    this.maybeFlush();
   }
 
   setValue(node: any, value: string): void {
@@ -416,7 +450,6 @@ export class AngNativeRenderer implements Renderer2 {
       id: element.id,
       text: value,
     });
-    this.maybeFlush();
   }
 
   /* ---------- events ---------- */
@@ -425,6 +458,7 @@ export class AngNativeRenderer implements Renderer2 {
     target: 'window' | 'document' | 'body' | any,
     eventName: string,
     callback: (event: any) => boolean | void,
+    _options?: { capture?: boolean; once?: boolean; passive?: boolean },
   ): () => void {
     let element: NativeElement | null = null;
     if (target === 'window' || target === 'document' || target === 'body') {
@@ -434,29 +468,45 @@ export class AngNativeRenderer implements Renderer2 {
       element = this.asElement(target);
     }
 
-    const listenerId = this.registry.allocateId();
+    const listenerId = this.nextListenerId++;
+    this.listeners.set(listenerId, callback);
     this.recordMutation({
       kind: 'SetProperty',
       id: element ? element.id : 0,
       key: `listener:${eventName}:${listenerId}`,
-      value: { eventName, callback },
+      value: { eventName, listenerId },
     });
 
-    this.maybeFlush();
 
     return () => {
       // Remove the listener registration.
       if (element) {
         element.removeProperty(`listener:${eventName}:${listenerId}`);
       }
+      this.listeners.delete(listenerId);
       this.recordMutation({
         kind: 'SetProperty',
         id: element ? element.id : 0,
         key: `listener:${eventName}:${listenerId}`,
         value: null,
       });
-      this.maybeFlush();
     };
+  }
+
+  /** Dispatch a native event to a listener registered by Angular. */
+  dispatchEvent(listenerId: number, event: any): boolean | void {
+    return this.listeners.get(listenerId)?.(event);
+  }
+
+  private destroyNativeNode(node: any): void {
+    if (!(node instanceof NativeElement) || !this.registry.has(node.id)) return;
+    if (node.parentId !== null && this.registry.has(node.parentId)) {
+      const parent = this.registry.get(node.parentId);
+      parent.removeChildId(node.id);
+      this.recordMutation({ kind: 'RemoveChild', parentId: parent.id, childId: node.id });
+    }
+    this.registry.remove(node.id);
+    this.recordMutation({ kind: 'RemoveNode', id: node.id });
   }
 
   /* ---------- internals ---------- */
@@ -473,18 +523,6 @@ export class AngNativeRenderer implements Renderer2 {
     this.mutations.push(mutation);
   }
 
-  /** Flush the accumulated batch if a flush handler is attached. */
-  private maybeFlush(): void {
-    if (!this.flush) return;
-    if (this.flushed) return; // already flushed this tick
-    this.flushed = true;
-    const batch = createBatch(this.frameId++, Date.now(), this.mutations);
-    const json = encodeBatch(batch);
-    this.flush.onFlush(json);
-    this.mutations.length = 0;
-    this.flushed = false;
-  }
-
   /** Manually flush the current batch (call at end of change detection tick). */
   flushBatch(): void {
     if (this.mutations.length === 0 || !this.flush) return;
@@ -492,7 +530,6 @@ export class AngNativeRenderer implements Renderer2 {
     const json = encodeBatch(batch);
     this.flush.onFlush(json);
     this.mutations.length = 0;
-    this.flushed = false;
   }
 
   /** Expose the registry for testing / backends. */

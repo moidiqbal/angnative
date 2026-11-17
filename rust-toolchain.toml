@@ -1,0 +1,23 @@
+# rust-toolchain.toml — Pinned toolchain for AngNative Android build
+# Matches TaskList.txt non-negotiables: Rust nightly for Android NDK targets
+
+[toolchain]
+channel = "nightly-2026-11-14"
+profile = "minimal"
+targets = [
+  "aarch64-linux-android",   # Android 64-bit ARM
+  "armv7-linux-androideabi", # Android 32-bit ARM
+  "x86_64-linux-android",    # Android x86_64 emulator
+]
+
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android24-clang"
+ar = "llvm-ar"
+
+[target.armv7-linux-androideabi]
+linker = "armv7a-linux-androideabi24-clang"
+ar = "llvm-ar"
+
+[target.x86_64-linux-android]
+linker = "x86_64-linux-android24-clang"
+ar = "llvm-ar"

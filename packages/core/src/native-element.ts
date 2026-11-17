@@ -116,6 +116,17 @@ export class ElementRegistry {
     this.elements.set(element.id, element);
   }
 
+  /** Register an element with an explicit id (used by the fake backend / Rust host mirror). */
+  registerWithId(element: NativeElement): void {
+    if (this.elements.has(element.id)) {
+      throw new Error(`Element with id ${element.id} already registered`);
+    }
+    this.elements.set(element.id, element);
+    if (element.id >= this.nextId) {
+      this.nextId = element.id + 1;
+    }
+  }
+
   /** Look up an element by id. Throws if missing (loud failure). */
   get(id: NodeId): NativeElement {
     const element = this.elements.get(id);

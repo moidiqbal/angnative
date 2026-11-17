@@ -244,7 +244,7 @@ function decodeCommand(raw: unknown): Command {
         childId: requireNonNegativeInteger(cmd, 'childId', 'RemoveChild'),
       };
     case 'SetProperty': {
-      const value = requireField(cmd, 'value', 'SetProperty');
+      const value = requireField<JsonValue>(cmd, 'value', 'SetProperty');
       return {
         kind,
         id: requireNonNegativeInteger(cmd, 'id', 'SetProperty'),

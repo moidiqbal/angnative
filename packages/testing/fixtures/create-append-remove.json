@@ -1,0 +1,22 @@
+{
+  "name": "create-append-remove",
+  "description": "Create nodes, append children, then remove them; assert tree shape and mutation sequence.",
+  "commands": [
+    { "kind": "CreateNode", "id": 1, "nodeType": "View" },
+    { "kind": "CreateNode", "id": 2, "nodeType": "View" },
+    { "kind": "CreateNode", "id": 3, "nodeType": "Text" },
+    { "kind": "InsertChild", "parentId": 1, "childId": 2, "index": 0 },
+    { "kind": "InsertChild", "parentId": 1, "childId": 3, "index": 1 },
+    { "kind": "SetTextContent", "id": 3, "text": "hello" },
+    { "kind": "RemoveChild", "parentId": 1, "childId": 3 },
+    { "kind": "RemoveNode", "id": 3 }
+  ],
+  "expect": {
+    "finalTree": {
+      "1": { "children": [2], "textContent": null },
+      "2": { "children": [], "textContent": null },
+      "3": null
+    },
+    "mutationKinds": ["CreateNode", "CreateNode", "CreateNode", "InsertChild", "InsertChild", "SetTextContent", "RemoveChild", "RemoveNode"]
+  }
+}

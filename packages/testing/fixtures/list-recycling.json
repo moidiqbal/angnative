@@ -1,0 +1,18 @@
+{
+  "name": "list-recycling",
+  "description": "na-list recycles a fixed slot count; removing a child does not destroy its native view slot.",
+  "commands": [
+    { "kind": "CreateNode", "id": 1, "nodeType": "Custom" },
+    { "kind": "CreateNode", "id": 2, "nodeType": "View" },
+    { "kind": "CreateNode", "id": 3, "nodeType": "View" },
+    { "kind": "InsertChild", "parentId": 1, "childId": 2, "index": 0 },
+    { "kind": "InsertChild", "parentId": 1, "childId": 3, "index": 1 },
+    { "kind": "RemoveChild", "parentId": 1, "childId": 2 },
+    { "kind": "InsertChild", "parentId": 1, "childId": 2, "index": 0 }
+  ],
+  "expect": {
+    "node1": { "children": [2, 3] },
+    "node2": { "reused": true },
+    "node3": { "children": [] }
+  }
+}

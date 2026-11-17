@@ -1,0 +1,18 @@
+{
+  "name": "reparent",
+  "description": "Re-parenting a node removes it from its old parent's child list (M0 review fix).",
+  "commands": [
+    { "kind": "CreateNode", "id": 1, "nodeType": "View" },
+    { "kind": "CreateNode", "id": 2, "nodeType": "View" },
+    { "kind": "CreateNode", "id": 3, "nodeType": "View" },
+    { "kind": "InsertChild", "parentId": 1, "childId": 2, "index": 0 },
+    { "kind": "InsertChild", "parentId": 2, "childId": 3, "index": 0 },
+    { "kind": "RemoveChild", "parentId": 2, "childId": 3 },
+    { "kind": "InsertChild", "parentId": 1, "childId": 3, "index": 1 }
+  ],
+  "expect": {
+    "node1": { "children": [2, 3] },
+    "node2": { "children": [] },
+    "node3": { "parentId": 1 }
+  }
+}

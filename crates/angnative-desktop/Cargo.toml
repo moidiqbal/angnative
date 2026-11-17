@@ -1,0 +1,21 @@
+[package]
+name = "angnative-desktop"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+log.workspace = true
+angnative-host-core = { path = "../angnative-host-core" }
+angnative-host-layout = { path = "../angnative-host-layout" }
+angnative-host-view = { path = "../angnative-host-view" }
+angnative-host-engine = { path = "../angnative-host-engine" }
+winit = "0.29"
+wgpu = "0.21"
+raw-window-handle = "0.6"
+bytemuck = "1.16"
+pollster = "0.3"

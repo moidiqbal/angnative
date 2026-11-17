@@ -1,0 +1,11 @@
+{
+  "name": "error-cases",
+  "description": "Unknown elements, unknown styles, missing fields, and bad protocol versions must throw loudly.",
+  "commands": [],
+  "expect": {
+    "unknownElementThrows": true,
+    "unknownStyleThrows": true,
+    "missingFieldThrows": true,
+    "badProtocolVersionThrows": true
+  }
+}

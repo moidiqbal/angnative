@@ -11,6 +11,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./native-element": {
+      "types": "./dist/native-element.d.ts",
+      "default": "./dist/native-element.js"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "default": "./dist/renderer.js"
     }
   },
   "files": ["dist/**"],

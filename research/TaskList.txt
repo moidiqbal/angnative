@@ -138,7 +138,7 @@ layout, and emits platform operations.
 | ID | Task | Definition of done |
 |---|---|---|
 | R1 | `angnative-host-core` — element tree, command decode (serde), retained-tree model, **diff/patch engine** (Fabric's model: a commit is a set of mutations, not a rebuild) | Unit tests; commands decode; diff emits minimal op set |
-| R2 | `angnative-host-layout` — taffy 0.15 layout + a `TextMeasurer` trait; `NaiveMeasurer` for unit tests, platform measurer (CoreText / StaticLayout) behind the same trait | Layout tests against known flex/grid cases; text cache keyed `(text, font, available width)` |
+| R2 | `angnative-host-layout` — Taffy 0.4 layout + a `TextMeasurer` trait; `NaiveMeasurer` for unit tests, platform measurer (CoreText / StaticLayout) behind the same trait | Align implementation to the pinned 0.4 API; layout tests cover known flex/grid cases and measured text; cache key `(text, font, available width)` |
 | R3 | `angnative-host-view` — view tree + `ViewFactory` trait + platform op emission (`Create / SetFrame / SetProps / SetText / Append / Insert / Remove / Destroy`) | Ops are deterministic and ordered |
 | R4 | **The Rust host passes the same conformance suite as the TS fake backend** — same JSON fixtures, two runners | One suite, two implementations, both green. **This is the keystone of the whole plan.** |
 | R5 | `angnative-host-engine` — engine-neutral trait; QuickJS-ng (rquickjs) impl; JavaScriptCore impl for Apple; dev-mode inspector hook | The TS side never learns which engine is embedded (spec D5 / `nativeangular-js`) |
@@ -202,7 +202,7 @@ Element → native view mapping (the spec's §8 element set, `na-` prefix per D9
 
 | ID | Task | Definition of done |
 |---|---|---|
-| W1 | Web build target using `@angular/platform-browser` — **no Rust host, no native renderer** | The same component tree renders in a browser |
+| W1 | Web build target using `@angular/platform-browser` — **no Rust host, no native renderer**; keep this dependency out of the DOM-less native `@angnative/platform` runtime | The same component tree renders in a browser |
 | W2 | Shared-services repo: validation, state, API clients, business logic in one place, used by both the web build and the native build | One service, two runtimes |
 | W3 | **Proof sample**: the same services/validation run on web and on device | This is the artefact that moves the scorecard's "Code reuse 1/5 → 2/5" |
 | W4 | Publish the migration story: *"an existing Angular web team gets a native app without rewriting the app"* — with real numbers | A published case study with measured figures |

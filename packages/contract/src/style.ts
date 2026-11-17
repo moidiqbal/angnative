@@ -51,7 +51,7 @@ const NAMED_COLORS = new Set([
   'transparent', 'currentcolor', 'black', 'white', 'red', 'green', 'blue',
   'gray', 'grey', 'yellow', 'orange', 'purple', 'pink', 'brown',
 ]);
-const RGB_COLOR = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([0-9](?:\.[0-9]+)?|1|0?\.[0-9]+)?)\s*\)$/;
+const RGB_COLOR = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:,\s*([0-9](?:\.[0-9]+)?|1|0?\.[0-9]+))?\s*\)$/;
 
 function clampByte(n: number, what: string): number {
   if (n < 0 || n > 255) throw new Error(`Invalid color: ${what}`);

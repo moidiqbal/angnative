@@ -61,7 +61,7 @@ describe('element contracts (§8 / D9 na- prefix)', () => {
   });
 
   it('throws on unknown elements', () => {
-    expect(() => getContract('na-not-an-element')).toBeUndefined();
+    expect(getContract('na-not-an-element')).toBeUndefined();
     expect(() => validateElementStyles('na-ghost', {})).toThrow(/Unknown/);
   });
 });

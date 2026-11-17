@@ -1,0 +1,14 @@
+{
+  "name": "set-text-content",
+  "description": "Set text content on text and input nodes; assert text_content field.",
+  "commands": [
+    { "kind": "CreateNode", "id": 1, "nodeType": "Text" },
+    { "kind": "CreateNode", "id": 2, "nodeType": "TextInput" },
+    { "kind": "SetTextContent", "id": 1, "text": "hello world" },
+    { "kind": "SetTextContent", "id": 2, "text": "initial value" }
+  ],
+  "expect": {
+    "node1": { "textContent": "hello world" },
+    "node2": { "textContent": "initial value" }
+  }
+}

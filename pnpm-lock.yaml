@@ -30,7 +30,84 @@ importers:
         specifier: 0.28.2
         version: 0.28.2
 
+  packages/common:
+    dependencies:
+      '@angnative/contract':
+        specifier: 0.1.0
+        version: link:../contract
+      '@angnative/core':
+        specifier: 0.1.0
+        version: link:../core
+    devDependencies:
+      '@angular/core':
+        specifier: 22.2.5
+        version: 22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2)
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.0)
+
+  packages/contract:
+    devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.0)
+
+  packages/core:
+    dependencies:
+      '@angnative/contract':
+        specifier: 0.1.0
+        version: link:../contract
+    devDependencies:
+      '@angular/core':
+        specifier: 22.2.5
+        version: 22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2)
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.0)
+
+  packages/platform:
+    dependencies:
+      '@angnative/contract':
+        specifier: 0.1.0
+        version: link:../contract
+      '@angnative/core':
+        specifier: 0.1.0
+        version: link:../core
+    devDependencies:
+      '@angular/common':
+        specifier: 22.2.5
+        version: 22.2.5(@angular/core@22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: 22.2.5
+        version: 22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2)
+      '@angular/platform-browser':
+        specifier: 22.2.5
+        version: 22.2.5(@angular/common@22.2.5(@angular/core@22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2))
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.0)
+
+  packages/testing:
+    dependencies:
+      '@angnative/contract':
+        specifier: 0.1.0
+        version: link:../contract
+      '@angnative/core':
+        specifier: 0.1.0
+        version: link:../core
+    devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.0)
+
 packages:
+
+  '@angular/common@22.2.5':
+    resolution: {integrity: sha512-8yRucwXK0pl+Y7d9rjz9Ml5Lp4OliOc+OTqIhy8X14vsQvn3eJ4fhDBL0Nk2YKKYE9j05X2YtARpX783av4odw==}
+    engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
+    peerDependencies:
+      '@angular/core': 22.2.5
+      rxjs: ^6.5.3 || ^7.4.0
 
   '@angular/compiler-cli@22.2.5':
     resolution: {integrity: sha512-eNZ+4v67MOvrFkz//zYwbW13MZkIduFxQSZsQr1XlU5QNb24WTzvfkXROvEByGM1z1wgmEXXJvk4kIY7j8XdPQ==}
@@ -58,6 +135,17 @@ packages:
       '@angular/compiler':
         optional: true
       zone.js:
+        optional: true
+
+  '@angular/platform-browser@22.2.5':
+    resolution: {integrity: sha512-q5xjwutXUNL3qiW2GGBdWIK5OVd7gquGIIWWkr9kgQaSG+0+nbMbmqqOpAWDbnDNv2Jw6ADdFRrZMMXk+71Ovg==}
+    engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
+    peerDependencies:
+      '@angular/animations': 22.2.5
+      '@angular/common': 22.2.5
+      '@angular/core': 22.2.5
+    peerDependenciesMeta:
+      '@angular/animations':
         optional: true
 
   '@babel/code-frame@8.0.6':
@@ -852,6 +940,12 @@ packages:
 
 snapshots:
 
+  '@angular/common@22.2.5(@angular/core@22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2))(rxjs@7.8.2)':
+    dependencies:
+      '@angular/core': 22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2)
+      rxjs: 7.8.2
+      tslib: 2.9.1
+
   '@angular/compiler-cli@22.2.5(@angular/compiler@22.2.5)(typescript@6.0.3)':
     dependencies:
       '@angular/compiler': 22.2.5
@@ -876,6 +970,12 @@ snapshots:
       tslib: 2.9.1
     optionalDependencies:
       '@angular/compiler': 22.2.5
+
+  '@angular/platform-browser@22.2.5(@angular/common@22.2.5(@angular/core@22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2))':
+    dependencies:
+      '@angular/common': 22.2.5(@angular/core@22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core': 22.2.5(@angular/compiler@22.2.5)(rxjs@7.8.2)
+      tslib: 2.9.1
 
   '@babel/code-frame@8.0.6':
     dependencies:

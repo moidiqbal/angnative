@@ -32,8 +32,10 @@
 ## D-8 (Rust-first) — decided
 
 Rust-first is the decided direction (TaskList.txt D-1, Q3 default). The 1 MB per-platform
-stripped+LTO static library budget (spec D-8) stands as a hard constraint. The measured
-number is produced by Phase 2, Task R8 — it is not estimated.
+stripped+LTO static library budget (spec D-8) stands as a hard constraint. The measurement
+tooling is implemented (`scripts/check-rust-size.mjs`, `pnpm run check:rust-size`) but the
+actual measured number still needs to be produced where `cargo`/`rustc` exists — see
+`docs/R8-SIZE-BUDGET.md` for the measurement procedure and results log.
 
 ## D-9 (element prefix) — decided
 

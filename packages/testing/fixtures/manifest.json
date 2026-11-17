@@ -1,0 +1,11 @@
+[
+  "create-append-remove",
+  "set-property-and-style",
+  "set-text-content",
+  "view-flattening",
+  "list-recycling",
+  "error-cases",
+  "capability-degradation",
+  "reparent",
+  "multiple-listeners-per-event"
+]

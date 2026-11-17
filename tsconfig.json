@@ -3,6 +3,9 @@
   "references": [
     { "path": "./packages/contract" },
     { "path": "./packages/core" },
+    { "path": "./packages/common" },
+    { "path": "./packages/platform" },
+    { "path": "./packages/testing" },
     { "path": "./packages/cli" }
   ]
 }

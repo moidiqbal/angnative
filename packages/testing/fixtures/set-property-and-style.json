@@ -1,0 +1,19 @@
+{
+  "name": "set-property-and-style",
+  "description": "Set properties and styles on a node; assert canonicalized values and unknown-key rejection.",
+  "commands": [
+    { "kind": "CreateNode", "id": 1, "nodeType": "View" },
+    { "kind": "SetStyle", "id": 1, "key": "flexDirection", "value": "row" },
+    { "kind": "SetStyle", "id": 1, "key": "width", "value": "200" },
+    { "kind": "SetStyle", "id": 1, "key": "color", "value": "#ff0000" },
+    { "kind": "SetProperty", "id": 1, "key": "disabled", "value": true },
+    { "kind": "SetProperty", "id": 1, "key": "count", "value": 42 }
+  ],
+  "expect": {
+    "node1": {
+      "styles": { "flexDirection": "row", "width": "200px", "color": "#ff0000" },
+      "properties": { "disabled": true, "count": 42 }
+    },
+    "unknownKeyThrows": true
+  }
+}

@@ -1,13 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/angnative-core",
+    # "crates/angnative-core",  # legacy; no lib.rs
+    "crates/angnative-host-core",
+    "crates/angnative-host-layout",
+    "crates/angnative-host-view",
+    "crates/angnative-host-engine",
+    "crates/angnative-host-ffi",
+    "crates/angnative-services-core",
+    # "crates/angnative-desktop",
     # The crates below are planned (TaskList.txt Phase 2/3) but not yet created.
-    # They will be added here as they are implemented — one at a time, verified.
-    # "crates/angnative-layout",
+    # They will be added here as they are implemented - one at a time, verified.
     # "crates/angnative-compiler",
     # "crates/angnative-runtime",
-    # "crates/angnative-desktop",
     # "crates/angnative-android",
 ]
 
@@ -18,17 +23,19 @@ authors = ["AngNative Team"]
 license = "MIT"
 repository = "https://github.com/angnative/angnative"
 
+# Release profile optimized for size — LTO + single codegen unit for the
+# 1 MB per-platform stripped+LTO budget (identity D-8 / TaskList R8).
+[profile.release]
+opt-level = "z"           # Optimize for binary size
+lto = "fat"               # Link-time optimization across the whole crate graph
+codegen-units = 1         # Better optimization at the cost of compile time
+panic = "abort"           # Smaller binaries (no unwind tables)
+strip = true              # Strip symbols from release binaries
+
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
 log = "0.4"
-taffy = "0.4"
-oxc_parser = "0.14"
-oxc_allocator = "0.14"
-oxc_span = "0.14"
-oxc_ast = "0.14"
+taffy = { version = "0.15.1", features = ["serde"] }
 rquickjs = { version = "0.5", features = ["classes", "chrono"] }
-winit = "0.29"
-raw-window-handle = "0.6"
-jni = { version = "0.21", default-features = false }

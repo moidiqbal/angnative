@@ -12,7 +12,8 @@
  *   - Rust host-view (ViewFactory trait mapping)
  */
 
-import type { StyleProperty, StyleMap, validateStyleMap } from './style';
+import type { StyleProperty, StyleMap } from './style';
+import { validateStyleMap } from './style';
 
 /** Canonical element tags — `na-` prefix (identity D-9). */
 export const ELEMENT_TAGS = {

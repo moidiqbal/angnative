@@ -12,6 +12,7 @@
     "test": "vitest run",
     "lint": "pnpm --recursive run lint",
     "check:toolchain": "node scripts/check-toolchain.mjs",
+    "check:rust-size": "node scripts/check-rust-size.mjs",
     "compile:fixtures": "node scripts/compile-fixtures.mjs",
     "bundle:fixtures": "node -e \"import('./packages/cli/dist/bundle.js').then(m => m.bundleApp('packages/testing/fixtures/out/app.js', 'packages/testing/fixtures/out/bundle.js'))\"",
     "start": "pnpm --filter @angnative/demo-app run start"

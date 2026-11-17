@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AngNative Tree Inspector</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  header { padding: 12px 16px; border-bottom: 1px solid #ccc; display: flex; gap: 12px; align-items: center; }
+  header h1 { margin: 0; font-size: 14px; }
+  main { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 52px); }
+  .pane { padding: 12px 16px; overflow: auto; }
+  .pane:first-child { border-right: 1px solid #ccc; }
+  textarea { width: 100%; height: 100%; font-family: inherit; font-size: 12px; }
+  .node { padding: 2px 0; }
+  .node .tag { color: #2a6; font-weight: 600; }
+  .node .id { color: #888; }
+  .node .props { color: #55a; }
+  .node .styles { color: #a55; }
+  .node .text { color: #333; font-style: italic; }
+  .children { margin-left: 16px; border-left: 1px dashed #ddd; padding-left: 8px; }
+  .empty { color: #999; }
+  button { padding: 4px 10px; cursor: pointer; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AngNative Tree Inspector</h1>
+  <div class="controls">
+    <button id="loadSample">Load sample</button>
+    <button id="render">Render tree</button>
+    <span id="status" class="empty"></span>
+  </div>
+</header>
+<main>
+  <div class="pane">
+    <textarea id="input" placeholder='Paste a host tree JSON snapshot here, e.g. {"nodes":[{"id":1,"tag":"na-view","children":[2],"styles":{},"properties":{},"textContent":null}]}'></textarea>
+  </div>
+  <div class="pane" id="tree"></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var input = document.getElementById('input');
+  var tree = document.getElementById('tree');
+  var status = document.getElementById('status');
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderNode(node, byId) {
+    var el = document.createElement('div');
+    el.className = 'node';
+    var head = '<span class="tag">' + escapeHtml(node.tag || node.nodeType || 'node') + '</span> ';
+    head += '<span class="id">#' + escapeHtml(node.id) + '</span>';
+    if (node.textContent) {
+      head += ' <span class="text">"' + escapeHtml(node.textContent) + '"</span>';
+    }
+    if (node.styles && Object.keys(node.styles).length) {
+      head += ' <span class="styles">{' + Object.keys(node.styles).map(function (k) {
+        return k + ':' + node.styles[k];
+      }).join(', ') + '}</span>';
+    }
+    if (node.properties && Object.keys(node.properties).length) {
+      head += ' <span class="props">(' + Object.keys(node.properties).map(function (k) {
+        return k + '=' + JSON.stringify(node.properties[k]);
+      }).join(', ') + ')</span>';
+    }
+    el.innerHTML = head;
+
+    var children = node.children || [];
+    if (children.length) {
+      var wrap = document.createElement('div');
+      wrap.className = 'children';
+      for (var i = 0; i < children.length; i++) {
+        var childId = children[i];
+        var child = (byId && byId[childId]) || { id: childId, tag: '?' + childId, children: [] };
+        wrap.appendChild(renderNode(child, byId));
+      }
+      el.appendChild(wrap);
+    }
+    return el;
+  }
+
+  function render() {
+    var raw = input.value.trim();
+    if (!raw) { status.textContent = 'empty input'; return; }
+    var data;
+    try { data = JSON.parse(raw); } catch (e) { status.textContent = 'invalid JSON: ' + e.message; return; }
+    tree.innerHTML = '';
+    var byId = {};
+    var roots = [];
+
+    // Accept either {nodes:[...]} or an array of nodes or {nodes:{id:node}}.
+    var nodes = data.nodes !== undefined ? data.nodes : data;
+    if (Array.isArray(nodes)) {
+      for (var i = 0; i < nodes.length; i++) byId[nodes[i].id] = nodes[i];
+      // roots: nodes with no parent or parentId null
+      for (var j = 0; j < nodes.length; j++) {
+        var n = nodes[j];
+        if (n.parentId === null || n.parentId === undefined) roots.push(n);
+      }
+      if (!roots.length && nodes.length) roots.push(nodes[0]);
+    } else if (nodes && typeof nodes === 'object') {
+      Object.keys(nodes).forEach(function (k) { byId[k] = nodes[k]; byId[nodes[k].id || k] = nodes[k]; });
+      Object.keys(nodes).forEach(function (k) {
+        var n = nodes[k];
+        if (n.parentId === null || n.parentId === undefined) roots.push(n);
+      });
+      if (!roots.length) roots = Object.keys(nodes).map(function (k) { return nodes[k]; }).slice(0, 1);
+    }
+
+    if (!roots.length) { status.textContent = 'no nodes found'; return; }
+    for (var r = 0; r < roots.length; r++) {
+      tree.appendChild(renderNode(roots[r], byId));
+    }
+    status.textContent = 'rendered ' + Object.keys(byId).length + ' nodes';
+  }
+
+  document.getElementById('render').addEventListener('click', render);
+  document.getElementById('loadSample').addEventListener('click', function () {
+    input.value = JSON.stringify({
+      nodes: [
+        { id: 1, tag: 'na-view', nodeType: 'View', parentId: null, children: [2, 3],
+          styles: { flexDirection: 'column', padding: '24px', gap: '16px' },
+          properties: {}, textContent: null },
+        { id: 2, tag: 'na-text', nodeType: 'Text', parentId: 1, children: [],
+          styles: { fontSize: '20px', fontWeight: 'bold' },
+          properties: {}, textContent: 'AngNative Demo' },
+        { id: 3, tag: 'na-text', nodeType: 'Text', parentId: 1, children: [],
+          styles: { color: '#666' },
+          properties: {}, textContent: 'Angular running natively — no WebView.' }
+      ]
+    }, null, 2);
+    render();
+  });
+})();
+</script>
+</body>
+</html>
