@@ -6,16 +6,15 @@
  * bootstrapping an Angular app for native (Android / iOS / Desktop / Web)
  * rendering.
  *
- * Zoneless: AngNative is zoneless by design — pair this with
- * `provideZoneChangeDetection({ eventCoalescing: true })` in your app
- * bootstrap options (see `bootstrapNativeAngularApp`).
+ * Zoneless: `bootstrapNativeAngularApp` uses Angular's
+ * `provideZonelessChangeDetection()` by default (no zone.js). Set
+ * `zoneless: false` to opt into `provideZoneChangeDetection`.
  */
 
 import {
   type Provider,
   RendererFactory2,
   Renderer2,
-  inject,
 } from '@angular/core';
 import {
   AngNativeRendererFactory2,
@@ -30,32 +29,54 @@ export interface NativeAngularConfig {
   flush?: FlushHandler;
 }
 
+/** Global hook native shells can install to receive encoded batches. */
+type HostDispatch = (batchJson: string) => void;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __angnativeBatches: string[] | undefined;
+  // eslint-disable-next-line no-var
+  var __angnativeDispatchBatch: HostDispatch | undefined;
+}
+
+/**
+ * Default flush handler. Keeps batches observable on `globalThis` for dev
+ * tooling and calls a host-installed `__angnativeDispatchBatch` when present.
+ * Platform shells override this by passing `nativeConfig.flush`.
+ */
+export function createDefaultFlushHandler(): FlushHandler {
+  return {
+    onFlush(batchJson: string): void {
+      globalThis.__angnativeBatches ??= [];
+      globalThis.__angnativeBatches.push(batchJson);
+      globalThis.__angnativeDispatchBatch?.(batchJson);
+    },
+  };
+}
+
 /**
  * Create the AngNative `RendererFactory2` provider. The factory is a singleton
  * per application; `createRenderer` returns the shared renderer instance.
  */
 export function provideNativeRendererFactory(config?: NativeAngularConfig): Provider[] {
+  const factory = new AngNativeRendererFactory2({
+    flush: config?.flush ?? createDefaultFlushHandler(),
+  });
+
   return [
-    {
-      provide: RendererFactory2,
-      useFactory: () => {
-        const factory = new AngNativeRendererFactory2({
-          flush: config?.flush ?? undefined,
-        });
-        return factory;
-      },
-    },
+    // The factory token must be provided explicitly: primitives inject it, and
+    // `AngNativeRendererFactory2` is intentionally not @Injectable.
+    { provide: AngNativeRendererFactory2, useValue: factory },
+    { provide: RendererFactory2, useValue: factory },
     {
       provide: Renderer2,
-      useFactory: (factory: RendererFactory2) => factory.createRenderer(null, null),
+      useFactory: (rendererFactory: RendererFactory2) =>
+        rendererFactory.createRenderer(null, null),
       deps: [RendererFactory2],
     },
     {
       provide: ElementRegistry,
-      useFactory: () => {
-        const factory = inject(AngNativeRendererFactory2);
-        return factory.getRenderer().getRegistry();
-      },
+      useFactory: () => factory.getRenderer().getRegistry(),
     },
   ];
 }

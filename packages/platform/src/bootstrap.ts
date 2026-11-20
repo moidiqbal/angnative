@@ -14,6 +14,7 @@
  */
 
 import {
+  provideZonelessChangeDetection,
   provideZoneChangeDetection,
   type EnvironmentProviders,
   type ApplicationRef,
@@ -47,6 +48,8 @@ export async function bootstrapNativeAngularApp(
   const appProviders: Array<Provider | EnvironmentProviders> = [];
 
   if (options.zoneless !== false) {
+    appProviders.push(provideZonelessChangeDetection());
+  } else {
     appProviders.push(provideZoneChangeDetection({ eventCoalescing: true }));
   }
 

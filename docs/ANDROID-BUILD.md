@@ -228,3 +228,26 @@ bash scripts/setup-android-native.sh
 3. Verify counter app renders and responds to input
 4. Check logcat for any FFI errors
 5. Once Android is verified, proceed to P3.2 (iOS shell)
+
+---
+
+## Two verified toolchain profiles (Windows, 2026-11-21)
+
+Both stacks build `app-debug.apk` successfully on this host. SDK/NDK live in
+`C:\Android\Sdk` (NDK 27.2.12479018, CMake 3.22.1, API 34/36, build-tools 34/37).
+
+| Profile | Gradle | AGP | Kotlin | JDK | compileSdk | Build script |
+|---|---|---|---|---|---|---|
+| `latest` (default) | 9.9.2 | 9.5.2 | built-in (AGP) | 25 | 36 | `pwsh -File scripts/build-android-stack.ps1 -Stack latest` |
+| `legacy` | 8.2 | 8.2.0 | KGP 1.9.20 | 17 | 34 | `pwsh -File scripts/build-android-stack.ps1 -Stack legacy` |
+
+The script copies the selected files from `platforms/android/profiles/<stack>/`
+into the live Gradle files, sets `JAVA_HOME`, and runs `assembleDebug`.
+
+Notes for the `latest` profile:
+- AGP 9+ has built-in Kotlin: `org.jetbrains.kotlin.android` must NOT be applied.
+- `kotlinOptions { jvmTarget }` is removed; Kotlin follows `compileOptions`.
+- Java 25 requires Gradle 9.1+; Gradle 8.2 cannot run on JDK 25 (use legacy).
+
+Rust host libraries for all three ABIs are rebuilt with
+`pwsh -File scripts/build-android-native.ps1` before the Gradle build.

@@ -26,9 +26,9 @@ import { counter, increment, decrement, reset, isEven } from './counter-signal';
       <na-text [style.fontSize]="'24px'" [style.fontWeight]="'bold'">Counter</na-text>
       <na-text [text]="counterDisplay()"></na-text>
       <na-view [style.flexDirection]="'row'" [style.gap]="'8px'" [style.marginTop]="'12px'">
-        <na-button (press)="decrement()">−</na-button>
-        <na-button (press)="reset()">reset</na-button>
-        <na-button (press)="increment()">+</na-button>
+        <na-button (click)="decrement()">−</na-button>
+        <na-button (click)="reset()">reset</na-button>
+        <na-button (click)="increment()">+</na-button>
       </na-view>
       <na-text [style.color]="isEven() ? 'green' : 'red'" [style.marginTop]="'8px'">
         {{ isEven() ? 'even' : 'odd' }}

@@ -125,6 +125,28 @@ const char* angnative_host_snapshot(AngNativeHost* handle);
 /** Parse a JSON string (for testing). */
 const char* angnative_host_parse_json(const char* json);
 
+/* =========================================================================
+ * Native event bridge — route platform events to JS/Angular listeners
+ * ========================================================================= */
+
+/** Callback delivering a native event to the JS/Angular listener layer. */
+typedef void (*EventCallback)(uint64_t listener_id, const char* payload_json, void* user_data);
+
+/** Install the event callback. Returns 0 on success. */
+int angnative_host_set_event_callback(AngNativeHost* handle, EventCallback callback, void* user_data);
+
+/** Register a listener id for a (node_id, event_name) pair. Returns 0 on success. */
+int angnative_host_add_event_listener(AngNativeHost* handle, uint64_t node_id,
+                                      const char* event_name, uint64_t listener_id);
+
+/** Remove a listener. Returns 0 when removed, 1 otherwise. */
+int angnative_host_remove_event_listener(AngNativeHost* handle, uint64_t node_id,
+                                         const char* event_name, uint64_t listener_id);
+
+/** Dispatch an event to all matching listeners; returns the number invoked. */
+unsigned int angnative_host_dispatch_event(AngNativeHost* handle, uint64_t node_id,
+                                           const char* event_name, const char* payload_json);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

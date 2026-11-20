@@ -9,6 +9,8 @@
  * This is the bridge between the embedded JS engine and the Rust host tree.
  */
 use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use crate::engine::{EngineError, JsEngine, JsValue};
 
@@ -25,6 +27,9 @@ pub struct AngNativeRuntime<E: JsEngine> {
     engine: E,
     adapter: MutationEngineAdapter,
     config: RuntimeConfig,
+    /// (node_id, event_name) → registered listener ids. Listeners are invoked
+    /// by calling the JS global `na_onEvent(listenerId, payloadJson)`.
+    event_listeners: Arc<Mutex<HashMap<(u64, String), Vec<u64>>>>,
 }
 
 impl<E: JsEngine> AngNativeRuntime<E> {
@@ -34,6 +39,7 @@ impl<E: JsEngine> AngNativeRuntime<E> {
             engine,
             adapter: MutationEngineAdapter::new(),
             config,
+            event_listeners: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -153,6 +159,65 @@ impl<E: JsEngine> AngNativeRuntime<E> {
                 }
             });
 
+        // Event bridge: JS registers listener ids for (node, event); the host
+        // dispatches native events through `AngNativeRuntime::dispatch_event`.
+        let add_listeners = self.event_listeners.clone();
+        self.engine
+            .register_function("na_addEventListener", move |args| {
+                if args.len() != 3 {
+                    return Err(EngineError::CallError(
+                        "na.addEventListener expects (number, string, number)".to_string(),
+                    ));
+                }
+                match (&args[0], &args[1], &args[2]) {
+                    (JsValue::Number(node), JsValue::String(event), JsValue::Number(listener)) => {
+                        add_listeners
+                            .lock()
+                            .unwrap()
+                            .entry((*node as u64, event.clone()))
+                            .or_default()
+                            .push(*listener as u64);
+                        Ok(JsValue::Null)
+                    }
+                    _ => Err(EngineError::CallError(
+                        "na.addEventListener expects (number, string, number)".to_string(),
+                    )),
+                }
+            });
+
+        let remove_listeners = self.event_listeners.clone();
+        self.engine
+            .register_function("na_removeEventListener", move |args| {
+                if args.len() != 3 {
+                    return Err(EngineError::CallError(
+                        "na.removeEventListener expects (number, string, number)".to_string(),
+                    ));
+                }
+                match (&args[0], &args[1], &args[2]) {
+                    (JsValue::Number(node), JsValue::String(event), JsValue::Number(listener)) => {
+                        let key = (*node as u64, event.clone());
+                        let mut map = remove_listeners.lock().unwrap();
+                        let removed = if let Some(ids) = map.get_mut(&key) {
+                            if let Some(pos) = ids.iter().position(|id| *id == *listener as u64) {
+                                ids.remove(pos);
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+                        if removed {
+                            map.retain(|_, ids| !ids.is_empty());
+                        }
+                        Ok(JsValue::Boolean(removed))
+                    }
+                    _ => Err(EngineError::CallError(
+                        "na.removeEventListener expects (number, string, number)".to_string(),
+                    )),
+                }
+            });
+
         // flush() → flush pending mutations
         self.engine.register_function("na_flush", move |_args| {
             let mut lock = flush_adapter.lock();
@@ -169,12 +234,44 @@ impl<E: JsEngine> AngNativeRuntime<E> {
                 setStyle: function(nodeId, key, value) { return na_setStyle(nodeId, key, value); },
                 setProperty: function(nodeId, key, value) { return na_setProperty(nodeId, key, value); },
                 setTextContent: function(nodeId, text) { return na_setTextContent(nodeId, text); },
+                addEventListener: function(nodeId, event, listenerId) { return na_addEventListener(nodeId, event, listenerId); },
+                removeEventListener: function(nodeId, event, listenerId) { return na_removeEventListener(nodeId, event, listenerId); },
                 flush: function() { return na_flush(); }
             };
         "#;
         self.engine.eval(na_js)?;
 
         Ok(())
+    }
+
+    /// Dispatch a native event to registered JS listeners by invoking the
+    /// global `na_onEvent(listenerId, payloadJson)` for each match.
+    /// Returns the number of listeners invoked.
+    pub fn dispatch_event(
+        &mut self,
+        node_id: u64,
+        event_name: &str,
+        payload_json: &str,
+    ) -> Result<u32, EngineError> {
+        let ids = self
+            .event_listeners
+            .lock()
+            .unwrap()
+            .get(&(node_id, event_name.to_string()))
+            .cloned()
+            .unwrap_or_default();
+        let mut invoked = 0;
+        for id in ids {
+            self.engine.call_function(
+                "na_onEvent",
+                &[
+                    JsValue::Number(id as f64),
+                    JsValue::String(payload_json.to_string()),
+                ],
+            )?;
+            invoked += 1;
+        }
+        Ok(invoked)
     }
 
     /// Evaluate a JS source string with the AngNative API available.

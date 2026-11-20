@@ -46,14 +46,14 @@ impl DesktopBridge {
     pub fn process_commands(&mut self, commands: &[Command]) -> Result<Vec<PlatformOp>, String> {
         let mut ops = Vec::new();
         for cmd in commands {
-            let op_kind = self.engine.run_command(cmd.clone()).map_err(|e| e.to_string())?;
+            self.engine.run_command(cmd.clone()).map_err(|e| e.to_string())?;
             ops.push(PlatformOp::Create {
                 node_id: match cmd {
-                    Command::CreateNode { id, .. } => id,
+                    Command::CreateNode { id, .. } => *id,
                     _ => 0,
                 },
                 view_type: match cmd {
-                    Command::CreateNode { node_type, .. } => node_type,
+                    Command::CreateNode { node_type, .. } => node_type.clone(),
                     _ => String::new(),
                 },
             });

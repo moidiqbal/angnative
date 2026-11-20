@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 /** Severity level of a diagnostic event. */
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiagnosticsLevel {
     Info,
     Warn,
@@ -227,7 +227,7 @@ impl DiagnosticsChannel {
 }
 
 /** Aggregated performance diagnostics for the host. */
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PerformanceDiagnostics {
     pub commit_count: u64,
     pub avg_commit_ms: f64,
@@ -317,7 +317,7 @@ mod tests {
 
         assert_eq!(channel.len(), 3);
         let ids: Vec<&str> = channel.events().iter().map(|e| e.id.as_str()).collect();
-        assert!(!ids.iter().any(|id| id == "evt-0")); // oldest evicted
+        assert!(!ids.iter().any(|id| *id == "evt-0")); // oldest evicted
     }
 
     #[test]

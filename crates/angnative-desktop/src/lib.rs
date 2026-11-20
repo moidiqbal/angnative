@@ -22,8 +22,10 @@ pub mod window;
 pub mod renderer;
 pub mod bridge;
 pub mod app;
+pub mod view_tree;
 
 pub use window::AngNativeDesktop;
 pub use renderer::DesktopRenderer;
 pub use bridge::DesktopBridge;
 pub use app::DemoApp;
+pub use view_tree::{LocalViewNode, LocalViewTree};

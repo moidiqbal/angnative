@@ -7,7 +7,7 @@
 
 ## 1. Product Positioning & Goals
 
-AngNative is positioned as **"the native runtime for Angular"**. It provides enterprise and open-source developers with a first-class route to build cross-platform mobile and desktop applications using Angular 19+ without WebViews.
+AngNative is positioned as **"the native runtime for Angular"**. It provides enterprise and open-source developers with a first-class route to build cross-platform mobile and desktop applications using Angular 22+ without WebViews.
 
 ### 1.1 Core Goals
 - **G1 — Real Native Views**: Render real platform widgets (`android.view.View`, `UIView`, etc.). No WebViews in the default execution path.
@@ -29,7 +29,7 @@ AngNative is positioned as **"the native runtime for Angular"**. It provides ent
 ### 2.1 Angular Framework Support
 | Requirement | Specification |
 | :--- | :--- |
-| **Angular Version** | Angular 19.0+ |
+| **Angular Version** | Angular 22+ |
 | **Reactivity** | Angular Signals (`signal`, `computed`, `effect`) & Signal Forms |
 | **Change Detection** | Zoneless by default (no `zone.js` patching required) |
 | **Compilation** | Strict Ahead-of-Time (AOT) via `ngc` & Angular Linker |
@@ -63,7 +63,7 @@ The framework provides unified cross-platform event dispatching:
 | **Cold Startup Time** | < 800 ms to interactive | Monitored |
 | **Frame Rate** | Constant 60 FPS (120 FPS on ProMotion/High-Refresh) | Enforced |
 | **Mutation Diffing** | < 1.0 ms for 1,000 node updates | Verified |
-| **Touch-to-Response Latency** | < 16 ms | Verified on Android 17 |
+| **Touch-to-Response Latency** | < 16 ms | Target; not yet verified end-to-end |
 | **Hot Module Replacement (HMR)** | < 1,000 ms from save to screen update | Enforced |
 
 ### 3.2 Size Budgets

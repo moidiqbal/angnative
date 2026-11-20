@@ -1,9 +1,10 @@
 /**
  * crypto.rs — Crypto + secure storage (behind `crypto` feature).
  *
- * Provides secure random generation, zeroizing secret wrappers, and a basic
- * authenticated encryption interface. Real production use should swap in
- * ring or rust-crypto for AES-GCM/ChaCha20-Poly1305.
+ * Provides secure random generation and zeroizing secret wrappers. The
+ * `encrypt`/`decrypt` pair is XOR-based obfuscation for API-shape demonstration
+ * only — it is NOT authenticated encryption and must not be used for secrets.
+ * Real production use requires AEAD (e.g. AES-GCM or ChaCha20-Poly1305).
  */
 
 use serde::{Deserialize, Serialize};
@@ -72,7 +73,7 @@ impl SecureKey {
 
 impl Clone for SecureKey {
     fn clone(&self) -> Self {
-        Self::from_bytes(self.inner.as_ref().to_vec())
+        Self::from_bytes(self.inner.to_vec())
     }
 }
 
@@ -141,9 +142,8 @@ impl CryptoService {
 
     /// Encrypt a plaintext using the key with the given ID.
     ///
-    * Placeholder: XOR-based obfuscation for API-shape demonstration only.
-    * Replace with AES-GCM/ChaCha20-Poly1305 in production.
-    */
+    /// Placeholder: XOR-based obfuscation for API-shape demonstration only.
+    /// Replace with AES-GCM/ChaCha20-Poly1305 in production.
     #[cfg(feature = "crypto")]
     pub fn encrypt(&self, key_id: &str, plaintext: &[u8]) -> Result<SealedBox, CryptoError> {
         let key = self.get_key(key_id)?;
@@ -152,7 +152,8 @@ impl CryptoService {
             return Err(CryptoError::Encrypt("empty key".to_string()));
         }
 
-        let nonce: [u8; 12] = rand::thread_rng().gen();
+        let mut nonce = [0u8; 12];
+        rand::thread_rng().fill_bytes(&mut nonce);
         let ciphertext: Vec<u8> = plaintext
             .iter()
             .enumerate()
@@ -173,6 +174,9 @@ impl CryptoService {
         let key_bytes = key.as_bytes();
         if key_bytes.is_empty() {
             return Err(CryptoError::Decrypt("empty key".to_string()));
+        }
+        if sealed.nonce.is_empty() {
+            return Err(CryptoError::Decrypt("empty nonce".to_string()));
         }
 
         let plaintext: Vec<u8> = sealed

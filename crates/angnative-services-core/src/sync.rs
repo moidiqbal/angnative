@@ -91,6 +91,7 @@ pub struct OfflineSyncQueue {
     next_id: u64,
     entity_versions: HashMap<String, u64>,
     sync_results: Vec<SyncResult>,
+    resolved_conflicts: Vec<SyncConflict>,
     max_retries: u32,
 }
 
@@ -107,6 +108,7 @@ impl OfflineSyncQueue {
             next_id: 1,
             entity_versions: HashMap::new(),
             sync_results: Vec::new(),
+            resolved_conflicts: Vec::new(),
             max_retries: 5,
         }
     }
@@ -215,16 +217,13 @@ impl OfflineSyncQueue {
         entity_id: &str,
         resolution: SyncConflictResolution,
     ) -> Result<(), String> {
-        // Find the conflict for this entity.
-        let conflict = self
+        // Find the conflict for this entity on the conflicting operation.
+        let mut conflict = self
             .operations
             .values()
             .find(|op| op.entity_id == entity_id && op.conflict.is_some())
-            .cloned();
-
-        let mut conflict = conflict.ok_or_else(|| {
-            format!("No unresolved conflict for entity {}", entity_id)
-        })?;
+            .and_then(|op| op.conflict.clone())
+            .ok_or_else(|| format!("No unresolved conflict for entity {}", entity_id))?;
 
         conflict.resolved = true;
         conflict.resolution = Some(resolution);
@@ -244,6 +243,9 @@ impl OfflineSyncQueue {
             Some(SyncConflictResolution::Manual) => {}
             None => {}
         }
+
+        // Persist the resolution so it remains observable after ops are un-pended.
+        self.resolved_conflicts.push(conflict);
 
         // Un-pend the conflicting ops.
         for op in self.operations.values_mut() {
@@ -280,6 +282,11 @@ impl OfflineSyncQueue {
     /** Get all sync results. */
     pub fn sync_results(&self) -> &[SyncResult] {
         &self.sync_results
+    }
+
+    /** Get all conflicts that have been resolved. */
+    pub fn resolved_conflicts(&self) -> &[SyncConflict] {
+        &self.resolved_conflicts
     }
 
     /** Get the current version of an entity. */
@@ -344,8 +351,9 @@ mod tests {
     #[test]
     fn conflict_detection() {
         let mut queue = OfflineSyncQueue::new();
+        // Keep the local operation pending: only pending ops can be marked
+        // Conflict by detect_conflict (acknowledged ops stay durable).
         queue.enqueue("user", "u1", SyncOpType::Create, serde_json::json!({"name": "Alice"}));
-        queue.acknowledge(&"op-1".to_string()).unwrap();
 
         // Remote has a newer version — conflict.
         let conflict = queue.detect_conflict("u1", 2, serde_json::json!({"name": "Bob"}));

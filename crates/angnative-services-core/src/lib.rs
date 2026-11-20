@@ -28,7 +28,10 @@ pub use capability::{
 pub use diagnostics::{
     DiagnosticsChannel, DiagnosticsEvent, DiagnosticsLevel, PerformanceDiagnostics,
 };
-pub use serialization::{serialize_json, serialize_messagepack, DeserializeError, SerializeError};
+pub use serialization::{
+    deserialize, deserialize_json, serialize, serialize_json, DeserializeError, SerializeError,
+    SerializationFormat,
+};
 pub use sync::{
     OfflineSyncQueue, QueuedOperation, SyncConflict, SyncDirection, SyncResult, SyncStatus,
 };

@@ -13,7 +13,7 @@
  */
 
 use angnative_services_core::capability::{
-    CapabilityDeclaration, CapabilityResolver,
+    CapabilityDeclaration, CapabilityRegistry, CapabilityResolver,
 };
 use angnative_services_core::diagnostics::{
     DiagnosticsChannel, DiagnosticsEventType,
@@ -45,9 +45,15 @@ fn capability_and_diagnostics_work_together() {
     assert_eq!(status, angnative_services_core::capability::CapabilityStatus::Available);
     assert!(channel.is_empty());
 
-    // Resolve an unavailable capability — diagnostic is published.
+    // Resolve an unavailable capability — the resolver records a degradation
+    // diagnostic; the caller bridges it to the shared diagnostics channel.
     let diag = resolver.resolve("gps").unwrap_err();
     assert_eq!(diag.capability_id, "gps");
+    assert_eq!(resolver.diagnostics().len(), 1);
+    assert_eq!(resolver.diagnostics()[0].capability_id, "gps");
+    assert!(channel.is_empty());
+
+    channel.native_capability_unavailable("gps", &diag.reason);
     assert_eq!(channel.len(), 1);
     assert_eq!(
         channel.events_by_type(&DiagnosticsEventType::NativeCapabilityUnavailable).len(),
@@ -58,12 +64,12 @@ fn capability_and_diagnostics_work_together() {
 #[test]
 fn offline_sync_with_conflict_and_resolution() {
     let mut queue = OfflineSyncQueue::new();
-    let mut channel = DiagnosticsChannel::new();
+    let channel = DiagnosticsChannel::new();
 
-    // Enqueue and acknowledge operations (durable).
+    // Enqueue operations: op2 is acknowledged (durable); op1 stays pending so
+    // it can be marked Conflict when the remote version arrives.
     let op1 = queue.enqueue("user", "u1", SyncOpType::Create, json!({"name": "Alice"}));
     let op2 = queue.enqueue("user", "u2", SyncOpType::Update, json!({"name": "Bob"}));
-    queue.acknowledge(&op1).unwrap();
     queue.acknowledge(&op2).unwrap();
 
     // Detect a conflict (remote has newer version).
@@ -72,6 +78,14 @@ fn offline_sync_with_conflict_and_resolution() {
 
     // Resolve with remote wins.
     queue.resolve_conflict("u1", SyncConflictResolution::RemoteWins).unwrap();
+    assert_eq!(queue.resolved_conflicts().len(), 1);
+    assert_eq!(
+        queue.resolved_conflicts()[0].resolution,
+        Some(SyncConflictResolution::RemoteWins)
+    );
+
+    // The resolved op is pending again and can now be acknowledged.
+    queue.acknowledge(&op1).unwrap();
 
     // Record the sync result.
     queue.record_sync_result(angnative_services_core::sync::SyncResult {
@@ -89,6 +103,7 @@ fn offline_sync_with_conflict_and_resolution() {
     assert_eq!(queue.acknowledged_operations().len(), 2);
     assert_eq!(queue.sync_results().len(), 1);
     assert_eq!(queue.sync_results()[0].conflicts_resolved, 1);
+    assert!(channel.is_empty());
 }
 
 #[test]
@@ -142,8 +157,13 @@ fn full_r7_integration() {
     );
     queue.acknowledge(&op_id).unwrap();
 
-    // 4. Resolve an unavailable capability — diagnostic published.
-    resolver.resolve("camera").unwrap_err();
+    // 4. Resolve an unavailable capability — resolver records a degradation
+    // diagnostic; bridge it to the shared channel explicitly.
+    let diag = resolver.resolve("camera").unwrap_err();
+    assert_eq!(diag.capability_id, "camera");
+    assert_eq!(resolver.diagnostics().len(), 1);
+    assert!(channel.is_empty());
+    channel.native_capability_unavailable("camera", &diag.reason);
     assert_eq!(channel.len(), 1);
 
     // 5. Serialize the acknowledged operation.

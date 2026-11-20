@@ -1,10 +1,11 @@
 plugins {
+  // AGP 9+ compiles Kotlin natively — do NOT apply org.jetbrains.kotlin.android.
   id("com.android.application")
-  id("org.jetbrains.kotlin.android")
 }
 
 android {
   namespace = "com.angnative.app"
+  // Latest stable toolchain: AGP 9.5 / Gradle 9.9 / JDK 25.
   compileSdk = 36
   buildToolsVersion = "37.0.0"
   ndkVersion = "27.2.12479018"
@@ -48,9 +49,7 @@ android {
     targetCompatibility = JavaVersion.VERSION_17
   }
 
-  kotlinOptions {
-    jvmTarget = "17"
-  }
+  // Kotlin jvmTarget now follows compileOptions.targetCompatibility (17).
 
   packaging {
     jniLibs {

@@ -30,6 +30,12 @@ export interface NodeSnapshot {
 export interface FakeBackendResult {
   readonly batches: readonly string[][]; // mutation kinds per batch, in order
   readonly nodes: ReadonlyMap<NodeId, NodeSnapshot>;
+  /**
+   * How many times each node id was created. A node whose native view slot
+   * survives a detach/reattach cycle is created exactly once; a host that
+   * destroys and recreates the slot will report a count greater than one.
+   */
+  readonly createCounts: ReadonlyMap<NodeId, number>;
 }
 function tagToNodeType(tag: string): string {
   switch (tag.toLowerCase()) {
@@ -86,6 +92,7 @@ export class FakeBackend {
   protected readonly registry = new ElementRegistry();
   private readonly batches: string[][] = [];
   private currentBatch: string[] = [];
+  private readonly createCounts = new Map<NodeId, number>();
 
   /** Execute a single command. Returns the mutation kind recorded. */
   runCommand(cmd: Command): string {
@@ -117,7 +124,7 @@ export class FakeBackend {
     for (const el of this.registry.all) {
       nodes.set(el.id, this.snapshotNode(el));
     }
-    return { batches: [...this.batches], nodes };
+    return { batches: [...this.batches], nodes, createCounts: new Map(this.createCounts) };
   }
 
   /** Look up a single node snapshot. Returns undefined if the node was removed. */
@@ -150,6 +157,7 @@ export class FakeBackend {
         }
         const el = new NativeElement(cmd.id, cmd.nodeType.toLowerCase(), cmd.nodeType as any);
         r.registerWithId(el);
+        this.createCounts.set(cmd.id, (this.createCounts.get(cmd.id) ?? 0) + 1);
         return 'CreateNode';
       }
       case 'RemoveNode': {

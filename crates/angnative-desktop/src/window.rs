@@ -2,24 +2,34 @@
  * window.rs — AngNativeDesktop window wrapper.
  *
  * Combines winit window, wgpu renderer, and Rust host bridge into a single
- * desktop window that can render native AngNative view trees.
+ * desktop window that can render native AngNative view trees. Ops emitted by
+ * the host are applied to a retained local view tree instead of discarded.
  */
 
-use angnative_host_core::command::{Command, CommandBatch};
-use angnative_desktop::{DesktopBridge, DesktopRenderer};
+use crate::{DesktopBridge, DesktopRenderer, LocalViewTree};
+use angnative_host_core::command::CommandBatch;
+use angnative_host_layout::LayoutResult;
+use std::collections::HashMap;
 use winit::dpi::PhysicalSize;
 use winit::window::{Window, WindowBuilder};
 
 /**
  * AngNativeDesktop — the main desktop window.
  *
- * Owns the winit window, wgpu renderer, and Rust host bridge. Processes
- * command batches, runs layout, and renders via wgpu.
+ * Owns the winit window, wgpu renderer, Rust host bridge, and a retained
+ * view tree. Processes command batches, runs layout, applies the resulting
+ * ops to the view tree, and renders via wgpu.
  */
 pub struct AngNativeDesktop {
-    window: Window,
+    // Declaration order is drop order: the renderer (and its GPU surface)
+    // must be dropped before the window the surface was created from.
     renderer: DesktopRenderer,
+    window: Window,
     bridge: DesktopBridge,
+    view_tree: LocalViewTree,
+    /// Interaction state forwarded to the renderer for visual feedback.
+    counter: i32,
+    pressed: Option<u64>,
 }
 
 impl AngNativeDesktop {
@@ -39,6 +49,9 @@ impl AngNativeDesktop {
             window,
             renderer,
             bridge,
+            view_tree: LocalViewTree::new(),
+            counter: 0,
+            pressed: None,
         })
     }
 
@@ -62,19 +75,49 @@ impl AngNativeDesktop {
         self.window.request_redraw();
     }
 
-    /// Process a command batch through the Rust host.
+    /// Process a command batch through the Rust host and apply the emitted
+    /// ops to the retained local view tree.
     pub fn process_batch(&mut self, batch: &CommandBatch) -> Result<(), String> {
         let ops = self.bridge.process_batch(batch)?;
-        // Apply ops to view tree (in a full implementation, this would
-        // update native widgets; for now we just track them)
-        let _ = ops;
+        self.view_tree.apply_ops(&ops);
         Ok(())
     }
 
-    /// Run layout and render.
+    /// Run layout and remember the result for rendering.
+    pub fn run_layout(
+        &mut self,
+        nodes: &HashMap<u64, angnative_host_layout::LayoutNodeInput>,
+        root_id: u64,
+        available_width: f32,
+        available_height: f32,
+    ) -> Result<LayoutResult, String> {
+        self.bridge
+            .run_layout(nodes, root_id, available_width, available_height)
+    }
+
+    /// Apply a computed layout as SetFrame ops to the retained view tree.
+    pub fn apply_layout(&mut self, layout: &LayoutResult) -> Result<(), String> {
+        let ops = self.bridge.apply_layout(layout)?;
+        self.view_tree.apply_ops(&ops);
+        Ok(())
+    }
+
+    /// Set interaction state used for button highlight + counter dots.
+    pub fn set_visual_state(&mut self, counter: i32, pressed: Option<u64>) {
+        self.counter = counter;
+        self.pressed = pressed;
+        self.renderer.set_state(counter, pressed);
+    }
+
+    /// Render the current frame.
     pub fn render(&mut self) -> Result<(), String> {
         let layout = self.bridge.last_layout();
         self.renderer.render(layout)
+    }
+
+    /// Inspect the retained local view tree (tests/diagnostics).
+    pub fn view_tree(&self) -> &LocalViewTree {
+        &self.view_tree
     }
 
     /// Get a reference to the bridge (for sending commands).

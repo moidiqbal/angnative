@@ -2,38 +2,35 @@
  * renderer.rs — wgpu GPU renderer for AngNative desktop.
  *
  * Renders the native view tree computed by the Rust host using GPU-accelerated
- * drawing. Each na-* element becomes a draw call with its layout rectangle.
+ * drawing. Each na-* element becomes an instance with its own layout rectangle
+ * and color, so distinct nodes render at distinct positions with distinct
+ * colors (all in a single draw call).
  *
  * No WebView, no Electron — pure GPU-accelerated native desktop rendering.
  */
 
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use angnative_host_layout::LayoutResult;
 
 /**
- * RectUniform — per-instance uniform data for each view node.
+ * RectUniform — per-instance data for one view node, consumed as a vertex
+ * buffer with `Instance` step mode. `rect` is in NDC (x, y, w, h), and `color`
+ * is RGBA.
  */
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct RectUniform {
-    rect: [f32; 4], // x, y, w, h in NDC
-    color: [f32; 4], // RGBA
+    rect: [f32; 4],
+    color: [f32; 4],
 }
 
 unsafe impl bytemuck::Pod for RectUniform {}
 unsafe impl bytemuck::Zeroable for RectUniform {}
 
 const SHADER_SRC: &str = r#"
-struct RectUniform {
-    rect: vec4<f32>,
-    color: vec4<f32>,
-};
-
-@group(0) @binding(0)
-var<uniform> rectUniform: RectUniform;
-
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) color: vec4<f32>,
@@ -42,21 +39,19 @@ struct VertexOutput {
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
-    @instance_index instance_index: u32,
+    @location(0) rect: vec4<f32>,
+    @location(1) color: vec4<f32>,
 ) -> VertexOutput {
-    let positions = array<vec2<f32>, 4>(
-        vec2<f32>(-1.0, -1.0),
-        vec2<f32>( 1.0, -1.0),
-        vec2<f32>(-1.0,  1.0),
-        vec2<f32>( 1.0,  1.0),
-    );
-
-    let rect = rectUniform.rect;
-    let pos = positions[vertex_index] * rect.zw + rect.xy;
+    // Derive the corner from the vertex index arithmetically. Indexing a
+    // const array with a dynamically-provided vertex_index is rejected by
+    // naga/wgpu ("expression may only be indexed by a constant").
+    let x = f32(vertex_index & 1u) * 2.0 - 1.0;
+    let y = f32((vertex_index >> 1u) & 1u) * 2.0 - 1.0;
+    let pos = vec2<f32>(x, y) * rect.zw + rect.xy;
 
     var output: VertexOutput;
     output.position = vec4<f32>(pos, 0.0, 1.0);
-    output.color = rectUniform.color;
+    output.color = color;
     return output;
 }
 
@@ -65,6 +60,10 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     return input.color;
 }
 "#;
+
+/// Number of rectangles the instance buffer holds initially. The buffer is
+/// grown automatically when a frame contains more nodes than this.
+const INITIAL_INSTANCE_CAPACITY: usize = 256;
 
 /**
  * DesktopRenderer — wgpu-based renderer for the desktop shell.
@@ -79,9 +78,12 @@ pub struct DesktopRenderer {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
-    uniform_buffer: wgpu::Buffer,
+    instance_buffer: wgpu::Buffer,
+    instance_capacity: usize,
+    /// Demo interaction state: currently pressed button and counter value.
+    pressed: Option<u64>,
+    counter: i32,
 }
 
 impl DesktopRenderer {
@@ -94,7 +96,25 @@ impl DesktopRenderer {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window).map_err(|e| e.to_string())?;
+        // Create the surface from the window's raw handles so it is 'static
+        // rather than borrowing the window for its lifetime. SAFETY: the raw
+        // handles stay valid while the winit window is alive; the owning
+        // AngNativeDesktop drops its renderer before the window.
+        let raw_window_handle = window
+            .window_handle()
+            .map_err(|e| format!("Failed to get raw window handle: {e}"))?
+            .as_raw();
+        let raw_display_handle = window
+            .display_handle()
+            .map_err(|e| format!("Failed to get raw display handle: {e}"))?
+            .as_raw();
+        let surface = unsafe {
+            instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::RawHandle {
+                raw_display_handle,
+                raw_window_handle,
+            })
+        }
+        .map_err(|e| e.to_string())?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -103,7 +123,7 @@ impl DesktopRenderer {
                 force_fallback_adapter: false,
             })
             .await
-            .map_err(|e| format!("Failed to request adapter: {e}"))?;
+            .ok_or_else(|| "Failed to request a wgpu adapter for this surface".to_string())?;
 
         let (device, queue) = adapter
             .request_device(
@@ -133,6 +153,7 @@ impl DesktopRenderer {
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
 
@@ -141,23 +162,11 @@ impl DesktopRenderer {
             source: wgpu::ShaderSource::Wgsl(SHADER_SRC.into()),
         });
 
+        // Rectangles are instanced via a vertex buffer, so no bind groups are
+        // needed — each instance carries its own rectangle and color.
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("angnative-pipeline-layout"),
-            bind_group_layouts: &[
-                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("rect-uniform-layout"),
-                    entries: &[wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    }],
-                }),
-            ],
+            bind_group_layouts: &[],
             push_constant_ranges: &[],
         });
 
@@ -167,6 +176,7 @@ impl DesktopRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
+                compilation_options: Default::default(),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<RectUniform>() as u64,
                     step_mode: wgpu::VertexStepMode::Instance,
@@ -187,8 +197,9 @@ impl DesktopRenderer {
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs_main",
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format,
+                    format: surface_format,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -196,20 +207,7 @@ impl DesktopRenderer {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            cache: None,
-        });
-
-        let vertices: [f32; 8] = [
-            -1.0, -1.0,
-             1.0, -1.0,
-            -1.0,  1.0,
-             1.0,  1.0,
-        ];
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("vertex-buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
+            multiview: None,
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -218,16 +216,7 @@ impl DesktopRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let initial_uniform = RectUniform {
-            rect: [0.0, 0.0, 0.0, 0.0],
-            color: [1.0, 1.0, 1.0, 1.0],
-        };
-
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("uniform-buffer"),
-            contents: bytemuck::cast_slice(&[initial_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let instance_buffer = Self::create_instance_buffer(&device, INITIAL_INSTANCE_CAPACITY);
 
         Ok(Self {
             surface,
@@ -236,9 +225,20 @@ impl DesktopRenderer {
             config,
             size,
             pipeline,
-            vertex_buffer,
             index_buffer,
-            uniform_buffer,
+            instance_buffer,
+            instance_capacity: INITIAL_INSTANCE_CAPACITY,
+            pressed: None,
+            counter: 0,
+        })
+    }
+
+    fn create_instance_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("rect-instance-buffer"),
+            size: (capacity * std::mem::size_of::<RectUniform>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         })
     }
 
@@ -251,7 +251,64 @@ impl DesktopRenderer {
         }
     }
 
+    /// Update the lightweight interaction state used for visual feedback.
+    pub fn set_state(&mut self, counter: i32, pressed: Option<u64>) {
+        self.counter = counter;
+        self.pressed = pressed;
+    }
+
     pub fn render(&mut self, layout: Option<&LayoutResult>) -> Result<(), String> {
+        // Build one RectUniform per node — each instance gets its own rect and
+        // color, so nodes no longer share a single uniform that is overwritten
+        // inside the render pass.
+        let instances: Vec<RectUniform> = match layout {
+            Some(layout) => layout
+                .nodes
+                .iter()
+                .map(|rect| RectUniform {
+                    rect: rect_to_ndc(
+                        rect.x,
+                        rect.y,
+                        rect.width,
+                        rect.height,
+                        self.size.width,
+                        self.size.height,
+                    ),
+                    color: if self.pressed == Some(rect.node_id) {
+                        [0.95, 0.75, 0.2, 1.0] // pressed button highlight
+                    } else {
+                        color_for_node(rect.node_id)
+                    },
+                })
+                .collect(),
+            None => vec![RectUniform {
+                rect: [-0.5, -0.5, 1.0, 1.0],
+                color: [0.3, 0.3, 0.35, 1.0],
+            }],
+        };
+
+        // Counter readout: one green dot per click (up to 10), drawn in a row
+        // at the bottom of the window. Text rendering is not wired up yet.
+        let mut instances = instances;
+        for i in 0..self.counter.clamp(0, 10) {
+            instances.push(RectUniform {
+                rect: [-0.92 + i as f32 * 0.11, -0.88, 0.07, 0.07],
+                color: [0.1, 0.85, 0.45, 1.0],
+            });
+        }
+
+        // Grow the instance buffer if a frame has more nodes than it can hold.
+        if instances.len() > self.instance_capacity {
+            let mut capacity = self.instance_capacity.max(1);
+            while capacity < instances.len() {
+                capacity *= 2;
+            }
+            self.instance_buffer = Self::create_instance_buffer(&self.device, capacity);
+            self.instance_capacity = capacity;
+        }
+        self.queue
+            .write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&instances));
+
         let frame = self
             .surface
             .get_current_texture()
@@ -287,62 +344,84 @@ impl DesktopRenderer {
             });
 
             render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
             render_pass.set_index_buffer(
                 self.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint16,
             );
-
-            if let Some(layout) = layout {
-                for (i, rect) in layout.nodes.iter().enumerate() {
-                    let x = rect.x / self.size.width as f32 * 2.0 - 1.0;
-                    let y = rect.y / self.size.height as f32 * 2.0 - 1.0;
-                    let w = rect.width / self.size.width as f32 * 2.0;
-                    let h = rect.height / self.size.height as f32 * 2.0;
-
-                    let color = match rect.node_id {
-                        1 => [0.2, 0.2, 0.25, 1.0],
-                        2 => [0.1, 0.4, 0.7, 1.0],
-                        3 => [0.1, 0.4, 0.7, 1.0],
-                        4 => [0.15, 0.15, 0.2, 1.0],
-                        5 => [0.2, 0.6, 0.9, 1.0],
-                        6 => [0.2, 0.6, 0.9, 1.0],
-                        7 => [0.2, 0.6, 0.9, 1.0],
-                        8 => [0.0, 0.8, 0.4, 1.0],
-                        _ => [0.3, 0.3, 0.35, 1.0],
-                    };
-
-                    let uniform = RectUniform {
-                        rect: [x, y, w, h],
-                        color,
-                    };
-
-                    self.queue.write_buffer(
-                        &self.uniform_buffer,
-                        0,
-                        bytemuck::cast_slice(&[uniform]),
-                    );
-
-                    let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("rect-bind-group"),
-                        layout: &self.pipeline.get_bind_group_layout(0),
-                        entries: &[wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: self.uniform_buffer.as_entire_binding(),
-                        }],
-                    });
-
-                    render_pass.set_bind_group(0, &bind_group, &[]);
-                    render_pass.draw_indexed(0..6, 0, i as i32..i as i32 + 1);
-                }
-            } else {
-                render_pass.draw_indexed(0..6, 0, 0..1);
-            }
+            render_pass.draw_indexed(0..6, 0, 0..instances.len() as u32);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
         frame.present();
 
         Ok(())
+    }
+}
+
+/// Convert a layout rectangle in device-independent pixels to NDC.
+/// Zero-sized surfaces are clamped to one pixel to avoid divide-by-zero.
+fn rect_to_ndc(
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    surface_width: u32,
+    surface_height: u32,
+) -> [f32; 4] {
+    let w = surface_width.max(1) as f32;
+    let h = surface_height.max(1) as f32;
+    [
+        x / w * 2.0 - 1.0,
+        y / h * 2.0 - 1.0,
+        width / w * 2.0,
+        height / h * 2.0,
+    ]
+}
+
+/// Deterministic, distinct color per demo node id so each rectangle is
+/// visually distinguishable.
+fn color_for_node(node_id: u64) -> [f32; 4] {
+    match node_id {
+        1 => [0.2, 0.2, 0.25, 1.0],
+        2 | 3 => [0.1, 0.4, 0.7, 1.0],
+        4 => [0.15, 0.15, 0.2, 1.0],
+        5 | 6 | 7 => [0.2, 0.6, 0.9, 1.0],
+        8 => [0.0, 0.8, 0.4, 1.0],
+        _ => [0.3, 0.3, 0.35, 1.0],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rect_to_ndc_maps_layout_space_to_clip_space() {
+        let ndc = rect_to_ndc(100.0, 50.0, 200.0, 100.0, 800, 600);
+        assert_eq!(ndc[0], -0.75);
+        assert!((ndc[1] - (-0.833_333_3)).abs() < 1e-5);
+        assert_eq!(ndc[2], 0.5);
+        assert!((ndc[3] - 0.333_333_3).abs() < 1e-5);
+    }
+
+    #[test]
+    fn rect_to_ndc_handles_zero_sized_surface() {
+        let ndc = rect_to_ndc(0.0, 0.0, 10.0, 10.0, 0, 0);
+        assert!(ndc.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn node_colors_are_distinct_across_groups() {
+        assert_ne!(color_for_node(1), color_for_node(2));
+        assert_ne!(color_for_node(4), color_for_node(5));
+        assert_ne!(color_for_node(8), color_for_node(99));
+        // Unknown ids share a fallback color, which is deterministic.
+        assert_eq!(color_for_node(99), color_for_node(100));
+    }
+
+    #[test]
+    fn rect_uniform_is_32_bytes() {
+        assert_eq!(std::mem::size_of::<RectUniform>(), 32);
     }
 }

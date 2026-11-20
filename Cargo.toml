@@ -8,7 +8,7 @@ members = [
     "crates/angnative-host-engine",
     "crates/angnative-host-ffi",
     "crates/angnative-services-core",
-    # "crates/angnative-desktop",
+    "crates/angnative-desktop",
     # The crates below are planned (TaskList.txt Phase 2/3) but not yet created.
     # They will be added here as they are implemented - one at a time, verified.
     # "crates/angnative-compiler",

@@ -27,6 +27,9 @@ local.properties
 *.dSYM/
 .swiftpm/
 
+# Generated test fixtures
+packages/testing/fixtures/out/
+
 # Local Research & Chat Logs
 research/
 post.txt

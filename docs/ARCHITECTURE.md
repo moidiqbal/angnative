@@ -10,7 +10,7 @@
 
 **AngNative** is an open-source, high-performance cross-platform application framework designed to render **modern Angular applications as true native UI widgets** (Android `View`s, iOS `UIView`s, Desktop native surfaces) with **zero WebViews**.
 
-AngNative decouples the Angular application layer from the browser DOM by providing a custom `Renderer2` implementation. Instead of mutating HTML elements, template mutations are serialized into an efficient binary/JSON command buffer and dispatched across a zero-copy FFI boundary into a high-speed **Rust Host Engine**.
+AngNative decouples the Angular application layer from the browser DOM by providing a custom `Renderer2` implementation. Instead of mutating HTML elements, template mutations are serialized into an efficient binary/JSON command buffer and dispatched as JSON batches across the FFI boundary into a high-speed **Rust Host Engine** (zero-copy transport is planned, not yet implemented).
 
 Layout calculation is handled asynchronously in Rust via **Taffy** (W3C Flexbox and CSS Grid), and the resulting layout rectangles are mounted onto native platform views.
 
@@ -20,7 +20,7 @@ Layout calculation is handled asynchronously in Rust via **Taffy** (W3C Flexbox 
 
 ```
 +-------------------------------------------------------------------------+
-|                        Angular 19+ Application                          |
+|                        Angular 22+ Application                          |
 |         Standalone Components, Reactive Signals, Zoneless Runtime       |
 |      Templates (<na-view>, <na-text>, <na-button>, <na-scroll-view>)    |
 +-------------------------------------------------------------------------+
@@ -39,7 +39,7 @@ Layout calculation is handled asynchronously in Rust via **Taffy** (W3C Flexbox 
 |                                                                         |
 |  +------------------------------+     +------------------------------+  |
 |  |    angnative-host-core       |     |     angnative-host-layout    |  |
-|  |  Shadow Tree Management      |     |  Taffy 0.5.2 Layout Adapter  |  |
+|  |  Shadow Tree Management      |     |  Taffy 0.15.1 Layout Adapter  |  |
 |  |  Mutation Protocol & Diffs   |     |  Text Measurer & Flex Cache  |  |
 |  +------------------------------+     +------------------------------+  |
 |                                                                         |
@@ -87,7 +87,7 @@ The Rust engine serves as the single source of truth for the UI shadow tree and 
    - Parses the mutation protocol with zero allocations.
    - Enforces element schema and property types.
 2. **`angnative-host-layout`**:
-   - Adapts [Taffy 0.5.2](https://github.com/DioxusLabs/taffy) for Flexbox and CSS Grid calculations.
+   - Adapts [Taffy 0.15.1](https://github.com/DioxusLabs/taffy) for Flexbox and CSS Grid calculations.
    - Maintains an asynchronous text-measuring cache so complex text wraps without blocking the main UI thread.
 3. **`angnative-host-ffi`**:
    - Exposes clean C-ABI functions defined in `angnative_host_ffi.h`.

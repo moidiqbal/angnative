@@ -116,22 +116,39 @@ impl ViewTree {
     }
 
     /// Register a newly created view.
-    /// If the node is flattened, no native view is created.
+    /// If the node is flattened, it is still tracked in `views` (so its parent
+    /// can be resolved for children) but is not added to `created` — no native
+    /// view exists for it.
     pub fn register_view(&mut self, node_id: u64, view_type: String) {
-        if self.flattened.contains(&node_id) {
-            return;
+        let flattened = self.flattened.contains(&node_id);
+        let parent_id = self.views.get(&node_id).and_then(|e| e.parent_id);
+        let children = self
+            .views
+            .get(&node_id)
+            .map(|e| e.children.clone())
+            .unwrap_or_default();
+        if !flattened {
+            self.created.insert(node_id);
         }
-        self.created.insert(node_id);
         self.views.insert(
             node_id,
             ViewEntry {
                 node_id,
                 view_type,
                 state: ViewState::Created,
-                parent_id: None,
-                children: Vec::new(),
+                parent_id,
+                children,
             },
         );
+    }
+
+    /// Restore a previously destroyed view to the created set without emitting
+    /// a new Create op (used when a recycled native view slot is reused).
+    pub fn restore_view(&mut self, node_id: u64) {
+        self.created.insert(node_id);
+        if let Some(entry) = self.views.get_mut(&node_id) {
+            entry.state = ViewState::Created;
+        }
     }
 
     /// Mark a view as attached to a parent.
@@ -144,10 +161,17 @@ impl ViewTree {
             parent_id
         };
 
+        // A flattened node is transparent: record its parent so descendants can
+        // resolve the grandparent, but do not expose it as a native child.
+        let flattened_self = self.flattened.contains(&node_id);
         if let Some(entry) = self.views.get_mut(&node_id) {
             entry.state = ViewState::Attached;
             entry.parent_id = Some(real_parent);
         }
+        if flattened_self {
+            return;
+        }
+
         self.attached.insert(node_id);
 
         // Add to real parent's children list

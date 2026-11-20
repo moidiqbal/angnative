@@ -5,9 +5,9 @@
  * and drives the desktop shell through command batches + layout.
  */
 
-use angnative_desktop::{AngNativeDesktop, DesktopBridge};
+use crate::AngNativeDesktop;
 use angnative_host_core::command::{Command, CommandBatch};
-use angnative_host_layout::{LayoutNodeInput, LayoutEngine};
+use angnative_host_layout::LayoutNodeInput;
 use std::collections::HashMap;
 
 /**
@@ -32,43 +32,37 @@ pub struct DemoApp {
 }
 
 impl DemoApp {
-    pub async fn new() -> Self {
-        // Create event loop and window (will be set by main)
-        // Note: In a real app, the event loop is passed from main.
-        // Here we use a placeholder that gets replaced.
-        panic!("DemoApp::new() should not be called directly. Use DemoApp::new_with_event_loop().");
-    }
-
-    pub async fn new_with_event_loop(
+    /// Construct the demo app on top of a real winit event loop.
+    ///
+    /// Creates the desktop window and GPU renderer, pushes the demo command
+    /// batch through the Rust host, runs Taffy layout, and applies the emitted
+    /// ops to the retained view tree.
+    pub async fn new(
         event_loop: &winit::event_loop::EventLoop<()>,
     ) -> Result<Self, String> {
-        let desktop = AngNativeDesktop::new(event_loop).await?;
+        let mut desktop = AngNativeDesktop::new(event_loop).await?;
 
-        // Build the demo command batch
+        // Build the demo command batch and process it through the Rust host.
         let batch = Self::demo_batch();
+        desktop.process_batch(&batch)?;
 
-        // Process through the Rust host
-        desktop.bridge_mut().process_batch(&batch)?;
-
-        // Build layout input from the command batch
+        // Build layout input from the command batch, run layout, then apply
+        // the resulting SetFrame ops to the retained view tree.
         let nodes = Self::layout_inputs();
-
-        // Run layout
-        desktop.bridge_mut().run_layout(
-            &nodes,
-            1, // root node id
-            800.0, // available width
-            600.0, // available height
-        )?;
-
-        // Apply layout as SetFrame ops
-        let layout = desktop.bridge.last_layout().unwrap();
-        desktop.bridge_mut().apply_layout(layout)?;
+        let layout = desktop.run_layout(&nodes, 1, 800.0, 600.0)?;
+        desktop.apply_layout(&layout)?;
 
         Ok(Self {
             desktop,
             counter_value: 0,
         })
+    }
+
+    /// Backwards-compatible alias for [`DemoApp::new`].
+    pub async fn new_with_event_loop(
+        event_loop: &winit::event_loop::EventLoop<()>,
+    ) -> Result<Self, String> {
+        Self::new(event_loop).await
     }
 
     /// Build the demo command batch (counter app UI).
@@ -263,9 +257,9 @@ impl DemoApp {
         });
 
         CommandBatch {
-            protocolVersion: 1,
-            frameId: 0,
-            timestampMs: 0,
+            protocol_version: 1,
+            frame_id: 0,
+            timestamp_ms: 0,
             commands,
         }
     }
@@ -372,8 +366,107 @@ impl DemoApp {
         &mut self.desktop
     }
 
+    /// Current demo counter value.
+    pub fn counter(&self) -> i32 {
+        self.counter_value
+    }
+
+    /// Hit-test a click against the retained view tree's Button nodes.
+    /// Updates the counter, dispatches a SetTextContent batch to the Rust host,
+    /// and returns true when a button was hit.
+    pub fn on_click(&mut self, x: f32, y: f32) -> bool {
+        let button = self
+            .desktop
+            .view_tree()
+            .nodes()
+            .find(|node| {
+                node.view_type == "Button"
+                    && x >= node.x
+                    && x <= node.x + node.width
+                    && y >= node.y
+                    && y <= node.y + node.height
+            })
+            .map(|node| node.id);
+
+        let Some(id) = button else { return false };
+
+        match id {
+            5 => self.counter_value -= 1,
+            6 => self.counter_value = 0,
+            7 => self.counter_value += 1,
+            _ => {}
+        }
+
+        let batch = CommandBatch {
+            protocol_version: 1,
+            frame_id: self.counter_value as u64,
+            timestamp_ms: 0,
+            commands: vec![Command::SetTextContent {
+                id: 8,
+                text: format!("Count: {}", self.counter_value),
+            }],
+        };
+        let _ = self.desktop.process_batch(&batch);
+        self.desktop.set_visual_state(self.counter_value, Some(id));
+        true
+    }
+
+    /// Clear the pressed-button highlight.
+    pub fn release_button(&mut self) {
+        self.desktop.set_visual_state(self.counter_value, None);
+    }
+
     /// Render the current frame.
     pub fn render(&mut self) -> Result<(), String> {
         self.desktop.render()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use angnative_host_core::command::PROTOCOL_VERSION;
+
+    #[test]
+    fn demo_batch_uses_wire_protocol_fields() {
+        let batch = DemoApp::demo_batch();
+        assert_eq!(batch.protocol_version, PROTOCOL_VERSION);
+        assert_eq!(batch.frame_id, 0);
+        assert_eq!(batch.timestamp_ms, 0);
+        assert!(!batch.commands.is_empty());
+
+        // The demo tree root (id 1) hosts all three top-level children.
+        let inserts: Vec<(u64, u64)> = batch
+            .commands
+            .iter()
+            .filter_map(|cmd| match cmd {
+                Command::InsertChild {
+                    parent_id,
+                    child_id,
+                    ..
+                } if *parent_id == 1 => Some((*parent_id, *child_id)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(inserts, vec![(1, 2), (1, 3), (1, 4), (1, 8)]);
+    }
+
+    #[test]
+    fn demo_batch_round_trips_through_serde() {
+        let batch = DemoApp::demo_batch();
+        let json = serde_json::to_string(&batch).expect("serialize");
+        let decoded: CommandBatch = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(decoded.protocol_version, batch.protocol_version);
+        assert_eq!(decoded.frame_id, batch.frame_id);
+        assert_eq!(decoded.commands.len(), batch.commands.len());
+    }
+
+    #[test]
+    fn layout_inputs_cover_every_demo_node() {
+        let inputs = DemoApp::layout_inputs();
+        assert_eq!(inputs.len(), 8);
+        assert!(inputs.contains_key(&1));
+        assert_eq!(inputs.get(&1).unwrap().children, vec![2, 3, 4, 8]);
+        assert_eq!(inputs.get(&4).unwrap().children, vec![5, 6, 7]);
     }
 }

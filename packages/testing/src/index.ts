@@ -12,7 +12,17 @@
  */
 
 export { FakeBackend, type FakeBackendResult, type NodeSnapshot } from './fake-backend';
-export { loadManifest, loadFixture, runFixture, type Fixture } from './conformance';
+export {
+  loadManifest,
+  loadFixture,
+  runFixture,
+  SUPPORTED_EXPECT_KEYS,
+  SUPPORTED_NODE_KEYS,
+  type Fixture,
+  type FixtureExpect,
+  type NodeExpect,
+  type CapabilityExpect,
+} from './conformance';
 export {
   MutantReparentNoDetach,
   MutantRemoveChildNoCheck,

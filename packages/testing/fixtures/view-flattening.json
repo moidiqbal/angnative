@@ -1,6 +1,6 @@
 {
   "name": "view-flattening",
-  "description": "A component host with no style/prop/listener gets no native view (view flattening).",
+  "description": "A component host with no style/prop/listener gets no native view (view flattening). The Custom host node is retained in the shadow tree even when flattened at paint time.",
   "commands": [
     { "kind": "CreateNode", "id": 1, "nodeType": "View" },
     { "kind": "CreateNode", "id": 2, "nodeType": "Custom" },
@@ -9,8 +9,10 @@
     { "kind": "InsertChild", "parentId": 2, "childId": 3, "index": 0 }
   ],
   "expect": {
-    "node1": { "children": [2] },
-    "node2": { "children": [3], "note": "Custom host node retained in tree even if flattened at paint" },
-    "node3": { "children": [] }
+    "nodes": {
+      "1": { "children": [2] },
+      "2": { "children": [3] },
+      "3": { "children": [] }
+    }
   }
 }

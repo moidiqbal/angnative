@@ -9,7 +9,6 @@ license.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-log.workspace = true
 rand = { version = "0.8", optional = true }
 zeroize = { version = "1", optional = true }
 

@@ -98,7 +98,7 @@
 
     <!-- Pill 4: Angular Signals -->
     <rect x="730" y="0" width="270" height="52" rx="12" fill="url(#cardBg)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-    <text x="750" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="700" fill="#A855F7">⚡ Angular 19+ Ready</text>
+    <text x="750" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="700" fill="#A855F7">⚡ Angular 22+ Ready</text>
     <text x="920" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12" font-weight="500" fill="#94A3B8">Signals &amp; DI</text>
   </g>
 </svg>

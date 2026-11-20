@@ -12,13 +12,10 @@
  * means failure. Use `angnative_host_last_error()` to retrieve a JSON error
  * message after a failure.
  */
-
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 
-use crate::bridge::{
-    Host, ViewFactoryCallbacks,
-};
+use crate::bridge::{EventCallback, Host, ViewFactoryCallbacks};
 use angnative_host_core::command::CommandBatch;
 use serde_json::Value;
 
@@ -364,4 +361,94 @@ pub unsafe extern "C" fn angnative_host_parse_json(json: *const c_char) -> *mut 
         },
         Err(_) => std::ptr::null_mut(),
     }
+}
+
+/* =========================================================================
+ * Native event bridge
+ * ========================================================================= */
+
+/// Install the callback that delivers native events to the JS/Angular layer.
+/// Returns 0 on success.
+#[no_mangle]
+pub unsafe extern "C" fn angnative_host_set_event_callback(
+    handle: *mut AngNativeHost,
+    callback: Option<EventCallback>,
+    user_data: *mut c_void,
+) -> c_int {
+    if handle.is_null() {
+        return 1;
+    }
+    let Some(cb) = callback else { return 1 };
+    let host = &mut *(handle as *mut Host);
+    host.set_event_callback(cb, user_data);
+    0
+}
+
+/// Register a listener id for `(node_id, event_name)`. Returns 0 on success.
+#[no_mangle]
+pub unsafe extern "C" fn angnative_host_add_event_listener(
+    handle: *mut AngNativeHost,
+    node_id: u64,
+    event_name: *const c_char,
+    listener_id: u64,
+) -> c_int {
+    if handle.is_null() || event_name.is_null() {
+        return 1;
+    }
+    let Ok(name) = CStr::from_ptr(event_name).to_str() else {
+        return 1;
+    };
+    let host = &mut *(handle as *mut Host);
+    host.add_event_listener(node_id, name, listener_id);
+    0
+}
+
+/// Remove a listener. Returns 0 when removed, 1 when not found/invalid.
+#[no_mangle]
+pub unsafe extern "C" fn angnative_host_remove_event_listener(
+    handle: *mut AngNativeHost,
+    node_id: u64,
+    event_name: *const c_char,
+    listener_id: u64,
+) -> c_int {
+    if handle.is_null() || event_name.is_null() {
+        return 1;
+    }
+    let Ok(name) = CStr::from_ptr(event_name).to_str() else {
+        return 1;
+    };
+    let host = &mut *(handle as *mut Host);
+    if host.remove_event_listener(node_id, name, listener_id) {
+        0
+    } else {
+        1
+    }
+}
+
+/// Dispatch a native event. `payload_json` is an optional UTF-8 JSON string.
+/// Returns the number of listeners invoked.
+#[no_mangle]
+pub unsafe extern "C" fn angnative_host_dispatch_event(
+    handle: *mut AngNativeHost,
+    node_id: u64,
+    event_name: *const c_char,
+    payload_json: *const c_char,
+) -> u32 {
+    if handle.is_null() || event_name.is_null() {
+        return 0;
+    }
+    let name = match CStr::from_ptr(event_name).to_str() {
+        Ok(v) => v,
+        Err(_) => return 0,
+    };
+    let payload = if payload_json.is_null() {
+        "{}"
+    } else {
+        match CStr::from_ptr(payload_json).to_str() {
+            Ok(v) => v,
+            Err(_) => return 0,
+        }
+    };
+    let host = &mut *(handle as *mut Host);
+    host.dispatch_event(node_id, name, payload)
 }

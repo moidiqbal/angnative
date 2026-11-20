@@ -1,0 +1,58 @@
+{
+  "name": "@angnative/web",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "license": "MIT",
+  "description": "AngNative web adapter — DOM PlatformOp backend, Renderer2 factory and browser bootstrap",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./dom-backend": {
+      "types": "./dist/dom-backend.d.ts",
+      "default": "./dist/dom-backend.js"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "default": "./dist/renderer.js"
+    },
+    "./bootstrap": {
+      "types": "./dist/bootstrap.d.ts",
+      "default": "./dist/bootstrap.js"
+    },
+    "./primitives": {
+      "types": "./dist/primitives.d.ts",
+      "default": "./dist/primitives.js"
+    }
+  },
+  "files": ["dist/**"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@angular/core": "22.2.5",
+    "@angular/common": "22.2.5",
+    "@angular/platform-browser": "22.2.5",
+    "@angnative/core": "0.1.0",
+    "@angnative/contract": "0.1.0",
+    "@angnative/common": "0.1.0"
+  },
+  "devDependencies": {
+    "@angular/core": "22.2.5",
+    "@angular/common": "22.2.5",
+    "@angular/compiler": "22.2.5",
+    "@angular/platform-browser": "22.2.5",
+    "happy-dom": "21.0.4",
+    "vitest": "3.2.4"
+  },
+  "dependencies": {
+    "@angnative/core": "workspace:*",
+    "@angnative/contract": "workspace:*",
+    "@angnative/common": "workspace:*"
+  }
+}

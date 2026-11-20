@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/moidiqbal/angnative/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=github-actions" alt="Build"/></a>
-  <a href="https://angular.dev"><img src="https://img.shields.io/badge/Angular-19+-DD0031?style=for-the-badge&logo=angular&logoColor=white" alt="Angular"/></a>
+  <a href="https://github.com/moidiqbal/angnative/actions/workflows/ci.yml"><img src="https://github.com/moidiqbal/angnative/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://angular.dev"><img src="https://img.shields.io/badge/Angular-22+-DD0031?style=for-the-badge&logo=angular&logoColor=white" alt="Angular"/></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.80+-orange?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"/></a>
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Android-17%20Ready-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Android"/></a>
   <a href="https://developer.apple.com/ios/"><img src="https://img.shields.io/badge/iOS-arm64-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS"/></a>
@@ -26,13 +26,13 @@ For over a decade, **Angular** has been the enterprise gold standard for web app
 
 **AngNative eliminates the compromise.**
 
-AngNative executes your Angular components and reactive signals on an embedded JS runtime, synchronizes a high-throughput shadow tree inside an ultra-fast **Rust Host Engine**, computes Flexbox/Grid layouts via **Taffy**, and renders **100% native platform UI widgets** (`android.widget.*`, `UIKit.*`) via zero-copy C-FFI / JNI bridges.
+AngNative executes your Angular components and reactive signals on an embedded JS runtime, synchronizes a high-throughput shadow tree inside an ultra-fast **Rust Host Engine**, computes Flexbox/Grid layouts via **Taffy**, and renders **100% native platform UI widgets** (`android.widget.*`, `UIKit.*`) via C-FFI / JNI bridges. Mutations cross the boundary as JSON batches (zero-copy transport is planned, not yet implemented).
 
 ---
 
 ## 📸 Live Demo Showcase
 
-Here is AngNative running on a physical **Android 17 (API 35)** device/emulator showcasing sub-millisecond event synchronization, top-aligned Material 3 views, and bounce animations:
+The Android shell is a functional Gradle project (API 34) with a hand-built Kotlin demo view. Native view mounting from Rust is still being wired — see [`docs/PROJECT-REVIEW-2026-11-20.md`](docs/PROJECT-REVIEW-2026-11-20.md) for the verified status.
 
 <p align="center">
   <table align="center">
@@ -61,7 +61,7 @@ Here is AngNative running on a physical **Android 17 (API 35)** device/emulator 
 
 ```
 +-------------------------------------------------------------+
-|                      Angular 19+ App                        |
+|                      Angular 22+ App                        |
 |        (Signals, Zoneless, Dependency Injection, DI)        |
 +-------------------------------------------------------------+
                               |
@@ -72,7 +72,7 @@ Here is AngNative running on a physical **Android 17 (API 35)** device/emulator 
 +-------------------------------------------------------------+
 |                      Rust Host Engine                       |
 |   crates/angnative-host-core   |   crates/angnative-host-ffi|
-|   crates/angnative-host-layout (Taffy 0.5.2 Flexbox/Grid)   |
+|   crates/angnative-host-layout (Taffy 0.15.1 Flexbox/Grid)   |
 |   crates/angnative-host-view   |   crates/angnative-services|
 +-------------------------------------------------------------+
                               |
@@ -80,7 +80,7 @@ Here is AngNative running on a physical **Android 17 (API 35)** device/emulator 
           | Zero-Copy JNI                         | C-FFI / Swift
           v                                       v
 +-----------------------+               +-----------------------+
-|   Android 17 Shell    |               |       iOS Shell       |
+|    Android Shell      |               |       iOS Shell       |
 |  (Native View Hierarchy,              |   (UIKit / Metal UI,  |
 |   Material 3 Surface) |               |    Mach-O arm64)      |
 +-----------------------+               +-----------------------+
@@ -92,10 +92,10 @@ Here is AngNative running on a physical **Android 17 (API 35)** device/emulator 
 
 - 🎯 **Pure Native Widgets (No WebViews)**: Buttons are real `android.widget.Button` / `UIButton`. Text is real `android.widget.TextView` / `UILabel`. 60–120 FPS buttery smooth scrolling.
 - 🦀 **Rust Core Engine**: Ultra-low memory footprint, lightning-fast mutation batching, and strict memory safety.
-- 📐 **Taffy 0.5.2 Layout**: High-performance CSS Flexbox & CSS Grid computation directly in Rust before touching the UI thread.
-- ⚡ **Angular 19 Ready**: Full support for Angular Signals (`signal()`, `computed()`, `effect()`), modern control flow (`@if`, `@for`), and zoneless change detection.
+- 📐 **Taffy 0.15.1 Layout**: High-performance CSS Flexbox & CSS Grid computation directly in Rust before touching the UI thread.
+- ⚡ **Angular 22 Ready**: Full support for Angular Signals (`signal()`, `computed()`, `effect()`), modern control flow (`@if`, `@for`), and zoneless change detection (Angular's `provideZonelessChangeDetection()`).
 - 🌉 **Zero-Copy FFI**: Fast mutation batch serialization using byte buffers over JNI on Android and direct C-ABI on iOS/Desktop.
-- 📱 **Cross-Platform**: Android (Android 17 / API 35 ready), iOS (arm64 pipeline), Desktop (Win32/macOS/Linux), and Web fallback adapter.
+- 📱 **Cross-Platform**: Android (API 34 shell), iOS (shell in progress — Mac build verification pending), Desktop (Win32/macOS/Linux, in development), and `@angnative/web` DOM fallback adapter (available).
 
 ---
 
@@ -105,12 +105,12 @@ Developing with AngNative feels identical to standard modern Angular, using nati
 
 ```typescript
 import { Component, signal } from '@angular/core';
-import { NaView, NaText, NaButton } from '@angnative/common';
+import { NaViewComponent, NaTextComponent, NaButtonComponent } from '@angnative/common';
 
 @Component({
   selector: 'app-counter',
   standalone: true,
-  imports: [NaView, NaText, NaButton],
+  imports: [NaViewComponent, NaTextComponent, NaButtonComponent],
   template: `
     <na-view style="flex-direction: column; padding: 24px; gap: 16px;">
       <na-text style="font-size: 28px; font-weight: bold; color: #1E293B;">
@@ -122,7 +122,7 @@ import { NaView, NaText, NaButton } from '@angnative/common';
       </na-text>
 
       <na-button 
-        (press)="increment()"
+        (click)="increment()"
         style="background-color: #4F46E5; border-radius: 12px; padding: 14px 20px;">
         <na-text style="color: #FFFFFF; font-weight: 600;">
           Tap Me! 🚀
@@ -152,7 +152,7 @@ angnative/
 │   ├── angnative-host-core/      # Mutation protocol, shadow DOM & element registry
 │   ├── angnative-host-engine/    # QuickJS runtime & embedded JS executor
 │   ├── angnative-host-ffi/       # C-ABI and JNI bindings with exported C header
-│   ├── angnative-host-layout/    # Taffy 0.5.2 Flexbox/Grid adapter & text measurer
+│   ├── angnative-host-layout/    # Taffy 0.15.1 Flexbox/Grid adapter & text measurer
 │   ├── angnative-host-view/      # View factory, view tree, and op emitter
 │   ├── angnative-services-core/  # Capabilities, crypto, diagnostics, and sync
 │   └── angnative-desktop/        # Native desktop shell (Windows, macOS, Linux)
@@ -207,10 +207,10 @@ cd platforms/android
 
 | Platform | Target Runtime | Layout Engine | Status |
 | :--- | :--- | :--- | :--- |
-| **Android** | Kotlin + Android View Hierarchy / Jetpack | Rust Taffy + JNI | ✅ Functional (Android 17 / API 35) |
+| **Android** | Kotlin + Android View Hierarchy / Jetpack | Rust Taffy + JNI | 🟡 Shell builds; Rust→native view wiring in progress (API 34) |
 | **iOS** | Swift + UIKit / Metal | Rust Taffy + C-FFI | 🟡 Toolchain & Mach-O arm64 Ready |
 | **Desktop** | Win32 / AppKit / Wayland | Rust Taffy + Winit | 🟡 In Development |
-| **Web** | Standard DOM / HTML5 Fallback | CSS Flexbox | 🟢 Planned |
+| **Web** | `@angnative/web` DOM renderer (Angular 22) | CSS Flexbox / DOM | ✅ Available (`pnpm start`) |
 
 ---
 

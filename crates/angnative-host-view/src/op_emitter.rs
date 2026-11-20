@@ -125,7 +125,10 @@ impl OpEmitter {
                 if !self.tree.has_view(*parent_id) && !self.tree.is_flattened(*parent_id) {
                     return Err(OpEmitterError::ParentNotFound(*parent_id));
                 }
-                if !self.tree.has_view(*child_id) && !self.tree.is_flattened(*child_id) {
+                if !self.tree.has_view(*child_id)
+                    && !self.tree.is_flattened(*child_id)
+                    && !self.recycle_pool.contains(child_id)
+                {
                     return Err(OpEmitterError::ChildNotFound(*child_id));
                 }
 
@@ -158,12 +161,15 @@ impl OpEmitter {
                     *parent_id
                 };
 
-                // Try to acquire a recycled view slot for the child.
-                let reused_slot = if self.tree.is_recyclable(*parent_id) {
-                    self.recycle_pool.pop_front()
-                } else {
-                    None
-                };
+                // A flattened child has no native view: record the attachment
+                // for descendant resolution but emit no Insert op.
+                if self.tree.is_flattened(*child_id) {
+                    self.tree.attach(*child_id, real_parent);
+                    return Ok(());
+                }
+
+                // Reuse an available recycled native view slot, if any.
+                let reused_slot = self.recycle_pool.pop_front();
 
                 if let Some(slot_id) = reused_slot {
                     // Reuse an existing view slot instead of creating new.
@@ -181,6 +187,9 @@ impl OpEmitter {
                         });
                         self.tree.attach(slot_id, real_parent);
                     } else {
+                        // Reusing this node's own released view: re-track it
+                        // without emitting a second Create.
+                        self.tree.restore_view(*child_id);
                         self.ops.push(PlatformOp::Insert {
                             parent_id: real_parent,
                             child_id: *child_id,
@@ -215,12 +224,11 @@ impl OpEmitter {
 
                 self.tree.detach(*child_id);
 
-                // Release child's view to recycle pool instead of destroying —
-                // enables list recycling (na-list reuses fixed slot count).
+                // Release child's view to the recycle pool instead of emitting
+                // a Destroy op — the native view can be reused on re-insert.
                 if self.tree.has_view(*child_id) {
                     self.recycle_pool.push_back(*child_id);
-                } else if self.tree.is_flattened(*child_id) {
-                    self.tree.detach(*child_id);
+                    self.tree.destroy(*child_id);
                 }
 
                 self.ops.push(PlatformOp::Remove {
@@ -714,6 +722,13 @@ mod tests {
                 node_type: "Custom".to_string(),
             })
             .unwrap();
+        emitter
+            .process_command(&Command::InsertChild {
+                parent_id: 1,
+                child_id: 2,
+                index: 0,
+            })
+            .unwrap();
 
         // Text child of flattened Custom — attaches to grandparent (node 1)
         emitter
@@ -762,6 +777,13 @@ mod tests {
             .process_command(&Command::CreateNode {
                 id: 2,
                 node_type: "Custom".to_string(),
+            })
+            .unwrap();
+        emitter
+            .process_command(&Command::InsertChild {
+                parent_id: 1,
+                child_id: 2,
+                index: 0,
             })
             .unwrap();
         emitter
@@ -889,11 +911,11 @@ mod tests {
             })
             .unwrap();
 
-        // No second Create op — the view was recycled
+        // No second Create op for node 2 — its native view was recycled.
         let create_ops: Vec<&PlatformOp> = emitter
             .ops()
             .iter()
-            .filter(|o| matches!(o, PlatformOp::Create { .. }))
+            .filter(|o| matches!(o, PlatformOp::Create { node_id: 2, .. }))
             .collect();
         assert_eq!(create_ops.len(), 1);
 

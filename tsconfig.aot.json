@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist/aot",
+    "rootDir": "apps/demo-app/src",
+    "declaration": false,
+    "sourceMap": true,
+    "inlineSources": true
+  },
+  "angularCompilerOptions": {
+    "enableIvy": true,
+    "enableResourceInlining": true,
+    "flatModuleOutDir": "dist/aot",
+    "flatModuleId": "angnative-app",
+    "skipTemplateCodegen": false,
+    "strictMetadataEmit": true,
+    "fullTemplateTypeCheck": true,
+    "strictInjectionParameters": true,
+    "strictInputTypes": true,
+    "strictOutputTypes": true,
+    "strictDomEventTypes": true
+  },
+  "files": [
+    "apps/demo-app/src/main.ts"
+  ],
+  "include": [
+    "apps/demo-app/src/**/*.ts"
+  ],
+  "exclude": [
+    "apps/demo-app/src/**/*.spec.ts",
+    "apps/demo-app/src/**/*.spec.d.ts"
+  ]
+}

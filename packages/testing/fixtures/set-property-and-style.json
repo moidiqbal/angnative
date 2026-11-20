@@ -10,9 +10,11 @@
     { "kind": "SetProperty", "id": 1, "key": "count", "value": 42 }
   ],
   "expect": {
-    "node1": {
-      "styles": { "flexDirection": "row", "width": "200px", "color": "#ff0000" },
-      "properties": { "disabled": true, "count": 42 }
+    "nodes": {
+      "1": {
+        "styles": { "flexDirection": "row", "width": "200px", "color": "#ff0000" },
+        "properties": { "disabled": true, "count": 42 }
+      }
     },
     "unknownKeyThrows": true
   }

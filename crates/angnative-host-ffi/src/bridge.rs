@@ -8,17 +8,21 @@
  *   - CommandBatch in → PlatformOp[] out (process_batch)
  *   - LayoutNodeInput[] + dims in → LayoutResult out (run_layout)
  */
-
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
+use std::ffi::{c_char, CString};
 use std::os::raw::c_void;
 
-use angnative_host_core::command::{Command, CommandBatch};
+/// Callback invoked by the FFI event bridge when a native event is dispatched.
+/// `listener_id` identifies the registered Angular listener, `payload` is a
+/// UTF-8 JSON string owned by the host for the duration of the call.
+pub type EventCallback = unsafe extern "C" fn(u64, *const c_char, *mut c_void);
+
+use angnative_host_core::command::CommandBatch;
 use angnative_host_core::mutation::MutationEngine;
-use angnative_host_layout::{LayoutEngine, LayoutNodeInput, LayoutResult};
+use angnative_host_layout::{LayoutEngine, LayoutNodeInput};
 use angnative_host_view::op_emitter::OpEmitter;
-use angnative_host_view::ops::{PlatformOp, ViewProps};
+use angnative_host_view::ops::ViewProps;
 use angnative_host_view::view_factory::{ViewFactory, ViewFactoryError, ViewFactoryResult};
 use angnative_host_view::view_tree::ViewTree;
 
@@ -46,16 +50,14 @@ pub type SetTextCb =
     extern "C" fn(node_id: u64, text: *const std::ffi::c_char, user_data: FfiUserData);
 
 /** Append a child view to a parent. */
-pub type AppendChildCb =
-    extern "C" fn(parent_id: u64, child_id: u64, user_data: FfiUserData);
+pub type AppendChildCb = extern "C" fn(parent_id: u64, child_id: u64, user_data: FfiUserData);
 
 /** Insert a child view at an index. */
 pub type InsertChildCb =
     extern "C" fn(parent_id: u64, child_id: u64, index: u32, user_data: FfiUserData);
 
 /** Remove a child view from a parent. */
-pub type RemoveChildCb =
-    extern "C" fn(parent_id: u64, child_id: u64, user_data: FfiUserData);
+pub type RemoveChildCb = extern "C" fn(parent_id: u64, child_id: u64, user_data: FfiUserData);
 
 /** Destroy a native view. */
 pub type DestroyViewCb = extern "C" fn(node_id: u64, user_data: FfiUserData);
@@ -110,17 +112,6 @@ impl CallbackViewFactory {
     pub fn new(cb: ViewFactoryCallbacks) -> Self {
         Self { cb }
     }
-
-    /// Safely read a C string pointer into a Rust String.
-    unsafe fn c_str_to_string(ptr: *const std::ffi::c_char) -> Option<String> {
-        if ptr.is_null() {
-            return None;
-        }
-        std::ffi::CStr::from_ptr(ptr)
-            .to_str()
-            .ok()
-            .map(|s| s.to_owned())
-    }
 }
 
 impl ViewFactory for CallbackViewFactory {
@@ -172,12 +163,7 @@ impl ViewFactory for CallbackViewFactory {
         Ok(())
     }
 
-    fn insert_child(
-        &self,
-        parent_id: u64,
-        child_id: u64,
-        index: usize,
-    ) -> ViewFactoryResult<()> {
+    fn insert_child(&self, parent_id: u64, child_id: u64, index: usize) -> ViewFactoryResult<()> {
         if let Some(cb) = self.cb.insert_child {
             cb(parent_id, child_id, index as u32, self.cb.user_data);
         }
@@ -204,7 +190,7 @@ impl ViewFactory for CallbackViewFactory {
  * ========================================================================= */
 
 /** Request to run layout. Mirror of LayoutNodeInput for JSON. */
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LayoutNodeInputJson {
     pub node_id: u64,
     pub styles: HashMap<String, String>,
@@ -212,7 +198,7 @@ pub struct LayoutNodeInputJson {
 }
 
 /** Full layout request. */
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LayoutRequestJson {
     pub root_id: u64,
     pub nodes: Vec<LayoutNodeInputJson>,
@@ -252,6 +238,11 @@ pub struct Host {
     view_factory: Option<Box<dyn ViewFactory>>,
     layout_engine: Option<LayoutEngine>,
     last_error: Option<String>,
+    /// Native event bridge: platform shells dispatch events here and the
+    /// registered callback forwards them to the JS/Angular listener layer.
+    event_callback: Option<EventCallback>,
+    event_user_data: *mut c_void,
+    event_listeners: HashMap<(u64, String), Vec<u64>>,
 }
 
 impl Host {
@@ -263,6 +254,9 @@ impl Host {
             view_factory: None,
             layout_engine: Some(LayoutEngine::default()),
             last_error: None,
+            event_callback: None,
+            event_user_data: std::ptr::null_mut(),
+            event_listeners: HashMap::new(),
         }
     }
 
@@ -283,6 +277,68 @@ impl Host {
         self.view_factory = Some(Box::new(CallbackViewFactory::new(cb)));
     }
 
+    /* =====================================================================
+     * Native event bridge (Angular listener round trip)
+     * ===================================================================== */
+
+    /// Install the single callback used to deliver native events to JS/Angular.
+    pub fn set_event_callback(&mut self, cb: EventCallback, user_data: *mut c_void) {
+        self.event_callback = Some(cb);
+        self.event_user_data = user_data;
+    }
+
+    /// Register a listener id for `(node_id, event_name)`.
+    pub fn add_event_listener(&mut self, node_id: u64, event_name: &str, listener_id: u64) {
+        self.event_listeners
+            .entry((node_id, event_name.to_string()))
+            .or_default()
+            .push(listener_id);
+    }
+
+    /// Remove a previously registered listener. Returns true when removed.
+    pub fn remove_event_listener(
+        &mut self,
+        node_id: u64,
+        event_name: &str,
+        listener_id: u64,
+    ) -> bool {
+        let key = (node_id, event_name.to_string());
+        let mut removed = false;
+        if let Some(ids) = self.event_listeners.get_mut(&key) {
+            if let Some(pos) = ids.iter().position(|id| *id == listener_id) {
+                ids.remove(pos);
+                removed = true;
+            }
+            if ids.is_empty() {
+                self.event_listeners.remove(&key);
+            }
+        }
+        removed
+    }
+
+    /// Dispatch a native event to every registered listener. Returns how many
+    /// listeners were invoked (0 also when no callback is installed).
+    pub fn dispatch_event(&mut self, node_id: u64, event_name: &str, payload: &str) -> u32 {
+        let ids = self
+            .event_listeners
+            .get(&(node_id, event_name.to_string()))
+            .cloned()
+            .unwrap_or_default();
+        let Some(cb) = self.event_callback else {
+            return 0;
+        };
+        let Ok(c_payload) = CString::new(payload) else {
+            return 0;
+        };
+        let user_data = self.event_user_data;
+        let mut invoked = 0;
+        for id in ids {
+            unsafe { cb(id, c_payload.as_ptr(), user_data) };
+            invoked += 1;
+        }
+        invoked
+    }
+
     /// Process a command batch: decode JSON → validate → emit ops → apply to view factory.
     pub fn process_batch_json(&mut self, batch_json: &str) -> Result<String, String> {
         self.clear_error();
@@ -295,14 +351,23 @@ impl Host {
         angnative_host_core::command::validate_version(batch.protocol_version)
             .map_err(|e| format!("Protocol error: {e}"))?;
 
+        // Apply the batch to the retained shadow tree so node_count/snapshot
+        // (used by platform shells) reflect the current state.
+        self.engine
+            .run_batch(batch.clone())
+            .map_err(|e| format!("MutationEngine error: {e}"))?;
+
         // Emit platform ops through the OpEmitter.
-        let ops = self.emitter.process_batch(&batch).map_err(|e| {
-            format!("OpEmitter error: {e}")
-        })?;
+        let ops = self
+            .emitter
+            .process_batch(&batch)
+            .map_err(|e| format!("OpEmitter error: {e}"))?;
 
         // Apply ops to the registered view factory, if any.
         if let Some(factory) = &self.view_factory {
-            factory.apply_ops(&ops).map_err(|e| format!("ViewFactory error: {e}"))?;
+            factory
+                .apply_ops(&ops)
+                .map_err(|e| format!("ViewFactory error: {e}"))?;
         }
 
         // Serialize ops back to JSON for the platform shell.
@@ -350,10 +415,11 @@ impl Host {
         serde_json::to_string(&response).map_err(|e| format!("Layout serialization: {e}"))
     }
 
-    /// Get the last error as JSON, or null if none.
+    /// Get the last error as JSON, or `{"ok":true}` if none.
+    /// Reading the error does not clear it; `clear_error` does.
     pub fn last_error_json(&mut self) -> String {
-        match self.last_error.take() {
-            Some(msg) => serde_json::to_string(&ErrorResponseJson { error: msg }).unwrap(),
+        match self.last_error.as_ref() {
+            Some(msg) => serde_json::to_string(&ErrorResponseJson { error: msg.clone() }).unwrap(),
             None => serde_json::to_string(&OkResponseJson { ok: true }).unwrap(),
         }
     }

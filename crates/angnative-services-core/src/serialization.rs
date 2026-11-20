@@ -56,6 +56,7 @@ pub fn deserialize<T: DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
 
     #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     struct TestValue {

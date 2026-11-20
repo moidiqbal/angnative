@@ -116,6 +116,23 @@ describe('AngNativeRenderer mutation batching', () => {
     expect(renderer.dispatchEvent(listener.value.listenerId, event)).toBeUndefined();
   });
 
+  it('routes native events to listeners by node id and event name', () => {
+    const el = renderer.createElement(null, 'na-button');
+    const received: unknown[] = [];
+    renderer.listen(el, 'press', (event) => {
+      received.push(event);
+    });
+
+    const event = { source: 'native' };
+    expect(renderer.dispatchNativeEvent(el.id, 'press', event)).toBe(true);
+    expect(received).toEqual([event]);
+
+    // A different event name or node must not fire the listener.
+    expect(renderer.dispatchNativeEvent(el.id, 'release', event)).toBe(false);
+    expect(renderer.dispatchNativeEvent(el.id + 100, 'press', event)).toBe(false);
+    expect(received).toEqual([event]);
+  });
+
   it('appendChild / removeChild record mutations', () => {
     const parent = renderer.createElement(null, 'na-view');
     const child = renderer.createElement(null, 'na-view');

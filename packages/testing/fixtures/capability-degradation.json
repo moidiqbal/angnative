@@ -1,12 +1,16 @@
 {
   "name": "capability-degradation",
-  "description": "A plugin declaring an unsupported feature is rejected; degradation is diagnosed, never silent.",
+  "description": "A plugin declaring an unsupported feature is rejected; degradation is diagnosed, never silent. The unsupported capability is recorded as a node property so it is diagnosable rather than silently dropped.",
   "commands": [
     { "kind": "CreateNode", "id": 1, "nodeType": "Custom" },
     { "kind": "SetProperty", "id": 1, "key": "capability:unsupported-feature", "value": true }
   ],
   "expect": {
-    "degradationDiagnosed": true,
-    "silentFailure": false
+    "capability": {
+      "nodeId": 1,
+      "key": "capability:unsupported-feature",
+      "value": true,
+      "diagnosed": true
+    }
   }
 }

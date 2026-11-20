@@ -1,65 +1,29 @@
 /**
  * conformance.spec.ts — the shared conformance suite (Task T3 / keystone).
  *
- * Loads JSON fixtures from fixtures/*.manifest, runs each command sequence
+ * Loads JSON fixtures from fixtures/*.json, runs each command sequence
  * through the TS fake backend, and asserts the fixture's expect block.
  *
  * The same fixtures must be run by the Rust host (angnative-host-core) and
  * produce identical results (Task R4). This suite is the detector that keeps
  * TS and Rust honest — swap the backend, re-run, both must stay green.
+ *
+ * Only the keys listed in SUPPORTED_EXPECT_KEYS / SUPPORTED_NODE_KEYS are
+ * asserted. A guard test fails loudly if a fixture introduces an unknown key
+ * (see FIXTURES.md).
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { fileURLToPath } from 'url';
+import { decodeBatch, encodeBatch } from '@angnative/contract/protocol';
 import { FakeBackend, type FakeBackendResult } from './fake-backend';
-import { encodeBatch, decodeBatch } from '@angnative/contract/protocol';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url)).replace(/%20/g, ' ');
-const FIXTURES_DIR = join(__dirname, '..', 'fixtures');
-
-interface Fixture {
-  name: string;
-  description: string;
-  commands: any[];
-  expect?: {
-    mutationKinds?: string[];
-    finalTree?: Record<string, { children?: number[]; textContent?: string | null } | null>;
-    nodes?: Record<string, NodeExpect>;
-    unknownElementThrows?: boolean;
-    unknownStyleThrows?: boolean;
-    missingFieldThrows?: boolean;
-    badProtocolVersionThrows?: boolean;
-  };
-}
-
-interface NodeExpect {
-  children?: number[];
-  parentId?: number | null;
-  textContent?: string | null;
-  styles?: Record<string, string>;
-  properties?: Record<string, unknown>;
-}
-
-/** Load the manifest (ordered list of fixture names). */
-function loadManifest(): string[] {
-  const raw = readFileSync(join(FIXTURES_DIR, 'manifest.json'), 'utf8');
-  return JSON.parse(raw) as string[];
-}
-
-/** Load a single fixture by name. */
-function loadFixture(name: string): Fixture {
-  const raw = readFileSync(join(FIXTURES_DIR, `${name}.json`), 'utf8');
-  return JSON.parse(raw) as Fixture;
-}
-
-function runFixture(name: string) {
-  const fixture = loadFixture(name);
-  const backend = new FakeBackend();
-  backend.runBatch(fixture.commands);
-  return { fixture, result: backend.snapshot() };
-}
+import {
+  loadManifest,
+  loadFixture,
+  runFixture,
+  SUPPORTED_EXPECT_KEYS,
+  SUPPORTED_NODE_KEYS,
+  type Fixture,
+} from './conformance';
 
 describe('conformance suite — shared fixtures (TS fake backend)', () => {
   const manifest = loadManifest();
@@ -78,6 +42,24 @@ describe('conformance suite — shared fixtures (TS fake backend)', () => {
 
       beforeEach(() => {
         ({ fixture, result } = runFixture(name));
+      });
+
+      it('uses only supported expectation keys', () => {
+        const expectBlock = fixture.expect ?? {};
+        for (const key of Object.keys(expectBlock)) {
+          expect(
+            SUPPORTED_EXPECT_KEYS,
+            `fixture ${name}: unsupported expect key "${key}"`,
+          ).toContain(key);
+        }
+        for (const [idStr, node] of Object.entries(expectBlock.nodes ?? {})) {
+          for (const key of Object.keys(node)) {
+            expect(
+              SUPPORTED_NODE_KEYS,
+              `fixture ${name} node ${idStr}: unsupported node key "${key}"`,
+            ).toContain(key);
+          }
+        }
       });
 
       it('runs without throwing', () => {
@@ -136,6 +118,38 @@ describe('conformance suite — shared fixtures (TS fake backend)', () => {
               expect(node.properties.get(key)).toEqual(value);
             }
           }
+          if (expected.reused !== undefined) {
+            const createCount = result.createCounts.get(id) ?? 0;
+            if (expected.reused) {
+              // The slot survived the detach: node is alive and was never
+              // destroyed/recreated (a recreate bumps the create count).
+              expect(node, `node ${id} view slot retained`).toBeDefined();
+              expect(
+                createCount,
+                `node ${id} created once (native view slot reused)`,
+              ).toBe(1);
+            } else {
+              expect(
+                createCount === 0 || createCount > 1,
+                `node ${id} view slot was not reused`,
+              ).toBe(true);
+            }
+          }
+        }
+      });
+
+      it('records capability degradation (never silent)', () => {
+        if (!fixture.expect?.capability) return;
+        const { nodeId, key, value = true, diagnosed = true } = fixture.expect.capability;
+        const node = result.nodes.get(nodeId);
+        expect(node, `node ${nodeId}`).toBeDefined();
+        if (diagnosed) {
+          expect(
+            node!.properties.get(key),
+            `capability "${key}" diagnosed (not silently dropped)`,
+          ).toEqual(value);
+        } else {
+          expect(node!.properties.has(key), `capability "${key}" not recorded`).toBe(false);
         }
       });
 
@@ -154,6 +168,17 @@ describe('conformance suite — shared fixtures (TS fake backend)', () => {
           backend.runBatch([
             { kind: 'CreateNode', id: 1, nodeType: 'View' },
             { kind: 'SetStyle', id: 1, key: 'bogus-style', value: '1px' },
+          ]);
+        }).toThrow(/Unknown/);
+      });
+
+      it('throws on unknown key (legacy alias)', () => {
+        if (!fixture.expect?.unknownKeyThrows) return;
+        const backend = new FakeBackend();
+        expect(() => {
+          backend.runBatch([
+            { kind: 'CreateNode', id: 1, nodeType: 'View' },
+            { kind: 'SetStyle', id: 1, key: 'bogus-key', value: '1px' },
           ]);
         }).toThrow(/Unknown/);
       });

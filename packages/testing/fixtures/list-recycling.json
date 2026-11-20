@@ -11,8 +11,10 @@
     { "kind": "InsertChild", "parentId": 1, "childId": 2, "index": 0 }
   ],
   "expect": {
-    "node1": { "children": [2, 3] },
-    "node2": { "reused": true },
-    "node3": { "children": [] }
+    "nodes": {
+      "1": { "children": [2, 3] },
+      "2": { "reused": true, "parentId": 1 },
+      "3": { "children": [] }
+    }
   }
 }

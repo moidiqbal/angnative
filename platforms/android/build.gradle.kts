@@ -4,8 +4,8 @@ buildscript {
     mavenCentral()
   }
   dependencies {
-    classpath("com.android.tools.build:gradle:8.2.0")
-    classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20")
+    // AGP 9.x has built-in Kotlin support; no separate KGP classpath needed.
+    classpath("com.android.tools.build:gradle:9.5.2")
   }
 }
 

@@ -11,14 +11,15 @@
  * the budget or if a target fails to build.
  *
  * Usage:
- *   node scripts/check-rust-size.mjs [--budget-bytes <bytes>] [--target <triple>...]
+ *   node scripts/check-rust-size.mjs [--budget-bytes <bytes>] [--target <triple>...] [--host]
  *
  * Default budget: 1 MB (1,048,576 bytes).
  * Default targets: the crates in the AngNative workspace release profile.
+ * `--host` measures the host target without a --target flag.
  */
 
 import { execSync } from 'child_process';
-import { existsSync, statSync } from 'fs';
+import { existsSync, statSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 const DEFAULT_BUDGET_BYTES = 1_048_576; // 1 MB
@@ -47,6 +48,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   let budgetBytes = DEFAULT_BUDGET_BYTES;
   const targets = [];
+  let hostOnly = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--budget-bytes' || args[i] === '-b') {
@@ -57,6 +59,8 @@ function parseArgs() {
       }
     } else if (args[i] === '--target' || args[i] === '-t') {
       targets.push(args[++i]);
+    } else if (args[i] === '--host') {
+      hostOnly = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       console.log(`
 Usage: node scripts/check-rust-size.mjs [options]
@@ -64,6 +68,7 @@ Usage: node scripts/check-rust-size.mjs [options]
 Options:
   --budget-bytes, -b <bytes>  Size budget in bytes (default: 1,048,576 = 1 MB)
   --target, -t <triple>       Target triple to measure (repeatable)
+  --host                      Measure the host target (no --target flag)
   --help, -h                  Show this help
 
 Default targets: ${DEFAULT_TARGETS.join(', ')}
@@ -75,7 +80,7 @@ Default targets: ${DEFAULT_TARGETS.join(', ')}
     }
   }
 
-  return { budgetBytes, targets: targets.length ? targets : DEFAULT_TARGETS };
+  return { budgetBytes, targets: hostOnly ? [null] : targets.length ? targets : DEFAULT_TARGETS };
 }
 
 function formatBytes(bytes) {
@@ -89,34 +94,57 @@ function cargoTargetDir() {
   return process.env.CARGO_TARGET_DIR || join(process.cwd(), 'target');
 }
 
-// Map target triple to the expected release artifact extension.
-function artifactExt(target) {
-  if (target.includes('windows')) return '.dll';
-  if (target.includes('darwin') || target.includes('ios')) return '.dylib';
-  if (target.includes('android')) return '.so';
-  if (target.includes('linux')) return '.so';
-  return '.a'; // static library fallback
-}
+// Extensions a host crate can produce. Cargo normalizes hyphens to
+// underscores in artifact file names (e.g. angnative-host-core →
+// libangnative_host_core.rlib), and rlib is what library-only crates emit.
+const ARTIFACT_EXTENSIONS = ['.rlib', '.so', '.dylib', '.dll', '.a'];
 
-// Possible artifact file names for a crate on a target.
-function candidateArtifactPaths(targetDir, target, crateName) {
-  const ext = artifactExt(target);
-  const candidates = [
-    // cdylib (Android .so, iOS/macOS .dylib, Windows .dll)
-    join(targetDir, target, 'release', `lib${crateName}${ext}`),
-    // static lib (.a)
-    join(targetDir, target, 'release', `${crateName}${ext}`),
-  ];
-  return candidates;
-}
-
+// Artifacts can land in target/<triple>/release/ or, on some nightly
+// toolchains, in target/release/build/<crate>/<hash>/out/. Search a bounded
+// subtree instead of assuming a single flat directory.
 function findArtifact(targetDir, target, crateName) {
-  for (const path of candidateArtifactPaths(targetDir, target, crateName)) {
-    if (existsSync(path)) {
-      return path;
+  const name = crateName.replace(/-/g, '_');
+  const releaseDir = target
+    ? join(targetDir, target, 'release')
+    : join(targetDir, 'release');
+  if (!existsSync(releaseDir)) return null;
+
+  // Cargo appends a metadata hash to artifact names on some toolchains:
+  // libangnative_host_core-1a0f788665e9b207.rlib
+  const extPattern = ARTIFACT_EXTENSIONS.map((e) => e.replace('.', '\\.')).join('|');
+  const matcher = new RegExp(`^(lib)?${name}(-[0-9a-f]+)?(${extPattern})$`);
+
+  const queue = [{ dir: releaseDir, depth: 0 }];
+  const seen = new Set();
+  const matches = [];
+  while (queue.length) {
+    const { dir, depth } = queue.shift();
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.isFile() && matcher.test(entry.name)) {
+        matches.push(join(dir, entry.name));
+      }
+    }
+    if (depth < 5) {
+      for (const entry of entries) {
+        if (entry.isDirectory()) queue.push({ dir: join(dir, entry.name), depth: depth + 1 });
+      }
     }
   }
-  return null;
+
+  if (!matches.length) return null;
+  // Prefer the most recently produced artifact (BFS order is not meaningful).
+  matches.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return matches[0];
 }
 
 function isStripped(path) {
@@ -157,13 +185,13 @@ async function main() {
   const results = [];
 
   for (const target of targets) {
-    console.log(`\n=== Target: ${target} ===`);
+    console.log(`\n=== Target: ${target || 'host'} ===`);
 
     // Build each host crate for the target.
     for (const crate of HOST_CRATES) {
       try {
         execSync(
-          `cargo build --release --target ${target} --package ${crate}`,
+          `cargo build --release ${target ? `--target ${target} ` : ''}--package ${crate}`,
           {
             stdio: ['pipe', 'pipe', 'pipe'],
             cwd: process.cwd(),

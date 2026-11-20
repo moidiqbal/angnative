@@ -6,7 +6,7 @@
  *   doctor   Check the toolchain (Node, Angular, TS, Rust, Android SDK, Xcode, NDK)
  *   create   Scaffold a new app (see create.ts)
  *   test     Run the repository test suite
- *   build    Bundle the app for production + size report
+ *   build    Bundle the app for production + size report (AOT compile + esbuild)
  *   dev      Start the dev server with incremental AOT + fast refresh
  *
  * The `build` command is wired here (this track owns commands.ts since no
@@ -21,7 +21,10 @@ import { createApp } from './create';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
+import { execSync } from 'child_process';
 
+const AOT_TSCONFIG = 'tsconfig.aot.json';
+const AOT_OUTPUT_DIR = join(process.cwd(), 'dist', 'aot');
 const BUNDLE_ENTRY = join(process.cwd(), 'packages', 'testing', 'fixtures', 'out', 'app.js');
 const BUNDLE_OUTFILE = join(
   process.cwd(),
@@ -40,17 +43,36 @@ Usage:
 Commands:
   doctor   Check the toolchain and the pinned package versions
   create <app-name>  Scaffold a new AngNative app
-  test     Run the contract suite
+  test     Run the repository test suite
   inspect  Render the native element tree of the AOT fixture as a self-contained page
-  build    Bundle the app for production and report its size
+  build    Bundle the app for production (AOT + esbuild) and report size
   dev      Start the dev server with incremental AOT and fast refresh
 `);
 }
 
 async function runBuild(): Promise<number> {
+  // Step 1: Run Angular AOT compilation
+  if (!existsSync(AOT_TSCONFIG)) {
+    console.error(`error: AOT tsconfig not found: ${AOT_TSCONFIG}`);
+    console.error('  Create tsconfig.aot.json with Angular compiler options.');
+    return 1;
+  }
+
+  console.log(`[angnative build] running AOT compile with ${AOT_TSCONFIG}...`);
+  try {
+    execSync(`npx ngc --project ${AOT_TSCONFIG}`, {
+      stdio: 'inherit',
+      cwd: process.cwd(),
+    });
+  } catch (err) {
+    console.error(`error: AOT compilation failed: ${err instanceof Error ? err.message : String(err)}`);
+    return 1;
+  }
+
+  // Step 2: Bundle the AOT output
   if (!existsSync(BUNDLE_ENTRY)) {
     console.error(`error: AOT fixture not found at ${BUNDLE_ENTRY}`);
-    console.error('  Run: pnpm run compile:fixtures first');
+    console.error(`  Check that tsconfig.aot.json outputs to ${BUNDLE_ENTRY}`);
     return 1;
   }
 
