@@ -1,0 +1,20 @@
+[package]
+name = "angnative-runtime-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Bridge between angnative-host-ffi Host and angnative-host-engine AngNativeRuntime"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+angnative-host-ffi = { path = "../angnative-host-ffi" }
+angnative-host-engine = { path = "../angnative-host-engine" }
+anyhow = "1.0"
+log = "0.4"
+
+# For testing
+[dev-dependencies]
+angnative-host-core = { path = "../angnative-host-core" }
+angnative-host-view = { path = "../angnative-host-view" }

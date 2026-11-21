@@ -9,14 +9,35 @@
  *   - LayoutNodeInput[] + dims in → LayoutResult out (run_layout)
  */
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{c_char, CString};
 use std::os::raw::c_void;
+use std::thread_local;
 
 /// Callback invoked by the FFI event bridge when a native event is dispatched.
 /// `listener_id` identifies the registered Angular listener, `payload` is a
 /// UTF-8 JSON string owned by the host for the duration of the call.
 pub type EventCallback = unsafe extern "C" fn(u64, *const c_char, *mut c_void);
+
+/// Thread-local storage for the JS runtime dispatch function.
+/// Set by RuntimeBridge when created, cleared when destroyed.
+/// This allows Host::dispatch_event to call the bridge's runtime.
+thread_local! {
+    static JS_RUNTIME_DISPATCH: RefCell<Option<extern "C" fn(u64, *const c_char, *const c_char) -> u32>> = RefCell::new(None);
+}
+
+/// Set the JS runtime dispatch function for the current thread.
+/// Called by RuntimeBridge::new() to register its dispatch function.
+pub fn set_js_runtime_dispatch_for_thread(f: extern "C" fn(u64, *const c_char, *const c_char) -> u32) {
+    JS_RUNTIME_DISPATCH.with(|dispatch| *dispatch.borrow_mut() = Some(f));
+}
+
+/// Clear the JS runtime dispatch function for the current thread.
+/// Called by RuntimeBridge::destroy() or when bridge is dropped.
+pub fn clear_js_runtime_dispatch_for_thread() {
+    JS_RUNTIME_DISPATCH.with(|dispatch| *dispatch.borrow_mut() = None);
+}
 
 use angnative_host_core::command::CommandBatch;
 use angnative_host_core::mutation::MutationEngine;
@@ -325,10 +346,28 @@ impl Host {
             .cloned()
             .unwrap_or_default();
         let Some(cb) = self.event_callback else {
-            return 0;
+            // If no FFI callback, still call JS runtime dispatch if registered via thread-local
+            return JS_RUNTIME_DISPATCH.with(|dispatch| {
+                if let Some(f) = dispatch.borrow().as_ref() {
+                    let c_event = CString::new(event_name).unwrap_or_default();
+                    let c_payload = CString::new(payload).unwrap_or_default();
+                    f(node_id, c_event.as_ptr(), c_payload.as_ptr())
+                } else {
+                    0
+                }
+            });
         };
         let Ok(c_payload) = CString::new(payload) else {
-            return 0;
+            // Still try JS dispatch
+            return JS_RUNTIME_DISPATCH.with(|dispatch| {
+                if let Some(f) = dispatch.borrow().as_ref() {
+                    let c_event = CString::new(event_name).unwrap_or_default();
+                    let c_payload = CString::new(payload).unwrap_or_default();
+                    f(node_id, c_event.as_ptr(), c_payload.as_ptr())
+                } else {
+                    0
+                }
+            });
         };
         let user_data = self.event_user_data;
         let mut invoked = 0;
@@ -336,6 +375,16 @@ impl Host {
             unsafe { cb(id, c_payload.as_ptr(), user_data) };
             invoked += 1;
         }
+        // Also call JS runtime dispatch if registered via thread-local
+        invoked += JS_RUNTIME_DISPATCH.with(|dispatch| {
+            if let Some(f) = dispatch.borrow().as_ref() {
+                let c_event = CString::new(event_name).unwrap_or_default();
+                let c_payload = CString::new(payload).unwrap_or_default();
+                f(node_id, c_event.as_ptr(), c_payload.as_ptr())
+            } else {
+                0
+            }
+        });
         invoked
     }
 

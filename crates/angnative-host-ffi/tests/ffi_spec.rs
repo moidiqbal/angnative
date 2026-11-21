@@ -14,7 +14,7 @@
  * entry points via JNI/Swift FFI.
  */
 use angnative_host_core::command::{Command, CommandBatch};
-use angnative_host_ffi::bridge::{LayoutNodeInputJson, LayoutRequestJson};
+use angnative_host_ffi::bridge::{LayoutNodeInputJson, LayoutRequestJson, set_js_runtime_dispatch_for_thread, clear_js_runtime_dispatch_for_thread};
 use angnative_host_ffi::ffi;
 use angnative_host_view::ops::PlatformOp;
 use angnative_host_view::view_factory::RecordingViewFactory;
@@ -477,4 +477,48 @@ fn op_kind_str(op: &PlatformOp) -> &'static str {
         PlatformOp::Remove { .. } => "Remove",
         PlatformOp::Destroy { .. } => "Destroy",
     }
+}
+
+#[test]
+fn js_runtime_dispatch_callback_is_invoked() {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    
+    static JS_DISPATCH_INVOKED: AtomicU32 = AtomicU32::new(0);
+    static JS_DISPATCH_NODE_ID: AtomicU64 = AtomicU64::new(0);
+    
+    extern "C" fn js_runtime_dispatch_callback(
+        node_id: u64,
+        _event_name: *const c_char,
+        _payload_json: *const c_char,
+    ) -> u32 {
+        JS_DISPATCH_INVOKED.fetch_add(1, Ordering::SeqCst);
+        JS_DISPATCH_NODE_ID.store(node_id, Ordering::SeqCst);
+        1 // return 1 listener invoked
+    }
+    
+    let handle = unsafe { ffi::angnative_host_create() };
+    assert!(!handle.is_null());
+    
+    // Register the JS runtime dispatch callback via thread-local
+    set_js_runtime_dispatch_for_thread(js_runtime_dispatch_callback);
+    
+    // Dispatch an event - should call both FFI callback (none registered) and JS dispatch
+    let count = unsafe {
+        ffi::angnative_host_dispatch_event(
+            handle,
+            42,
+            cstr("press").as_ptr(),
+            cstr("{\"test\":true}").as_ptr(),
+        )
+    };
+    
+    // JS dispatch should have been called and returned 1
+    assert_eq!(count, 1);
+    assert_eq!(JS_DISPATCH_INVOKED.load(Ordering::SeqCst), 1);
+    assert_eq!(JS_DISPATCH_NODE_ID.load(Ordering::SeqCst), 42);
+    
+    // Cleanup thread-local
+    clear_js_runtime_dispatch_for_thread();
+    
+    unsafe { ffi::angnative_host_destroy(handle) };
 }

@@ -9,10 +9,35 @@
  *   - engine       — `JsEngine` trait + `JsValue` + `EngineError`
  *   - quickjs      — QuickJS-ng (rquickjs) implementation
  *   - runtime      — AngNative JS runtime API exposed to scripts
+ *   - quickjs_shims — DOM/platform shims for QuickJS
+ *   - runtime_controller — Application lifecycle controller
  */
 pub mod engine;
 pub mod quickjs;
 pub mod runtime;
+pub mod quickjs_shims;
+pub mod runtime_controller;
 
 pub use engine::{EngineError, JsEngine, JsValue};
 pub use runtime::{AngNativeRuntime, RuntimeConfig};
+pub use runtime_controller::{RuntimeController, RuntimeControllerConfig, LifecycleState};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_runtime_controller_integration() {
+        let mut controller = RuntimeController::new(RuntimeControllerConfig::default()).unwrap();
+        assert_eq!(controller.state(), LifecycleState::Created);
+        
+        controller.initialize().unwrap();
+        assert_eq!(controller.state(), LifecycleState::Ready);
+        
+        controller.run().unwrap();
+        assert_eq!(controller.state(), LifecycleState::Running);
+        
+        controller.stop().unwrap();
+        assert_eq!(controller.state(), LifecycleState::Destroyed);
+    }
+}

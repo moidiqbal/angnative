@@ -48,8 +48,16 @@ class JniBridge(private val context: Context) {
   external fun nativeHostLastError(handle: Long): String?
   external fun nativeHostNodeCount(handle: Long): Int
   external fun nativeHostSnapshot(handle: Long): String?
+  external fun nativeHostDispatchEvent(handle: Long, nodeId: Long, eventName: String, payloadJson: String?): Int
+  
+  // Runtime bridge methods (unified host + QuickJS runtime)
+  external fun nativeRuntimeBridgeCreate(): Long
+  external fun nativeRuntimeBridgeDestroy(handle: Long)
+  external fun nativeRuntimeBridgeDispatchEvent(handle: Long, nodeId: Long, eventName: String, payloadJson: String?): Int
+  external fun nativeRuntimeBridgeGetHost(handle: Long): Long
 
   private var hostHandle: Long = 0
+  private var runtimeBridgeHandle: Long = 0
   private var isInitialized: Boolean = false
   private var pressCount: Int = 0
 
@@ -58,10 +66,17 @@ class JniBridge(private val context: Context) {
 
   fun initHost() {
     if (isInitialized) return
-    hostHandle = nativeHostCreate()
+    
+    // Create unified runtime bridge (host + QuickJS runtime)
+    runtimeBridgeHandle = nativeRuntimeBridgeCreate()
+    if (runtimeBridgeHandle == 0L) {
+      throw RuntimeException("Failed to create AngNative runtime bridge")
+    }
+    
+    // Get the underlying host for ViewFactory registration
+    hostHandle = nativeRuntimeBridgeGetHost(runtimeBridgeHandle)
     if (hostHandle == 0L) {
-      val err = nativeHostLastError(hostHandle)
-      throw RuntimeException("Failed to create AngNative host: $err")
+      throw RuntimeException("Failed to get host from runtime bridge")
     }
 
     // C++ allocates a real ViewFactoryContext (JNI global ref) from `this`.
@@ -104,10 +119,11 @@ class JniBridge(private val context: Context) {
   }
 
   fun destroyHost() {
-    if (hostHandle != 0L) {
-      nativeHostDestroy(hostHandle) // C++ deletes the context + JNI global ref
-      hostHandle = 0L
+    if (runtimeBridgeHandle != 0L) {
+      nativeRuntimeBridgeDestroy(runtimeBridgeHandle)
+      runtimeBridgeHandle = 0L
     }
+    hostHandle = 0L
     viewFactory = null
     isInitialized = false
   }
@@ -205,22 +221,15 @@ class JniBridge(private val context: Context) {
    * Handle a native press event from a Rust-created view.
    *
    * The click originates in a native Button created by a Rust Create op; the
-   * listener calls this method, which dispatches an imperative command batch to
-   * the Rust host (SetTextContent on the bound output node). A full Angular
-   * listener round trip requires the embedded JS runtime, which is not wired
-   * up on Android yet — this path does not claim to reach Angular.
+   * listener calls this method, which dispatches a native event through the
+   * AngNative runtime bridge. This enables the Angular listener round trip:
+   * native click → runtime bridge → JS runtime → na_onEvent → Angular listener.
    */
   fun onNativePress(nodeId: Long) {
     if (!isInitialized) return
-    if (nodeId == RESET_NODE_ID) {
-      pressCount = 0
-      processBatch(buildBatch { setText(OUTPUT_NODE_ID, "") })
-    } else {
-      pressCount++
-      val value = if (pressCount == 1) "Hello World!" else "Hello World! (x$pressCount)"
-      val response = processBatch(buildBatch { setText(OUTPUT_NODE_ID, value) })
-      Log.i(TAG, "onNativePress($nodeId) dispatched to Rust host: $response")
-    }
+    val payload = """{"source":"native","nodeId":$nodeId}"""
+    val invoked = nativeRuntimeBridgeDispatchEvent(runtimeBridgeHandle, nodeId, "press", payload)
+    Log.i(TAG, "onNativePress($nodeId) dispatched to runtime bridge, listeners invoked: $invoked")
   }
 
   /* =======================================================================

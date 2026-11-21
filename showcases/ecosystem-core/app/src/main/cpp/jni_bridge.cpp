@@ -382,3 +382,80 @@ Java_com_angnative_app_JniBridge_nativeHostSnapshot(JNIEnv* env, jobject /*thiz*
   }
   return rustStringToJString(env, snapshot);  // frees the Rust string
 }
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeHostDispatchEvent(JNIEnv* env, jobject /*thiz*/,
+                                                         jlong handle, jlong nodeId,
+                                                         jstring eventName, jstring payloadJson) {
+  AngNativeHost* h = reinterpret_cast<AngNativeHost*>(handle);
+  if (h == nullptr) return 0;
+  
+  const char* event_name = env->GetStringUTFChars(eventName, nullptr);
+  if (event_name == nullptr) return 0;
+  
+  const char* payload = payloadJson != nullptr 
+      ? env->GetStringUTFChars(payloadJson, nullptr) 
+      : nullptr;
+  
+  unsigned int invoked = angnative_host_dispatch_event(h, static_cast<uint64_t>(nodeId), event_name, payload);
+  
+  env->ReleaseStringUTFChars(eventName, event_name);
+  if (payload != nullptr) {
+    env->ReleaseStringUTFChars(payloadJson, payload);
+  }
+  
+  return static_cast<jint>(invoked);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeCreate(JNIEnv* /*env*/, jobject /*thiz*/) {
+  AngNativeRuntimeBridge* bridge = angnative_runtime_bridge_create();
+  if (bridge == nullptr) {
+    LOGE("Failed to create AngNative runtime bridge");
+    return 0;
+  }
+  LOGI("AngNative runtime bridge created: %p", bridge);
+  return reinterpret_cast<jlong>(bridge);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDestroy(JNIEnv* env, jobject /*thiz*/, jlong handle) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  angnative_runtime_bridge_destroy(b);
+  LOGI("AngNative runtime bridge destroyed: %p", b);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDispatchEvent(JNIEnv* env, jobject /*thiz*/,
+                                                                  jlong handle, jlong nodeId,
+                                                                  jstring eventName, jstring payloadJson) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  if (b == nullptr) return 0;
+  
+  const char* event_name = env->GetStringUTFChars(eventName, nullptr);
+  if (event_name == nullptr) return 0;
+  
+  const char* payload = payloadJson != nullptr 
+      ? env->GetStringUTFChars(payloadJson, nullptr) 
+      : nullptr;
+  
+  unsigned int invoked = angnative_runtime_bridge_dispatch_event(b, static_cast<uint64_t>(nodeId), event_name, payload);
+  
+  env->ReleaseStringUTFChars(eventName, event_name);
+  if (payload != nullptr) {
+    env->ReleaseStringUTFChars(payloadJson, payload);
+  }
+  
+  return static_cast<jint>(invoked);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeGetHost(JNIEnv* /*env*/, jobject /*thiz*/, jlong handle) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  if (b == nullptr) return 0;
+  
+  AngNativeHost* h = angnative_runtime_bridge_get_host(b);
+  if (h == nullptr) return 0;
+  
+  return reinterpret_cast<jlong>(h);
+}
