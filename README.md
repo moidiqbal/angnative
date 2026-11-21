@@ -172,6 +172,10 @@ cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeH
 
 ## 🍎 Help us finish iOS — sponsors / Mac needed
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/moidiqbal)
+[![Sponsor](https://img.shields.io/badge/Sponsor-Open%20Collective-3385FF?style=for-the-badge&logo=opencollective&logoColor=white)](https://opencollective.com/angnative)
+· Details & transparency: [`docs/SPONSORS.md`](docs/SPONSORS.md)
+
 The iOS shell is **code-complete** (Swift 6 SwiftPM package, C-ABI bridge with `UInt64` node ids, 8 UIKit view-factory callbacks, demo + tests) but we do not have a Mac/Xcode in the current development environment, so no simulator run has happened.
 
 We are looking for:
