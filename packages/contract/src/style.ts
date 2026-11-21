@@ -382,7 +382,13 @@ export const PROPERTY_TABLE: ReadonlyMap<string, StyleProperty> = new Map([
 ]);
 
 export function getStyleProperty(name: string): StyleProperty | undefined {
-  return PROPERTY_TABLE.get(name);
+  // Angular templates can emit CSS style names in kebab-case
+  // (`[style.flex-direction]`) while the contract table uses camelCase
+  // (`flexDirection`). Normalize so both spellings resolve.
+  const camel = name.includes('-')
+    ? name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
+    : name;
+  return PROPERTY_TABLE.get(camel) ?? PROPERTY_TABLE.get(name);
 }
 
 export function isKnownStyle(name: string): boolean {

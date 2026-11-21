@@ -18,14 +18,33 @@
  */
 import { build } from 'esbuild';
 import path from 'node:path';
+import { writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+// pnpm's virtual store is not on the default resolution path when esbuild is
+// imported as a library (only `pnpm exec esbuild` adds it via NODE_PATH).
+const pnpmStore = path.join(root, 'node_modules', '.pnpm', 'node_modules');
+const compilerEntry = require
+  .resolve('@angular/compiler', { paths: [pnpmStore] })
+  .replaceAll('\\', '/');
 const entry = path.join(root, 'dist', 'aot', 'main.js');
 const outfile = path.join(root, 'dist', 'aot', 'quickjs-bundle.js');
+const quickjsEntry = path.join(root, 'dist', 'aot', 'quickjs-entry.js');
+
+// The @angnative/common primitives ship as decorated (non-Ivy) JS, so Angular
+// needs its JIT compiler registered before bootstrap. A real file on disk (as
+// opposed to esbuild stdin) lets esbuild's pnpm-aware resolver find it.
+await writeFile(
+  quickjsEntry,
+  `import ${JSON.stringify(compilerEntry)};\nimport './main.js';\n`,
+  'utf8',
+);
 
 await build({
-  entryPoints: [entry],
+  entryPoints: [quickjsEntry],
   outfile,
   bundle: true,
   format: 'iife',

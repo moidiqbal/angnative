@@ -177,12 +177,17 @@ export class AngNativeRenderer implements Renderer2 {
     if (typeof name !== 'string') {
       throw new TypeError('createElement requires an element name');
     }
-    const canonicalTag = canonicalElementTag(name);
-    if (!isKnownElement(canonicalTag)) {
+    const mappedTag = canonicalElementTag(name);
+    // Unknown `na-*` tags are real mistakes — fail loudly (§5.3).
+    if (!isKnownElement(mappedTag) && name.toLowerCase().startsWith('na-')) {
       throw new Error(
         `Unknown element "${name}". Use a canonical na-* tag (e.g. na-view, na-text).`,
       );
     }
+    // Angular creates host elements for custom component selectors (e.g.
+    // `<demo-counter>`). Those are generic layout containers, not native
+    // primitives — map them to `na-view` instead of failing bootstrap.
+    const canonicalTag = isKnownElement(mappedTag) ? mappedTag : ELEMENT_TAGS.view;
 
     const contract = getContract(canonicalTag)!;
     const nodeType = tagToNodeType(canonicalTag);

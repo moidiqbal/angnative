@@ -141,6 +141,24 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
                 event.currentTarget = this;
                 for (var i = 0; i < ls.length; i++) ls[i].call(this, event);
                 return !event.defaultPrevented;
+            },
+            // Angular's SharedStylesHost calls doc.head.querySelectorAll(...),
+            // so elements need these too (not just `document`).
+            querySelectorAll: function(selector) {
+                var out = [], nodes = [];
+                _domWalk(this._domId, nodes);
+                for (var i = 0; i < nodes.length; i++) {
+                    if (_domMatches(nodes[i], selector)) out.push(nodes[i]);
+                }
+                return out;
+            },
+            querySelector: function(selector) {
+                var nodes = [];
+                _domWalk(this._domId, nodes);
+                for (var i = 0; i < nodes.length; i++) {
+                    if (_domMatches(nodes[i], selector)) return nodes[i];
+                }
+                return null;
             }
         };
 
