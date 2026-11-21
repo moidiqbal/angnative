@@ -22,21 +22,27 @@ add_library(
   jni_bridge.cpp
 )
 
-# Link against the AngNative Rust host library (prebuilt).
-# Primary: library staged into jniLibs by the build script.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libangnative_host_ffi.a")
-  add_library(angnative_host STATIC IMPORTED)
-  set_target_properties(angnative_host PROPERTIES
-    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libangnative_host_ffi.a"
-  )
-  target_link_libraries(angnative angnative_host)
-# Fallback: cargo output at the repository root (NOT platforms/android/crates).
-elseif(EXISTS "${ANGNATIVE_REPO_ROOT}/crates/angnative-host-ffi/target/${ANDROID_ABI}/release/libangnative_host_ffi.a")
-  add_library(angnative_host STATIC IMPORTED)
-  set_target_properties(angnative_host PROPERTIES
-    IMPORTED_LOCATION "${ANGNATIVE_REPO_ROOT}/crates/angnative-host-ffi/target/${ANDROID_ABI}/release/libangnative_host_ffi.a"
-  )
-  target_link_libraries(angnative angnative_host)
+# Link the unified Rust library. libangnative_runtime_bridge.a is a staticlib
+# that bundles host-ffi + host-engine + QuickJS + the runtime bridge into one
+# archive (one owner, no duplicate symbols).
+set(ANGNATIVE_RUST_LIB "")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libangnative_runtime_bridge.a")
+  set(ANGNATIVE_RUST_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libangnative_runtime_bridge.a")
+elseif(EXISTS "${ANGNATIVE_REPO_ROOT}/target/${ANDROID_ABI}/release/libangnative_runtime_bridge.a")
+  set(ANGNATIVE_RUST_LIB "${ANGNATIVE_REPO_ROOT}/target/${ANDROID_ABI}/release/libangnative_runtime_bridge.a")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libangnative_host_ffi.a")
+  # Legacy host-only fallback (no JS runtime round-trip).
+  set(ANGNATIVE_RUST_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libangnative_host_ffi.a")
 endif()
 
-target_link_libraries(angnative android log)
+if(ANGNATIVE_RUST_LIB)
+  add_library(angnative_rust STATIC IMPORTED)
+  set_target_properties(angnative_rust PROPERTIES
+    IMPORTED_LOCATION "${ANGNATIVE_RUST_LIB}"
+  )
+  target_link_libraries(angnative angnative_rust)
+else()
+  message(FATAL_ERROR "No AngNative Rust library for ${ANDROID_ABI}; run scripts/build-android-native.ps1")
+endif()
+
+target_link_libraries(angnative android log dl m)

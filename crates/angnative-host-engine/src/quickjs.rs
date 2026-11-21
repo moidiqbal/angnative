@@ -127,6 +127,44 @@ impl JsEngine for QuickJsEngine {
         })
     }
 
+    fn drain_microtasks(&mut self) -> Result<u32, EngineError> {
+        let mut total = 0u32;
+        for _ in 0..1024 {
+            // JS-level queueMicrotask shim (engine-neutral API).
+            let queued = match self.eval(
+                r#"(function () {
+                    if (typeof _angnative_microtasks === 'undefined') return 0;
+                    var q = _angnative_microtasks;
+                    _angnative_microtasks = [];
+                    for (var i = 0; i < q.length; i++) q[i]();
+                    return q.length;
+                })()"#,
+            )? {
+                JsValue::Number(n) => n as u32,
+                _ => 0,
+            };
+
+            // Native QuickJS Promise jobs — required for async AOT bundles
+            // whose bootstrap uses `await import(...)` / `.then(...)`.
+            let mut jobs = 0u32;
+            while self.runtime.is_job_pending() {
+                match self.runtime.execute_pending_job() {
+                    Ok(true) => jobs += 1,
+                    Ok(false) | Err(_) => break,
+                }
+                if jobs >= 1024 {
+                    break;
+                }
+            }
+
+            total += queued + jobs;
+            if queued == 0 && jobs == 0 {
+                break;
+            }
+        }
+        Ok(total)
+    }
+
     fn gc(&mut self) -> Result<(), EngineError> {
         self.runtime.run_gc();
         Ok(())

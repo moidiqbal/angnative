@@ -24,6 +24,9 @@ extern "C" {
 /** Opaque handle to a Rust host instance. */
 typedef struct AngNativeHost AngNativeHost;
 
+/** Opaque handle to the unified runtime bridge (Host + QuickJS + runtime). */
+typedef struct AngNativeRuntimeBridge AngNativeRuntimeBridge;
+
 /* =========================================================================
  * Lifecycle
  * ========================================================================= */
@@ -146,6 +149,31 @@ int angnative_host_remove_event_listener(AngNativeHost* handle, uint64_t node_id
 /** Dispatch an event to all matching listeners; returns the number invoked. */
 unsigned int angnative_host_dispatch_event(AngNativeHost* handle, uint64_t node_id,
                                            const char* event_name, const char* payload_json);
+
+/* =========================================================================
+ * Unified runtime bridge — single owner of Host + QuickJS + Angular runtime
+ * ========================================================================= */
+
+/** Create a runtime bridge. Returns NULL on failure. Must be used on one thread. */
+AngNativeRuntimeBridge* angnative_runtime_bridge_create(void);
+
+/** Destroy a runtime bridge (and the Host it owns). Safe to call with NULL. */
+void angnative_runtime_bridge_destroy(AngNativeRuntimeBridge* handle);
+
+/** Dispatch a native event through the single JS event pipeline.
+ * Returns the number of JS listeners invoked (0 on error / no match). */
+unsigned int angnative_runtime_bridge_dispatch_event(AngNativeRuntimeBridge* handle,
+                                                    uint64_t node_id,
+                                                    const char* event_name,
+                                                    const char* payload_json);
+
+/** Load a raw JS source string (e.g. a self-contained AOT bundle) and drain
+ * its microtasks. Returns 0 on success, 1 on invalid input or script error. */
+int angnative_runtime_bridge_load_script(AngNativeRuntimeBridge* handle,
+                                         const char* source);
+
+/** Borrow the Host owned by the bridge (valid until the bridge is destroyed). */
+AngNativeHost* angnative_runtime_bridge_get_host(AngNativeRuntimeBridge* handle);
 
 #ifdef __cplusplus
 } /* extern "C" */

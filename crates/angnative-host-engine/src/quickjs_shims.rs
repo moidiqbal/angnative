@@ -23,6 +23,41 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
     // numeric id — never as object-to-object references — to avoid the
     // rquickjs cyclic-GC stack overflow (see module docs).
     engine.eval(r#"
+        // ES2022 helpers used by Angular 22 bundles that QuickJS-ng lacks.
+        if (typeof Object.hasOwn !== 'function') {
+            Object.hasOwn = function (obj, prop) {
+                return Object.prototype.hasOwnProperty.call(obj, prop);
+            };
+        }
+
+        if (typeof FinalizationRegistry === 'undefined') {
+            globalThis.FinalizationRegistry = function () {};
+            globalThis.FinalizationRegistry.prototype.register = function () {};
+            globalThis.FinalizationRegistry.prototype.unregister = function () {};
+            globalThis.FinalizationRegistry.prototype.cleanupSome = function () {};
+        }
+        if (typeof WeakRef === 'undefined') {
+            globalThis.WeakRef = function (value) { this._value = value; };
+            globalThis.WeakRef.prototype.deref = function () { return this._value; };
+        }
+
+        // Angular's dev-mode component timing calls performance.mark/measure.
+        if (typeof performance === 'undefined') {
+            globalThis.performance = {
+                mark: function () {},
+                measure: function () {},
+                now: function () { return 0; }
+            };
+        }
+
+        // Microtask queue — zoneless Angular change detection needs this.
+        // A JS-level queue keeps the engine-neutral JsEngine trait simple and
+        // avoids cyclic object graphs in QuickJS.
+        var _angnative_microtasks = [];
+        function queueMicrotask(callback) {
+            if (typeof callback === 'function') _angnative_microtasks.push(callback);
+        }
+
         var _domById = {};
         var _domParent = {};
         var _domChildren = {};
@@ -389,6 +424,7 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             Event: Event,
             CustomEvent: CustomEvent,
             document: document,
+            queueMicrotask: queueMicrotask,
         };
         Object.defineProperty(window, 'self', { get: function() { return window; } });
         Object.defineProperty(window, 'window', { get: function() { return window; } });
@@ -558,6 +594,28 @@ mod tests {
             })()
         "#).unwrap();
         assert_eq!(result, crate::engine::JsValue::Boolean(true));
+    }
+
+    #[test]
+    fn test_queue_microtask_and_drain() {
+        let mut engine = installed();
+        engine.eval(r#"
+            var _order = [];
+            queueMicrotask(function () { _order.push('first'); });
+            queueMicrotask(function () {
+                _order.push('second');
+                queueMicrotask(function () { _order.push('nested'); });
+            });
+        "#).unwrap();
+
+        // The drain loop keeps going until the queue is empty, so the nested
+        // microtask runs in the same call.
+        assert_eq!(engine.drain_microtasks().unwrap(), 3);
+        assert_eq!(engine.drain_microtasks().unwrap(), 0);
+        assert_eq!(
+            engine.eval("_order.join(',')").unwrap(),
+            crate::engine::JsValue::String("first,second,nested".to_string())
+        );
     }
 
     #[test]

@@ -271,12 +271,29 @@ impl<E: JsEngine> AngNativeRuntime<E> {
             )?;
             invoked += 1;
         }
+        // Zoneless Angular change detection runs in microtasks; drain them
+        // after the event callback so the DOM/native tree is up to date.
+        self.engine.drain_microtasks()?;
         Ok(invoked)
     }
 
     /// Evaluate a JS source string with the AngNative API available.
     pub fn eval(&mut self, source: &str) -> Result<JsValue, EngineError> {
         self.engine.eval(source)
+    }
+
+    /// Load an arbitrary script (e.g. a self-contained AOT bundle) and drain
+    /// any microtasks it schedules. The source is evaluated as-is — never
+    /// interpolated into a generated string literal.
+    pub fn load_script(&mut self, source: &str) -> Result<JsValue, EngineError> {
+        let result = self.engine.eval(source)?;
+        self.engine.drain_microtasks()?;
+        Ok(result)
+    }
+
+    /// Drain pending microtasks explicitly (useful after manual `eval` calls).
+    pub fn drain_microtasks(&mut self) -> Result<u32, EngineError> {
+        self.engine.drain_microtasks()
     }
 
     /// Get the underlying engine (for advanced use).

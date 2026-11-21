@@ -149,17 +149,24 @@ All *actionable* gaps from the original list were closed:
 - **`window.self` restored** via getter (probe-tested safe); `window.window` and `window.globalThis` likewise.
 - **Dangling-pointer bug found and fixed** — `RuntimeBridge` now holds the runtime in a `Box` so the address stored in the thread-local dispatch pointer stays stable when the bridge is moved into a `Box` by the C API (`angnative_runtime_bridge_create`). Without this, every JNI-dispatched event would have dereferenced a dangling pointer.
 - **Bridge now installs the DOM shims** into its engine, so JS code actually has `window`/`document` available.
-- **Android JNI** — unused Kotlin `nativeHostCreate`/`nativeHostDestroy` declarations removed (bridge owns the Host; a standalone destroy would double-free). C++ legacy exports clearly marked. Added `scripts/check-jni-signatures.py`, a static check that every Kotlin `external fun` has a C++ JNI implementation with matching arity (11 declarations matched).
+- **Android JNI + native build** — unused Kotlin `nativeHostCreate`/`nativeHostDestroy` declarations removed (bridge owns the Host; a standalone destroy would double-free). C++ legacy exports clearly marked. Added `scripts/check-ffi-declarations.py` (Kotlin↔C++ JNI arity, C++↔header, Swift↔header). The **real Android build exposed two more genuine defects**: the C header had no runtime-bridge declarations, and the Android build pipeline never built or linked the runtime-bridge crate (staged `.a` was also stale). Fixed by declaring the bridge ABI in the header, making `angnative-runtime-bridge` a `staticlib` (bundles host-ffi + engine + QuickJS into one archive), enabling Android `bindgen` for rquickjs-sys 0.5.1 (no shipped Android bindings) with NDK sysroot + VS LLVM libclang, and staging the unified archive for all three ABIs into both Android projects.
 
 ### Verification evidence
 
 - `cargo test --workspace`: **119 passed, 0 failed**
 - `cargo check --workspace`: clean, no warnings
 - `pnpm test`: **208 passed**
-- `python scripts/check-jni-signatures.py`: OK (11 declarations)
+- `python scripts/check-ffi-declarations.py`: OK (11 JNI methods, 9 Swift bindings, 19 header declarations)
+- `pwsh -File scripts/build-android-native.ps1`: unified staticlib built and staged for arm64-v8a, armeabi-v7a, x86_64
+- `showcases/ecosystem-core/gradlew assembleDebug`: **BUILD SUCCESSFUL** (all 3 ABIs)
+- `scripts/build-android-local.ps1` (`platforms/android`): **BUILD SUCCESSFUL**
 
 ### Honest remaining gaps (NOT claimed as fixed)
 
-- **Angular bootstrap in QuickJS is still missing** (issue P0-06) — functional DOM shims are necessary but not sufficient to run a real Angular app.
-- **Android JNI is static-checked only; no Android/Gradle build was run** here (no device/SDK verification).
-- **iOS/Mac remains parked** by the user; nothing here claims iOS verification.
+- **Angular bootstrap in QuickJS is still not working** (issue P0-06). Honest detail from the follow-up spike:
+  - `scripts/bundle-quickjs.mjs` (`pnpm bundle:quickjs`) now produces a **self-contained IIFE** (Angular included, no ESM imports, `target: es2018` because QuickJS-ng cannot parse the default ES2022 output).
+  - The runtime now has a raw `load_script` API (Rust + C ABI + JNI), a `queueMicrotask` shim, a native Promise-job drain (`Runtime::execute_pending_job`), and polyfills for `Object.hasOwn`, `FinalizationRegistry`, `WeakRef` and `performance`.
+  - With those in place, the **real AOT bundle parses and executes in QuickJS without a load-time error**. However `bootstrapNativeAngularApp(...)` rejects with **"JIT compiler unavailable"** — the `@angnative/common` primitive components shipped as decorated TS are not AOT-compiled, so Angular tries to JIT-compile them.
+  - Remaining work: AOT-compile the native primitive components (or provide a JIT-capable Angular compiler in the bundle), then add a QuickJS-native renderer adapter that calls `na_*` globals, wire `na_*` mutations to the Host pipeline, and write the acceptance test (component constructor + click handler + host node count). This is a multi-part feature; **no claim of a working Angular app in native QuickJS is made**.
+- **iOS/Mac cannot be built here** (Windows host, no Xcode). Swift bindings and the C header are statically cross-checked, and `scripts/build-ios-native.sh` is kept aligned, but no `swift build` or device verification was performed. Nothing here claims iOS verification.
+- **No on-device runtime verification of Android** — the APK builds and links, but no emulator/device smoke test of the click → JS → Angular round trip was run.

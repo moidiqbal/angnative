@@ -111,6 +111,36 @@ pub trait JsEngine {
     /// Get a global variable from the JS engine.
     fn get_global(&self, name: &str) -> Option<JsValue>;
 
+    /// Drain queued microtasks, invoking them in FIFO order.
+    ///
+    /// Default implementation uses the JS-level queue installed by
+    /// `quickjs_shims::install_dom_shims` (`queueMicrotask`). It is a no-op for
+    /// engines that never installed the shims. Returns the number invoked.
+    fn drain_microtasks(&mut self) -> Result<u32, EngineError> {
+        let mut total = 0u32;
+        // Bound the loop so a microtask that endlessly schedules another one
+        // cannot hang the host.
+        for _ in 0..1024 {
+            let n = match self.eval(
+                r#"(function () {
+                    if (typeof _angnative_microtasks === 'undefined') return 0;
+                    var q = _angnative_microtasks;
+                    _angnative_microtasks = [];
+                    for (var i = 0; i < q.length; i++) q[i]();
+                    return q.length;
+                })()"#,
+            )? {
+                JsValue::Number(n) => n as u32,
+                _ => 0,
+            };
+            total += n;
+            if n == 0 {
+                break;
+            }
+        }
+        Ok(total)
+    }
+
     /// Run garbage collection if the engine supports it.
     fn gc(&mut self) -> Result<(), EngineError>;
 

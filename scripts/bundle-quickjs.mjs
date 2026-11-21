@@ -1,0 +1,39 @@
+/**
+ * bundle-quickjs.mjs — produce a self-contained JS bundle embeddable in QuickJS.
+ *
+ * Prerequisite: `pnpm compile:aot` (generates dist/aot/main.js via ngc).
+ *
+ * Why this exists:
+ *  - `packages/cli/src/bundle.ts` emits ESM with `packages: 'external'`, so
+ *    `dist/aot/bundle.js` cannot run inside QuickJS (no module loader).
+ *  - esbuild's default ES2022 output uses syntax QuickJS-ng 0.5.1 cannot parse.
+ *    target 'es2018' keeps the output parseable.
+ *
+ * Output: dist/aot/quickjs-bundle.js (IIFE, no imports, Angular included).
+ *
+ * NOTE: loading this bundle into QuickJS currently reaches Angular bootstrap
+ * but fails with "JIT compiler unavailable" because the @angnative/common
+ * primitive components are not AOT-compiled. This script is the first step of
+ * that work, not a claim that a real Angular app boots yet.
+ */
+import { build } from 'esbuild';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const entry = path.join(root, 'dist', 'aot', 'main.js');
+const outfile = path.join(root, 'dist', 'aot', 'quickjs-bundle.js');
+
+await build({
+  entryPoints: [entry],
+  outfile,
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2018',
+  minify: false,
+  define: { ngDevMode: 'false' },
+  logLevel: 'info',
+});
+
+console.log(`Wrote ${outfile}`);

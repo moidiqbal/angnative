@@ -469,6 +469,19 @@ Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDispatchEvent(JNIEnv* env, j
   return static_cast<jint>(invoked);
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLoadScript(JNIEnv* env, jobject /*thiz*/,
+                                                              jlong handle, jstring source) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  if (b == nullptr || source == nullptr) return 1;
+  const char* script = env->GetStringUTFChars(source, nullptr);
+  if (script == nullptr) return 1;
+  int rc = angnative_runtime_bridge_load_script(b, script);
+  env->ReleaseStringUTFChars(source, script);
+  if (rc != 0) LOGE("Failed to load JS bundle into runtime bridge (rc=%d)", rc);
+  return static_cast<jint>(rc);
+}
+
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_angnative_app_JniBridge_nativeRuntimeBridgeGetHost(JNIEnv* /*env*/, jobject /*thiz*/, jlong handle) {
   AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);

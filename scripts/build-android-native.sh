@@ -1,210 +1,110 @@
 #!/usr/bin/env bash
-# build-android-native.sh — Build libangnative for Android via cargo + NDK
+# build-android-native.sh — Build the unified AngNative Rust library for Android.
 #
-# Prerequisites:
-#   1. Rust toolchain installed
-#   2. Android NDK (r25+) installed
-#   3. ANDROID_NDK_HOME environment variable set (or auto-detected)
-#   4. Android targets added: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+# The runtime-bridge staticlib bundles host-ffi + host-engine + QuickJS + the
+# runtime bridge into one archive, so platform shells link a single library.
+# rquickjs-sys 0.5.1 ships no Android bindings, so bindgen is enabled with the
+# NDK sysroot and a libclang installation (LIBCLANG_PATH).
 #
-# Usage:
-#   ./scripts/build-android-native.sh [arm64-v8a|armeabi-v7a|x86_64|all]
-#
-# Output:
-#   platforms/android/app/src/main/jniLibs/<abi>/libangnative_host_ffi.a
-#   platforms/android/app/src/main/jniLibs/<abi>/libangnative_host_ffi.so
+# Prerequisites: Rust Android targets, Android NDK, libclang (for bindgen).
+# Usage: ./scripts/build-android-native.sh [arm64-v8a|armeabi-v7a|x86_64|all]
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# --- Configuration ---
 ANDROID_API_LEVEL=24
 DEFAULT_TARGETS="aarch64-linux-android armv7-linux-androideabi x86_64-linux-android"
-ABI_MAP=(
-  "aarch64-linux-android:arm64-v8a"
-  "armv7-linux-androideabi:armeabi-v7a"
-  "x86_64-linux-android:x86_64"
-)
-
 BUILD_TARGET="${1:-all}"
-BUILD_TYPE="release"
 
-# --- Validate & auto-detect environment ---
+# --- Validate environment -------------------------------------------------
 if [[ -z "${ANDROID_NDK_HOME:-}" ]]; then
-  if [[ -d "C:/Program Files (x86)/Android/AndroidNDK/android-ndk-r27c" ]]; then
-    export ANDROID_NDK_HOME="C:/Program Files (x86)/Android/AndroidNDK/android-ndk-r27c"
-  elif [[ -d "/c/Program Files (x86)/Android/AndroidNDK/android-ndk-r27c" ]]; then
-    export ANDROID_NDK_HOME="/c/Program Files (x86)/Android/AndroidNDK/android-ndk-r27c"
-  elif [[ -d "$HOME/AppData/Local/Android/Sdk/ndk" ]]; then
-    LATEST_NDK=$(ls -1d "$HOME/AppData/Local/Android/Sdk/ndk/"* 2>/dev/null | tail -1)
-    if [[ -n "${LATEST_NDK}" ]]; then
-      export ANDROID_NDK_HOME="${LATEST_NDK}"
+  for candidate in "${ANDROID_HOME:-}/ndk"/* "$HOME/AppData/Local/Android/Sdk/ndk"/*; do
+    if [[ -d "$candidate" ]]; then
+      export ANDROID_NDK_HOME="${candidate%/}"
+      break
     fi
-  fi
+  done
 fi
-
 if [[ -z "${ANDROID_NDK_HOME:-}" ]]; then
   echo "ERROR: ANDROID_NDK_HOME is not set."
-  echo "  Set it to your Android NDK path, e.g.:"
-  echo "    export ANDROID_NDK_HOME=\$HOME/Android/Sdk/ndk/25.1.8937393"
+  exit 1
+fi
+if [[ -z "${LIBCLANG_PATH:-}" ]]; then
+  echo "ERROR: LIBCLANG_PATH must point to a directory containing libclang."
   exit 1
 fi
 
-if ! command -v cargo &> /dev/null; then
-  echo "ERROR: cargo not found. Install Rust: https://rustup.rs/"
-  exit 1
-fi
+HOST_TAG="linux-x86_64"
+[[ "$(uname -s)" == "Darwin" ]] && HOST_TAG="darwin-x86_64"
+uname -s | grep -qi mingw && HOST_TAG="windows-x86_64"
 
-if ! command -v rustc &> /dev/null; then
-  echo "ERROR: rustc not found."
-  exit 1
-fi
+TOOLCHAIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${HOST_TAG}"
+BIN="${TOOLCHAIN}/bin"
+SYSROOT="${TOOLCHAIN}/sysroot"
+AR="${BIN}/llvm-ar"
+[[ -f "${AR}.exe" ]] && AR="${AR}.exe"
 
 echo "=============================================="
 echo "  AngNative Android Native Library Build"
 echo "=============================================="
 echo "  NDK: ${ANDROID_NDK_HOME}"
-echo "  Rust: $(rustc --version)"
-echo "  Cargo: $(cargo --version)"
+echo "  Bindgen libclang: ${LIBCLANG_PATH}"
 echo ""
 
-# --- Determine targets to build ---
-if [[ "${BUILD_TARGET}" == "all" ]]; then
-  TARGETS=(${DEFAULT_TARGETS})
-else
-  # Map ABI name to rust target
-  case "${BUILD_TARGET}" in
-    arm64-v8a) TARGETS=("aarch64-linux-android") ;;
-    armeabi-v7a) TARGETS=("armv7-linux-androideabi") ;;
-    x86_64) TARGETS=("x86_64-linux-android") ;;
-    *)
-      echo "ERROR: Unknown target '${BUILD_TARGET}'. Use: arm64-v8a, armeabi-v7a, x86_64, or all."
-      exit 1
-      ;;
-  esac
-fi
+case "${BUILD_TARGET}" in
+  all) TARGETS=(${DEFAULT_TARGETS}) ;;
+  arm64-v8a) TARGETS=("aarch64-linux-android") ;;
+  armeabi-v7a) TARGETS=("armv7-linux-androideabi") ;;
+  x86_64) TARGETS=("x86_64-linux-android") ;;
+  *) echo "ERROR: unknown target '${BUILD_TARGET}'"; exit 1 ;;
+esac
 
-echo "  Targets: ${TARGETS[*]}"
-echo ""
+DESTINATIONS=(
+  "${REPO_ROOT}/platforms/android/app/src/main/jniLibs"
+  "${REPO_ROOT}/showcases/ecosystem-core/app/src/main/jniLibs"
+)
 
-# --- Find NDK clang linker ---
-find_ndk_toolchain() {
-  local target="$1"
-  local ndk="$ANDROID_NDK_HOME"
-
-  # Find the clang compiler in the NDK toolchains
-  local toolchain_dir="${ndk}/toolchains/llvm/prebuilt/linux-x86_64"
-  if [[ ! -d "${toolchain_dir}" ]]; then
-    # Try macOS
-    toolchain_dir="${ndk}/toolchains/llvm/prebuilt/darwin-x86_64"
-  fi
-  if [[ ! -d "${toolchain_dir}" ]]; then
-    # Try Windows
-    toolchain_dir="${ndk}/toolchains/llvm/prebuilt/windows-x86_64"
-  fi
-
-  local ext=""
-  if [[ -f "${toolchain_dir}/bin/aarch64-linux-android${ANDROID_API_LEVEL}-clang.cmd" ]]; then
-    ext=".cmd"
-  fi
-
-  case "${target}" in
-    aarch64-linux-android) echo "${toolchain_dir}/bin/aarch64-linux-android${ANDROID_API_LEVEL}-clang${ext}" ;;
-    armv7-linux-androideabi) echo "${toolchain_dir}/bin/armv7a-linux-androideabi${ANDROID_API_LEVEL}-clang${ext}" ;;
-    x86_64-linux-android) echo "${toolchain_dir}/bin/x86_64-linux-android${ANDROID_API_LEVEL}-clang${ext}" ;;
-    *) echo "" ;;
-  esac
-}
-
-# Helper: format bytes
-format_size() {
-  local bytes=$1
-  if [[ ${bytes} -lt 1024 ]]; then
-    echo "${bytes} B"
-  elif [[ ${bytes} -lt 1048576 ]]; then
-    echo "$((bytes / 1024)) KB"
-  else
-    echo "$((bytes / 1048576)) MB"
-  fi
-}
-
-# --- Build each target ---
 for rust_target in "${TARGETS[@]}"; do
-  # Map rust target to Android ABI
-  abi=""
-  for pair in "${ABI_MAP[@]}"; do
-    IFS=':' read -r rt abi_name <<< "${pair}"
-    if [[ "${rt}" == "${rust_target}" ]]; then
-      abi="${abi_name}"
-      break
-    fi
+  case "${rust_target}" in
+    aarch64-linux-android)
+      abi="arm64-v8a"; clang="aarch64-linux-android${ANDROID_API_LEVEL}-clang"; incdir="aarch64-linux-android"
+      prefix="AARCH64_LINUX_ANDROID"; ccvar="CC_aarch64_linux_android" ;;
+    armv7-linux-androideabi)
+      abi="armeabi-v7a"; clang="armv7a-linux-androideabi${ANDROID_API_LEVEL}-clang"; incdir="arm-linux-androideabi"
+      prefix="ARMV7_LINUX_ANDROIDEABI"; ccvar="CC_armv7_linux_androideabi" ;;
+    x86_64-linux-android)
+      abi="x86_64"; clang="x86_64-linux-android${ANDROID_API_LEVEL}-clang"; incdir="x86_64-linux-android"
+      prefix="X86_64_LINUX_ANDROID"; ccvar="CC_x86_64_linux_android" ;;
+  esac
+
+  clang_path="${BIN}/${clang}"
+  [[ -f "${clang_path}.cmd" ]] && clang_path="${clang_path}.cmd"
+  if [[ ! -f "${clang_path}" ]]; then
+    echo "ERROR: linker not found: ${clang_path}"
+    exit 1
+  fi
+
+  export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=${SYSROOT} -I${SYSROOT}/usr/include -I${SYSROOT}/usr/include/${incdir} -D__ANDROID_API__=${ANDROID_API_LEVEL}"
+  export "${ccvar}=${clang_path}"
+  export "CARGO_TARGET_${prefix}_LINKER=${clang_path}"
+  export "CARGO_TARGET_${prefix}_AR=${AR}"
+  export PATH="${BIN}:${PATH}"
+
+  echo "=== Building ${rust_target} (${abi}) ==="
+  cargo build --release --target "${rust_target}" --package angnative-runtime-bridge
+
+  src="${REPO_ROOT}/target/${rust_target}/release/libangnative_runtime_bridge.a"
+  for dest in "${DESTINATIONS[@]}"; do
+    abi_dir="${dest}/${abi}"
+    mkdir -p "${abi_dir}"
+    cp "${src}" "${abi_dir}/libangnative_runtime_bridge.a"
+    # Keep the legacy filename in sync for configurations that cached it.
+    cp "${src}" "${abi_dir}/libangnative_host_ffi.a"
+    echo "  copied -> ${abi_dir}"
   done
-
-  if [[ -z "${abi}" ]]; then
-    echo "WARNING: No ABI mapping for ${rust_target}, skipping."
-    continue
-  fi
-
-  echo "----------------------------------------------"
-  echo "  Building ${rust_target} (ABI: ${abi})"
-  echo "----------------------------------------------"
-
-  # Find linker
-  LINKER=$(find_ndk_toolchain "${rust_target}")
-  if [[ ! -f "${LINKER}" ]]; then
-    echo "ERROR: Linker not found for ${rust_target}: ${LINKER}"
-    echo "  Check ANDROID_NDK_HOME points to a valid NDK."
-    exit 1
-  fi
-
-  TOOLCHAIN_DIR="$(dirname "$(dirname "${LINKER}")")"
-  AR="${TOOLCHAIN_DIR}/bin/llvm-ar"
-  if [[ -f "${TOOLCHAIN_DIR}/bin/llvm-ar.exe" ]]; then
-    AR="${TOOLCHAIN_DIR}/bin/llvm-ar.exe"
-  fi
-
-  # Set up cargo environment for cross-compilation
-  target_upper=$(echo "${rust_target}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-  export CARGO_TARGET_${target_upper}_LINKER="${LINKER}"
-  export CARGO_TARGET_${target_upper}_AR="${AR}"
-  export PATH="${TOOLCHAIN_DIR}/bin:${PATH}"
-
-  # Build the host-ffi crate
-  echo "  Building angnative-host-ffi for ${rust_target}..."
-  cargo build \
-    --release \
-    --target "${rust_target}" \
-    --package angnative-host-ffi \
-    2>&1 | tail -20
-
-  TARGET_DIR="${REPO_ROOT}/target/${rust_target}/release"
-  STATIC_LIB="${TARGET_DIR}/libangnative_host_ffi.a"
-  SHARED_LIB="${TARGET_DIR}/libangnative_host_ffi.so"
-
-  if [[ ! -f "${STATIC_LIB}" && ! -f "${SHARED_LIB}" ]]; then
-    echo "ERROR: Built libraries not found in: ${TARGET_DIR}"
-    exit 1
-  fi
-
-  JNI_DEST="${REPO_ROOT}/platforms/android/app/src/main/jniLibs/${abi}"
-  mkdir -p "${JNI_DEST}"
-
-  if [[ -f "${STATIC_LIB}" ]]; then
-    cp "${STATIC_LIB}" "${JNI_DEST}/libangnative_host_ffi.a"
-    echo "  ✓ static: ${STATIC_LIB} -> ${JNI_DEST}/"
-  fi
-  if [[ -f "${SHARED_LIB}" ]]; then
-    cp "${SHARED_LIB}" "${JNI_DEST}/libangnative_host_ffi.so"
-    echo "  ✓ shared: ${SHARED_LIB} -> ${JNI_DEST}/"
-  fi
 done
 
 echo ""
-echo "=============================================="
-echo "  Build Complete!"
-echo "=============================================="
-echo "  Libs copied to:"
-echo "    platforms/android/app/src/main/jniLibs/<abi>/"
-echo ""
+echo "Android Rust libraries rebuilt (unified runtime bridge)."

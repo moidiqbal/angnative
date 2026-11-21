@@ -14,3 +14,9 @@ log.workspace = true
 rquickjs.workspace = true
 angnative-host-core = { path = "../angnative-host-core" }
 anyhow = "1.0"
+
+# rquickjs-sys 0.5.1 ships pregenerated bindings for desktop targets only.
+# Android needs bindgen, driven by LIBCLANG_PATH / BINDGEN_EXTRA_CLANG_ARGS
+# in scripts/build-android-native.{sh,ps1}.
+[target.'cfg(target_os = "android")'.dependencies]
+rquickjs = { version = "0.5", features = ["bindgen", "classes", "chrono"] }

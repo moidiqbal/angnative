@@ -56,6 +56,7 @@ class JniBridge(private val context: Context) {
   external fun nativeRuntimeBridgeDestroy(handle: Long, hostHandle: Long)
   external fun nativeRuntimeBridgeDispatchEvent(handle: Long, nodeId: Long, eventName: String, payloadJson: String?): Int
   external fun nativeRuntimeBridgeGetHost(handle: Long): Long
+  external fun nativeRuntimeBridgeLoadScript(handle: Long, source: String): Int
 
   private var hostHandle: Long = 0
   private var runtimeBridgeHandle: Long = 0
@@ -87,6 +88,12 @@ class JniBridge(private val context: Context) {
 
   fun initHostWithCallbacks() {
     initHost()
+  }
+
+  /** Load a self-contained JS bundle (e.g. compiled Angular AOT output). */
+  fun loadScript(source: String): Int {
+    check(isInitialized) { "AngNative host not initialized" }
+    return nativeRuntimeBridgeLoadScript(runtimeBridgeHandle, source)
   }
 
   /** Process a JSON command batch through the Rust host. */
