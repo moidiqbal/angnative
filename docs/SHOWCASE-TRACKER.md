@@ -54,6 +54,17 @@ Build/verify scripts: `scripts/generate-showcase.ps1`, `scripts/build-showcases.
 Remaining categories (rich text, calendar, microfrontends, etc.) are documented in
 the compatibility matrix and tracked as native-port work; no APK claimed for them.
 
+## Phase 3 — reusable infrastructure
+| Package | Status |
+|---|---|
+| `@angnative/native-ui-core` (`packages/native-ui-core/`) | ✅ real Android library: 8 PlatformOp callbacks, pluggable view creator, theme, StyleCodec, 6 JUnit tests; AAR 40,554 bytes; `assembleRelease` + `test` BUILD SUCCESSFUL |
+| Adapter packages (`material-adapter`, etc.) | ⬜ not created — rule "no empty placeholders": each needs a real native implementation first |
+
+## Phase 5/6 — build/verify/performance
+- All 8 showcase APKs staged under `dist/showcases/<name>/` with source.zip + compatibility-report.md; installed/launched on emulator API 34; `WebViews=0`.
+- Initial cold-start/memory numbers in `docs/BENCHMARKS.md` + `docs/benchmarks/*.json` (1 sample, emulator, honest caveats).
+- Remaining: frame pacing/CPU/physical device/multi-sample averages — not yet done.
+
 ## Phase 3 — Reusable packages
 ⬜ `@angnative/ui-core`, adapter packages, native-grid/charts/animation/richtext — incremental only.
 

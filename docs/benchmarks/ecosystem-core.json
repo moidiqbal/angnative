@@ -1,0 +1,14 @@
+{
+  "name": "ecosystem-core",
+  "package": "com.angnative.demo.ecosystem.core",
+  "measured_at": "2026-11-21T14:24:52.7817247+05:00",
+  "device": "sdk_gphone64_x86_64",
+  "android_api": "34",
+  "cold_process_ms": 16627,
+  "cold_total_ms": 19634,
+  "pss_kb": -1,
+  "webviews": -1,
+  "apk_bytes": 20184398,
+  "sample_count": 1,
+  "note": "Single cold-start sample on emulator; not a frame-pacing benchmark."
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@angnative/native-ui-core",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "license": "MIT",
+  "description": "Reusable Android native view factory for AngNative: materializes Rust-emitted PlatformOps into real Android Views. No WebView, no Capacitor.",
+  "files": [
+    "android/**",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/gradle.mjs assembleRelease",
+    "test": "node scripts/gradle.mjs test"
+  },
+  "keywords": [
+    "angnative",
+    "android",
+    "kotlin",
+    "native-ui",
+    "view-factory"
+  ]
+}
