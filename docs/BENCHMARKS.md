@@ -30,8 +30,14 @@ Raw JSON: `docs/benchmarks/*.json`.
 | ecosystem-calendar (Canvas month grid) | 14 | 64.29% | 42 ms | 700 ms |
 
   **Caveat:** software-rasterized emulator, one burst per app, low frame counts for
-  richtext/calendar. These are NOT production performance figures — a physical-device,
-  multi-sample run is still required before any comparison claim.
+  richtext/calendar. These are NOT production performance figures.
+
+### Physical-device run (OnePlus Open, Android 16) — DONE
+`docs/benchmarks/physical/README.md` + `results.json`: all 10 APKs installed/launched,
+WebViews=0 on every app. Real-GPU headline: **ecosystem-grid 170 frames, 1.76% jank,
+6 ms p50 / 20 ms p95** vs emulator 16.13% / 20 ms. Screenshots from that run are
+invalid (display OFF at capture) and are not used as UI evidence — re-capture steps
+are documented. Multi-sample averaging is still pending.
 - CPU utilization during scroll
 - Warm start, multi-sample averages, physical device
 - WebView comparison builds (deliberately not built for native showcases)

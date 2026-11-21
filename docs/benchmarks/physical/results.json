@@ -1,0 +1,112 @@
+[
+  {
+    "name": "material",
+    "package": "com.angnative.demo.material",
+    "frames": "31",
+    "janky_pct": "9.68",
+    "p50_ms": "6",
+    "p95_ms": "21",
+    "pss_kb": "101698",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "primeng",
+    "package": "com.angnative.demo.primeng",
+    "frames": "15",
+    "janky_pct": "6.67",
+    "p50_ms": "10",
+    "p95_ms": "200",
+    "pss_kb": "101446",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "ngzorro",
+    "package": "com.angnative.demo.ngzorro",
+    "frames": "6",
+    "janky_pct": "66.67",
+    "p50_ms": "17",
+    "p95_ms": "200",
+    "pss_kb": "99018",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "taiga",
+    "package": "com.angnative.demo.taiga",
+    "frames": "6",
+    "janky_pct": "33.33",
+    "p50_ms": "15",
+    "p95_ms": "200",
+    "pss_kb": "99135",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "spartan",
+    "package": "com.angnative.demo.spartan",
+    "frames": "6",
+    "janky_pct": "50.00",
+    "p50_ms": "18",
+    "p95_ms": "300",
+    "pss_kb": "98832",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "ecosystem-grid",
+    "package": "com.angnative.demo.ecosystem.grid",
+    "frames": "170",
+    "janky_pct": "1.76",
+    "p50_ms": "6",
+    "p95_ms": "20",
+    "pss_kb": "103331",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "ecosystem-charts",
+    "package": "com.angnative.demo.ecosystem.charts",
+    "frames": "11",
+    "janky_pct": "45.45",
+    "p50_ms": "15",
+    "p95_ms": "250",
+    "pss_kb": "102961",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "ecosystem-core",
+    "package": "com.angnative.demo.ecosystem.core",
+    "frames": "165",
+    "janky_pct": "1.82",
+    "p50_ms": "6",
+    "p95_ms": "20",
+    "pss_kb": "104683",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "ecosystem-richtext",
+    "package": "com.angnative.demo.ecosystem.richtext",
+    "frames": "52",
+    "janky_pct": "13.46",
+    "p50_ms": "8",
+    "p95_ms": "28",
+    "pss_kb": "108058",
+    "webviews": "0",
+    "inner_screenshot": true
+  },
+  {
+    "name": "ecosystem-calendar",
+    "package": "com.angnative.demo.ecosystem.calendar",
+    "frames": "16",
+    "janky_pct": "25.00",
+    "p50_ms": "7",
+    "p95_ms": "250",
+    "pss_kb": "103118",
+    "webviews": "0",
+    "inner_screenshot": true
+  }
+]
