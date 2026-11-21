@@ -1,0 +1,46 @@
+{
+  "measured_at": "2026-11-21T15:15:00+05:00",
+  "device": "sdk_gphone64_x86_64 (Android emulator, API 34, SwiftShader software GPU)",
+  "method": "dumpsys gfxinfo <pkg> framestats after reset; app foreground confirmed via topResumedActivity; 5-8 touch/swipe interactions per app",
+  "sample_note": "Single interaction burst per app on an emulator with software rendering. NOT representative of physical-device GPU performance. Janky % is gfxinfo's own metric.",
+  "results": [
+    {
+      "name": "ecosystem-grid",
+      "package": "com.angnative.demo.ecosystem.grid",
+      "total_frames": 186,
+      "janky_percent": 16.13,
+      "p50_ms": 20,
+      "p90_ms": 38,
+      "p95_ms": 48,
+      "interaction": "8 swipes over 10000-row RecyclerView"
+    },
+    {
+      "name": "ecosystem-charts",
+      "package": "com.angnative.demo.ecosystem.charts",
+      "total_frames": 70,
+      "janky_percent": 25.71,
+      "p50_ms": 16,
+      "p95_ms": 81,
+      "interaction": "5 taps + swipes across bar/line/donut tabs"
+    },
+    {
+      "name": "ecosystem-richtext",
+      "package": "com.angnative.demo.ecosystem.richtext",
+      "total_frames": 23,
+      "janky_percent": 73.91,
+      "p50_ms": 34,
+      "p95_ms": 150,
+      "interaction": "5 toolbar taps + swipes in EditText"
+    },
+    {
+      "name": "ecosystem-calendar",
+      "package": "com.angnative.demo.ecosystem.calendar",
+      "total_frames": 14,
+      "janky_percent": 64.29,
+      "p50_ms": 42,
+      "p95_ms": 700,
+      "interaction": "5 day taps + swipes on Canvas month grid"
+    }
+  ],
+  "interpretation": "Low frame counts for richtext/calendar indicate the emulator rendered few frames during a short burst; the high jank percentages are dominated by SwiftShader software rasterization and input latency. Do NOT present these as production performance. A physical-device, multi-sample run is still required."
+}

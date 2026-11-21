@@ -16,7 +16,7 @@
 | Angular bundle execution on native | Not implemented | QuickJS bridge scaffolding exists (`docs/EVENT-BRIDGE.md`), runtime integration pending. |
 | Angular `(click)` listener round trip on native | Partially implemented | FFI event bridge + QuickJS API exist; platform buttons still dispatch imperative Rust batches. |
 | iOS build / simulator run | Not tested | No macOS/Xcode in this environment. Code ready (`docs/IOS-BUILD.md`). |
-| Frame pacing / CPU benchmark | Not measured | `scripts/measure-frames.ps1` exists but the shared emulator went offline during collection; no frame stats captured. `docs/BENCHMARKS.md` has startup/memory only. |
+| Frame pacing / CPU benchmark | Emulator-only data captured | `docs/benchmarks/frame-pacing.json` — gfxinfo jank/p50/p95 for 4 showcases on SwiftShader emulator, single burst; physical-device multi-sample and CPU measurement still pending. |
 
 ## Web adapter (`@angnative/web`)
 

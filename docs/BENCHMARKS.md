@@ -17,12 +17,21 @@
 Raw JSON: `docs/benchmarks/*.json`.
 
 ## Not yet measured (Phase 6 remaining)
-- Frame pacing / dropped frames — `scripts/measure-frames.ps1` was added, but the shared
-  emulator repeatedly went `offline`. A direct `dumpsys gfxinfo ... framestats` call did
-  return data for `ecosystem-grid`, but only **2 frames** with "100% janky / 950 ms"
-  from a non-foreground app on an offline device. That is an invalid sample, not a
-  performance result, so **no FPS / jank number is claimed**. Re-run on a stable
-  emulator or physical device before publishing frame-pacing figures.
+- Frame pacing / dropped frames — **measured on emulator** after restarting the AVD and
+  confirming each app was `topResumedActivity`. Raw data: `docs/benchmarks/frame-pacing.json`.
+  The earlier "2 frames / 100% janky" sample was invalid (background app, offline device) and
+  was discarded. Current single-burst results on **SwiftShader software rendering**:
+
+| Showcase | Frames | Janky % | p50 | p95 |
+|---|---:|---:|---:|---:|
+| ecosystem-grid (10k RecyclerView) | 186 | 16.13% | 20 ms | 48 ms |
+| ecosystem-charts (Canvas) | 70 | 25.71% | 16 ms | 81 ms |
+| ecosystem-richtext (Spannable editor) | 23 | 73.91% | 34 ms | 150 ms |
+| ecosystem-calendar (Canvas month grid) | 14 | 64.29% | 42 ms | 700 ms |
+
+  **Caveat:** software-rasterized emulator, one burst per app, low frame counts for
+  richtext/calendar. These are NOT production performance figures — a physical-device,
+  multi-sample run is still required before any comparison claim.
 - CPU utilization during scroll
 - Warm start, multi-sample averages, physical device
 - WebView comparison builds (deliberately not built for native showcases)

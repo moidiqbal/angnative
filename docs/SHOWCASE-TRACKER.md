@@ -66,7 +66,7 @@ JS runtime); no APK claimed.
 ## Phase 5/6 — build/verify/performance
 - All 8 showcase APKs staged under `dist/showcases/<name>/` with source.zip + compatibility-report.md; installed/launched on emulator API 34; `WebViews=0`.
 - Initial cold-start/memory numbers in `docs/BENCHMARKS.md` + `docs/benchmarks/*.json` (1 sample, emulator, honest caveats).
-- Remaining: frame pacing/CPU/physical device/multi-sample averages — not yet done.
+- Frame pacing measured on emulator: `docs/benchmarks/frame-pacing.json` (gfxinfo jank/p50/p95 for grid, charts, richtext, calendar). Physical-device multi-sample and CPU still pending.
 
 ## Phase 3 — Reusable packages
 ⬜ `@angnative/ui-core`, adapter packages, native-grid/charts/animation/richtext — incremental only.
