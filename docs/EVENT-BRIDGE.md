@@ -55,7 +55,9 @@ native button click (Kotlin / Swift / winit)
    `AngNativeRuntime::dispatch_event` (needs a crate depending on both
    `angnative-host-ffi` and `angnative-host-engine`; verify on Mac/Linux).
 2. **Load the compiled Angular bundle into QuickJS** in each native shell
-   (DOM shims + Angular runtime; no ngc pipeline exists yet).
+   (DOM shims + Angular runtime). The AOT/ngc pipeline itself is now built and
+   verified (`scripts/compile-aot.mjs` → `dist/aot/` with Ivy definitions);
+   what remains is wiring that compiled bundle into the native shells' QuickJS runtime.
 3. **Wire platform shell clicks** to `angnative_host_dispatch_event` instead of
    the current imperative `SetTextContent` batches.
 

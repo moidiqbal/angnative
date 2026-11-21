@@ -4,7 +4,7 @@
  * Compiled to dist/cli.js and registered as the `angnative` bin.
  */
 
-import { main } from './commands';
+import { main } from './commands.js';
 
 main(process.argv).then((code) => process.exit(code)).catch((err) => {
   console.error('fatal:', err instanceof Error ? err.message : String(err));

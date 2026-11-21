@@ -100,6 +100,7 @@ cargo test --workspace   # 108 tests pass, including host-engine (6) and desktop
 | Web adapter (browser) | ✅ verified |
 | iOS shell | ⚠️ code complete, Mac build pending |
 | Native event bridge (FFI + QuickJS API) | ✅ scaffold + tests; full Angular-in-native pending (`docs/EVENT-BRIDGE.md`) |
+| Production AOT (`pnpm run compile:aot`, `angnative build`) | ✅ real Angular `ngc` (not shadowed 0.1.0 binary), Ivy definitions verified in `dist/aot/`, esbuild bundle produced |
 
 Full history: `docs/PROJECT-REVIEW-2026-11-20.md`
 Roadmap: `docs/ROADMAP.md`

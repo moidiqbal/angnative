@@ -14,10 +14,10 @@
  * `build` delegate to their respective modules.
  */
 
-import { doctorMain } from './doctor';
-import { devMain } from './dev';
-import { bundleApp } from './bundle';
-import { createApp } from './create';
+import { doctorMain } from './doctor.js';
+import { devMain } from './dev.js';
+import { bundleApp } from './bundle.js';
+import { createApp } from './create.js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -25,15 +25,10 @@ import { execSync } from 'child_process';
 
 const AOT_TSCONFIG = 'tsconfig.aot.json';
 const AOT_OUTPUT_DIR = join(process.cwd(), 'dist', 'aot');
-const BUNDLE_ENTRY = join(process.cwd(), 'packages', 'testing', 'fixtures', 'out', 'app.js');
-const BUNDLE_OUTFILE = join(
-  process.cwd(),
-  'packages',
-  'testing',
-  'fixtures',
-  'out',
-  'bundle.js'
-);
+// Real ngc emits the AOT entry at dist/aot/main.js — bundle THAT, not the
+// legacy fixture entry (which is used by the separate size-budget gate).
+const BUNDLE_ENTRY = join(AOT_OUTPUT_DIR, 'main.js');
+const BUNDLE_OUTFILE = join(process.cwd(), 'dist', 'aot', 'bundle.js');
 
 function usage(): void {
   console.log(`
@@ -58,9 +53,9 @@ async function runBuild(): Promise<number> {
     return 1;
   }
 
-  console.log(`[angnative build] running AOT compile with ${AOT_TSCONFIG}...`);
+  console.log(`[angnative build] running real Angular AOT compile (scripts/compile-aot.mjs)...`);
   try {
-    execSync(`npx ngc --project ${AOT_TSCONFIG}`, {
+    execSync(`node scripts/compile-aot.mjs ${AOT_TSCONFIG}`, {
       stdio: 'inherit',
       cwd: process.cwd(),
     });

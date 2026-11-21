@@ -88,6 +88,13 @@ Selected verified rows:
 - **This validator is not yet wired into CI.** Add a `pnpm run validate:build-tools`
   step to `.github/workflows/ci.yml` if you want it as a gate (that edit is out
   of scope for this change).
+- **AOT shadowed binary (fixed).** `npx ngc` in this workspace resolves to a
+  shadowing 0.1.0 binary that emits plain JS with no Ivy component definitions.
+  `scripts/compile-aot.mjs` now resolves the genuine `@angular/compiler-cli` `ngc`
+  via its `package.json` `bin.ngc` field and verifies Ivy output (`defineComponent`)
+  after compilation. `node packages/cli/dist/cli.js build` runs this real AOT path
+  and bundles `dist/aot/main.js` with esbuild. The CLI's ESM relative imports were
+  given `.js` extensions so the compiled binary is runnable.
 - **Native shells still have no embedded JS runtime that can execute an Angular
   bundle.** QuickJS scaffolding exists but is not connected; see
   [EVENT-BRIDGE.md](EVENT-BRIDGE.md). This matters for the library matrix in

@@ -22,7 +22,7 @@
 
 | Feature | Status | Reason |
 |---|---|---|
-| AOT/ngc production build | Not implemented | Uses JIT `@angular/compiler`; bundle ~2.3 MB dev. |
+| AOT/ngc production build | Implemented and verified | `scripts/compile-aot.mjs` resolves the real Angular compiler-cli `ngc` (the workspace's `npx ngc` is a shadowing 0.1.0 plain-JS emitter). `pnpm run compile:aot` and `node packages/cli/dist/cli.js build` both succeed; `dist/aot/*.js` contains `ɵɵdefineComponent` / template functions. The web adapter's browser demo still uses JIT — migrating it to consume `dist/aot/bundle.js` is a separate task. |
 | Web size-budget gate | Not implemented | JS gate covers fixtures only. |
 | SSR / hydration | Not implemented | Out of scope. |
 
