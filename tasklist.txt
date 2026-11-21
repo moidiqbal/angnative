@@ -1,0 +1,106 @@
+================================================================================
+ANGNATIVE — TASKLIST (2026-11-21)
+Current release: v0.2.0 (pushed, master @ 5e276d4)
+Rule: nothing below is "done" without execution evidence. No fabricated claims.
+================================================================================
+
+--------------------------------------------------------------------------------
+ONGOING / IMPORTANT — kya abhi karna hai (priority order)
+--------------------------------------------------------------------------------
+
+[P0] iOS / Mac verification — LAST BLOCKER
+     Status  : code complete, NOT built/tested (no macOS/Xcode here)
+     Files   : platforms/ios/Package.swift, Sources/**, Tests/**, scripts/build-ios-native.sh
+     Command : ./scripts/build-ios-native.sh simulator
+               cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost
+     Proof   : swift build + swift test pass, Simulator screenshot, nodeCount > 0
+     Blocker : Mac needed — sponsors being collected (README + docs/SPONSORS.md)
+     Note    : user said "iOS/Mac abhi chor dain" — keep parked, do not claim done
+
+[P1] Native JS runtime wiring — biggest feature gap
+     Status  : scaffolding only (FFI event bridge + QuickJS API exist)
+     Have    : angnative_host_set_event_callback / add|remove|dispatch_event (host-ffi)
+               na.addEventListener / runtime.dispatch_event (host-engine)
+     Missing : runtime bridge crate (Host callback -> AngNativeRuntime::dispatch_event)
+               load compiled Angular bundle (dist/aot/) into QuickJS in each shell
+               platform button clicks -> angnative_host_dispatch_event
+     Ref     : docs/EVENT-BRIDGE.md
+     Proof   : Angular (click) reaches component handler on Android/iOS/Desktop
+
+[P1] Sustained-load benchmark (community asked for this)
+     Status  : single-burst data only
+     Have    : emulator + OnePlus Open gfxinfo (docs/benchmarks/, physical/README.md)
+     Missing : 30-60s continuous scroll, memory growth over time, cold/warm start
+               distribution, CPU, multi-sample averages, physical device repeats
+     Proof   : docs/BENCHMARKS.md with sample counts + methodology
+
+[P1] Ship social posts for v0.2.0
+     Status  : drafts only — see SOCIAL-v0.2.0.txt in repo root
+     Todo    : GitHub Sponsors enable (github.com/sponsors/moidiqbal)
+               Open Collective create (opencollective.com/angnative)
+               Publish LinkedIn post, X thread, HN Show HN, Reddit (r/angular/r/rust)
+     Note    : use docs/COMPARISON.md as evidence base; never claim "faster than NativeScript"
+
+--------------------------------------------------------------------------------
+SHORT / EASY WINS (cleanup backlog)
+--------------------------------------------------------------------------------
+
+[P2] CLI runTest() — currently only prints a message
+     File: packages/cli/src/commands.ts:119
+     Fix : spawn `pnpm test` and `cargo test --workspace`, forward exit code
+
+[P2] HMR placeholder in dev.ts
+     File: packages/cli/src/dev.ts:175  (setTimeout placeholder)
+     Fix : incremental ngc/incremental compile hook
+
+[P2] Wire scripts/validate-build-tools.mjs into CI
+     Current: 25 PASS / 0 FAIL / 6 INFO, but not a gate
+     Fix    : add `pnpm run validate:build-tools` step to .github/workflows/ci.yml
+
+[P2] docs/CONTRIBUTORS.md
+     Status : missing (promised in docs/SPONSORS.md — sponsor recognition)
+     Fix    : create + link from README
+
+[P2] Web demo -> AOT bundle
+     Status: web adapter uses JIT @angular/compiler; real AOT now exists in dist/aot/
+     Fix   : make @angnative/web consume dist/aot/bundle.js
+
+--------------------------------------------------------------------------------
+FEATURE BACKLOG (after the above)
+--------------------------------------------------------------------------------
+
+[P3] Binary / zero-copy mutation transport (currently JSON batches)
+     Opcodes already specified in docs/SPECIFICATIONS.md
+
+[P3] Promote primitives from showcases to packages
+     na-data-grid (real RecyclerView virtualization — currently grid showcase only)
+     na-chart (Canvas), na-calendar (Canvas), na-rich-text (Spannable)
+     Package: packages/native-ui-core (Android) + packages/common (Angular API)
+
+[P3] Runtime theming / dark mode via DesignTokens presets
+     Have: DesignTokens MATERIAL_3 / PRIMENG / NG_ZORRO / TAIGA / SPARTAN
+     Missing: runtime switch at app level
+
+[P3] Foldable-aware layout (Jetpack WindowManager, hinge/posture)
+     Device tested (OnePlus Open) but no posture API integration
+
+[P3] Accessibility: TalkBack / VoiceOver labels, keyboard navigation
+
+[P3] Microfrontends — architecture-dependent, not tested (docs/ECOSYSTEM-COMPATIBILITY.md)
+
+--------------------------------------------------------------------------------
+ALREADY COMPLETE (do not redo — just maintain)
+--------------------------------------------------------------------------------
+
+[x] Rust host core/layout/view/ffi/engine/services/desktop — cargo test 108 pass
+[x] Angular renderer/contract/platform/testing/cli/web/native-ui-core — pnpm test 208 pass
+[x] Production AOT: real Angular ngc + Ivy verified + esbuild (angnative build)
+[x] Android JNI bridge: 8 callbacks, free_string, snapshot layout, ops-driven UI
+[x] 10 native showcase APKs + sources + reports + clean screenshots
+[x] Desktop shell: winit + wgpu, 11 tests, window + interactive button
+[x] Web adapter: DOM backend + Playwright render/click verified
+[x] Evidence: VERIFICATION-REPORT.md, COMPATIBILITY-EVIDENCE.md, BENCHMARKS.md
+[x] ADRs 0001-0004, DELIVERABLES.md, UNSUPPORTED-FEATURES.md, COMPARISON.md
+[x] Release v0.2.0 + tag pushed; GitHub Sponsors + Open Collective config
+[x] All 10 screenshots: status bar + navbar cropped, strict foreground guard
+================================================================================

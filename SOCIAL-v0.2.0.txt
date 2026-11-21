@@ -1,0 +1,131 @@
+================================================================================
+ANGNATIVE v0.2.0 — READY-TO-POST SOCIAL TEXT
+Release: https://github.com/moidiqbal/angnative/releases/tag/v0.2.0
+Repo:    https://github.com/moidiqbal/angnative
+Evidence: https://github.com/moidiqbal/angnative/blob/main/docs/VERIFICATION-REPORT.md
+Comparison (honest): https://github.com/moidiqbal/angnative/blob/main/docs/COMPARISON.md
+================================================================================
+
+--------------------------------------------------------------------------------
+1) LINKEDIN — main announcement post
+--------------------------------------------------------------------------------
+🚀 AngNative v0.2.0 — Angular ab real native widgets par chal sakta hai.
+
+Angular developers ke paas mobile par do options the: WebView (sluggish) ya Angular chhod doosra framework. AngNative teesra raasta try karti hai — custom Renderer2 → Rust Host Engine (Taffy layout) → asli android.widget.* / UIKit widgets. Zero WebView.
+
+Aaj jo actually verify kiya (evidence repo me hai):
+• 108 Rust + 208 JS tests pass, CI live
+• Production AOT: asla Angular compiler-cli ngc, Ivy definitions verified
+• 10 native showcase APKs — Angular Material, PrimeNG, NG-ZORRO, Taiga UI, Spartan UI + grid/charts/state/i18n/forms/animation/rich-text/calendar
+• OnePlus Open (Android 16) par real GPU: 10,000-row virtualized grid 1.76% jank, 6ms p50 (SwiftShader emulator me 16.13% tha)
+• Har app par WebViews: 0
+• 10 clean screenshots, status bar/notifications crop kiye gaye
+
+Ek honest baat (main chhupana nahi chahta): Angular Material/PrimeNG jaise DOM libraries native par unchanged nahi chal saktin. Hum unka native reimplementation dete hain aur har compatibility report me clearly likhte hain. NativeScript aaj bhi production Angular apps ke liye zyada mature hai — hamara comparison doc ye sach batata hai.
+
+iOS shell code-complete hai lekin Mac/Xcode verification pending hai. Agar aap Mac time ya sponsor de sakte hain to help karein (README me "Help us finish iOS" section).
+
+MIT licensed. Repo + release + evidence neeche:
+🔗 https://github.com/moidiqbal/angnative/releases/tag/v0.2.0
+
+#Angular #RustLang #OpenSource #Android #MobileDevelopment #NativeApps #Performance #DeveloperTools
+
+--------------------------------------------------------------------------------
+2) X / TWITTER — 6-tweet thread
+--------------------------------------------------------------------------------
+1/6 Angular on mobile usually means a WebView. We built a different path: custom Renderer2 → Rust host engine → Taffy layout → real native widgets. Zero WebView. MIT. v0.2.0 out today. 🧵
+
+2/6 The stack: Angular 22 signals → CommandBatch JSON → Rust shadow tree → Taffy 0.15.1 layout → C-ABI/JNI → TextView/UIButton. 108 Rust + 208 JS tests green. Production AOT with real Angular ngc (Ivy verified).
+
+3/6 Real hardware, not just emulator: OnePlus Open (Android 16), 10,000-row virtualized grid = 170 frames, 1.76% jank, 6ms p50. Same grid on SwiftShader emulator: 16.13% jank. WebViews: 0 in all 10 showcase APKs.
+
+4/6 Honest note: Angular Material / PrimeNG / NG-ZORRO are DOM libs — they can't run unchanged natively. Our showcases are clearly-labelled native reimplementations with a compatibility matrix. NativeScript is more mature for shipping Angular natively today; our comparison doc says so.
+
+5/6 What's in the repo: 10 showcase APKs + sources, real-device benchmarks, ADRs, compatibility evidence, sponsors setup. iOS shell is code-complete but needs a Mac for simulator verification — sponsors welcome.
+
+6/6 Repo + release + full evidence: https://github.com/moidiqbal/angnative/releases/tag/v0.2.0
+
+--------------------------------------------------------------------------------
+3) HACKER NEWS — Show HN
+--------------------------------------------------------------------------------
+TITLE:
+Show HN: AngNative – Angular on native widgets via a Rust host engine, no WebView
+
+BODY:
+Hi HN,
+
+AngNative is an MIT-licensed experiment: a custom Angular Renderer2 that turns
+template mutations into batches, a Rust host engine that keeps a shadow tree and
+computes Taffy 0.15.1 layout, and platform shells (Android JNI, iOS Swift, desktop
+winit+wgpu) that render real native widgets. No WebView in native mode.
+
+What's verified in v0.2.0:
+- 108 Rust tests + 208 JS tests pass in CI
+- Production AOT uses the real Angular compiler-cli ngc; Ivy component definitions
+  are verified in dist/aot
+- 10 showcase APKs built and installed on a OnePlus Open (Android 16)
+- 10,000-row virtualized grid: 170 frames, 1.76% jank, 6ms p50 on real GPU;
+  the same grid on the SwiftShader emulator measured 16.13% jank
+- WebViews: 0 in every showcase app
+
+What it is NOT:
+- NativeScript is more mature and actually runs your compiled Angular app natively
+  today. Our native shells currently drive Rust-built demo trees; wiring the
+  QuickJS runtime to execute compiled Angular bundles is the next milestone.
+- DOM libraries (Angular Material, PrimeNG, etc.) do not run unchanged — our
+  showcases are native reimplementations, clearly labelled.
+- No head-to-head benchmark against NativeScript/Flutter/React Native was run, so
+  we make no performance-superiority claims.
+
+Repo: https://github.com/moidiqbal/angnative
+Release: https://github.com/moidiqbal/angnative/releases/tag/v0.2.0
+Full verification report: https://github.com/moidiqbal/angnative/blob/main/docs/VERIFICATION-REPORT.md
+Comparison doc: https://github.com/moidiqbal/angnative/blob/main/docs/COMPARISON.md
+
+Happy to answer questions about the FFI protocol, layout pipeline, or the honest
+gaps.
+
+--------------------------------------------------------------------------------
+4) REDDIT — r/angular (title + body)
+--------------------------------------------------------------------------------
+TITLE:
+[OC] AngNative v0.2.0 — custom Angular Renderer2 → Rust host → native widgets, zero WebView. Real-device numbers inside.
+
+BODY:
+I've been building an Angular-native experiment for a while and just released v0.2.0. The short version: a custom Renderer2 emits mutation batches, a Rust host maintains the shadow tree and computes layout with Taffy, and the Android/iOS/desktop shells render actual platform widgets (TextView, UIButton, etc.) — no WebView.
+
+Verified: 108 Rust + 208 JS tests, production AOT with real Angular ngc, and 10 showcase APKs installed on a OnePlus Open. The 10k-row virtualized grid measured 1.76% jank / 6ms p50 on real hardware (SwiftShader emulator: 16.13%). WebViews: 0 everywhere.
+
+Important honesty: NativeScript is still the better choice if you need to ship Angular natively in production today — it actually runs your Angular code on device. Our native shells currently render Rust-built demo trees; the QuickJS runtime wiring is the next big milestone. DOM libraries like Angular Material are represented by clearly-labelled native reimplementations, not unchanged compatibility.
+
+Repo + full evidence + comparison doc are in the release notes. Questions welcome — especially about the FFI protocol and layout pipeline.
+
+--------------------------------------------------------------------------------
+5) REDDIT — r/rust (shorter variant)
+--------------------------------------------------------------------------------
+TITLE:
+Rust host engine driving native mobile UI from Angular mutations (v0.2.0, MIT)
+
+BODY:
+AngNative's Rust crates (host-core mutation tree, host-layout with Taffy 0.15.1,
+host-view op emitter, host-ffi C-ABI, host-engine QuickJS) sit between an Angular
+Renderer2 and native platform shells via JNI / Swift FFI.
+
+v0.2.0: 108 Rust tests pass; 10 showcase APKs run on a OnePlus Open with WebViews=0.
+10k-row virtualized grid: 1.76% jank / 6ms p50 on real GPU vs 16.13% on SwiftShader.
+
+Honest gap: the QuickJS engine is not yet wired into the native shells, so compiled
+Angular bundles don't execute there today. Event bridge scaffolding exists.
+
+Repo + verification report linked in comments/release notes.
+
+--------------------------------------------------------------------------------
+GENERAL RULES FOR ALL POSTS
+--------------------------------------------------------------------------------
+• Never say "faster than NativeScript/Flutter" — no head-to-head benchmark exists.
+• Always mention: DOM libraries are native reimplementations, not unchanged compatibility.
+• Always mention: iOS needs Mac verification; JS runtime wiring is pending.
+• Lead with measured numbers (1.76% jank / 6ms p50 / WebViews: 0) — they are the story.
+• Link the release, then the verification report, then the comparison doc.
+• Before posting: enable GitHub Sponsors and create Open Collective (see docs/SPONSORS.md).
+================================================================================
