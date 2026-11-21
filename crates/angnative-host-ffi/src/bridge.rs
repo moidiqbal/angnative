@@ -20,9 +20,7 @@ use std::thread_local;
 /// UTF-8 JSON string owned by the host for the duration of the call.
 pub type EventCallback = unsafe extern "C" fn(u64, *const c_char, *mut c_void);
 
-/// Thread-local storage for the JS runtime dispatch function.
-/// Set by RuntimeBridge when created, cleared when destroyed.
-/// This allows Host::dispatch_event to call the bridge's runtime.
+// Thread-local JS dispatch callback (installed by RuntimeBridge).
 thread_local! {
     static JS_RUNTIME_DISPATCH: RefCell<Option<extern "C" fn(u64, *const c_char, *const c_char) -> u32>> = RefCell::new(None);
 }
@@ -337,54 +335,40 @@ impl Host {
         removed
     }
 
-    /// Dispatch a native event to every registered listener. Returns how many
-    /// listeners were invoked (0 also when no callback is installed).
+    /// Dispatch a native event. EXACTLY ONE pipeline is invoked (P0-03 fix):
+    /// 1. If a JS-runtime dispatch callback is registered on this thread, call it
+    ///    (the RuntimeBridge path — single authoritative listener registry lives
+    ///    inside AngNativeRuntime).
+    /// 2. Otherwise fall back to the legacy FFI `event_callback`, once per id.
+    /// Never both — that previously double-fired listeners.
     pub fn dispatch_event(&mut self, node_id: u64, event_name: &str, payload: &str) -> u32 {
+        let Ok(c_event) = CString::new(event_name) else { return 0 };
+        let Ok(c_payload) = CString::new(payload) else { return 0 };
+
+        // Canonical path: JS runtime dispatch (thread-local, installed by RuntimeBridge).
+        let js_invoked = JS_RUNTIME_DISPATCH.with(|dispatch| {
+            match dispatch.borrow().as_ref() {
+                Some(f) => f(node_id, c_event.as_ptr(), c_payload.as_ptr()),
+                None => 0,
+            }
+        });
+        if js_invoked > 0 {
+            return js_invoked;
+        }
+
+        // Legacy FFI callback path (kept for shells that register one directly).
+        let Some(cb) = self.event_callback else { return 0 };
         let ids = self
             .event_listeners
             .get(&(node_id, event_name.to_string()))
             .cloned()
             .unwrap_or_default();
-        let Some(cb) = self.event_callback else {
-            // If no FFI callback, still call JS runtime dispatch if registered via thread-local
-            return JS_RUNTIME_DISPATCH.with(|dispatch| {
-                if let Some(f) = dispatch.borrow().as_ref() {
-                    let c_event = CString::new(event_name).unwrap_or_default();
-                    let c_payload = CString::new(payload).unwrap_or_default();
-                    f(node_id, c_event.as_ptr(), c_payload.as_ptr())
-                } else {
-                    0
-                }
-            });
-        };
-        let Ok(c_payload) = CString::new(payload) else {
-            // Still try JS dispatch
-            return JS_RUNTIME_DISPATCH.with(|dispatch| {
-                if let Some(f) = dispatch.borrow().as_ref() {
-                    let c_event = CString::new(event_name).unwrap_or_default();
-                    let c_payload = CString::new(payload).unwrap_or_default();
-                    f(node_id, c_event.as_ptr(), c_payload.as_ptr())
-                } else {
-                    0
-                }
-            });
-        };
         let user_data = self.event_user_data;
         let mut invoked = 0;
         for id in ids {
             unsafe { cb(id, c_payload.as_ptr(), user_data) };
             invoked += 1;
         }
-        // Also call JS runtime dispatch if registered via thread-local
-        invoked += JS_RUNTIME_DISPATCH.with(|dispatch| {
-            if let Some(f) = dispatch.borrow().as_ref() {
-                let c_event = CString::new(event_name).unwrap_or_default();
-                let c_payload = CString::new(payload).unwrap_or_default();
-                f(node_id, c_event.as_ptr(), c_payload.as_ptr())
-            } else {
-                0
-            }
-        });
         invoked
     }
 

@@ -4,33 +4,13 @@
  * Provides only the absolute minimum for Angular to run.
  * Uses the JsEngine trait API (eval, set_global, register_function).
  */
-use rquickjs::{Function, Object, Value};
 use crate::engine::JsEngine;
 
 /// Install minimal DOM and platform shims using the JsEngine trait API.
 pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engine::EngineError> {
-    // window / globalThis
-    engine.eval(r#"
-        const window = {
-            console: console,
-            setTimeout: setTimeout,
-            clearTimeout: clearTimeout,
-            setInterval: setInterval,
-            clearInterval: clearInterval,
-            requestAnimationFrame: requestAnimationFrame,
-            cancelAnimationFrame: cancelAnimationFrame,
-            localStorage: localStorage,
-            sessionStorage: sessionStorage,
-            fetch: fetch,
-            EventTarget: EventTarget,
-            Event: Event,
-            CustomEvent: CustomEvent,
-        };
-        window.self = window;
-        window.globalThis = window;
-        globalThis = window;
-    "#)?;
-    
+    // Native console backends must exist before the `console` shim calls them.
+    register_console_functions(engine)?;
+
     // document
     engine.eval(r#"
         const document = {
@@ -186,6 +166,31 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         };
         const localStorage = Object.create(_storage);
         const sessionStorage = Object.create(_storage);
+    "#)?;
+    
+    // window / globalThis — defined LAST so every referenced identifier
+    // (console, timers, Event*, fetch, storage) already exists. Defining it
+    // first caused a QuickJS exception on undefined identifiers.
+    // NOTE: `window.self = window` / `window.globalThis = window` are
+    // deliberately omitted: cyclic object graphs trigger a stack overflow in
+    // rquickjs 0.5.1 (debug builds) during GC/Drop. Angular code that relies on
+    // `window.self` must use `globalThis` instead until this is resolved.
+    engine.eval(r#"
+        const window = {
+            console: console,
+            setTimeout: setTimeout,
+            clearTimeout: clearTimeout,
+            setInterval: setInterval,
+            clearInterval: clearInterval,
+            requestAnimationFrame: requestAnimationFrame,
+            cancelAnimationFrame: cancelAnimationFrame,
+            localStorage: localStorage,
+            sessionStorage: sessionStorage,
+            fetch: fetch,
+            EventTarget: EventTarget,
+            Event: Event,
+            CustomEvent: CustomEvent,
+        };
     "#)?;
     
     Ok(())

@@ -28,7 +28,7 @@ mod tests {
     
     #[test]
     fn test_runtime_controller_integration() {
-        let mut controller = RuntimeController::new(RuntimeControllerConfig::default()).unwrap();
+        let controller = RuntimeController::new(RuntimeControllerConfig::default()).unwrap();
         assert_eq!(controller.state(), LifecycleState::Created);
         
         controller.initialize().unwrap();

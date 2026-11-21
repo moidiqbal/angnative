@@ -1,19 +1,21 @@
 # Code Review — 2026-11-22
 
 **Reviewer:** AI agent · **Scope:** current uncommitted working tree + last committed state
-**Status of tree:** 7 modified tracked files + 4 untracked paths (runtime bridge, architecture docs). These are NOT from the v0.2.0 release commits — they appear to be in-progress work by you/teammate. **Nothing was modified during this review.**
+**Status of tree:** 7 modified tracked files + 4 untracked paths (runtime bridge, architecture docs). These are NOT from the v0.2.0 release commits — they appear to be in-progress work by you/teammate.
 
-## Executive summary
+> **UPDATE (same day, after your explicit request):** All P0/P1 findings below were fixed. See **"Fix status"** at the end of this document. The table below records the *original* review state for the record; the current tree is green.
 
-| Check | Result |
-|---|---|
-| `pnpm test` | ✅ 208 passed |
-| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors |
-| `cargo check --workspace` | ❌ same 7 errors |
-| Committed baseline (`fc8b6a2` + earlier) | ✅ was green (108 Rust tests) |
-| Current working tree | 🔴 broken; do not commit as-is |
+## Executive summary (original review state)
 
-The in-progress "JS runtime wiring" is the right feature (it is our #1 gap from `tasklist.txt`), but the current implementation is **not compilable and has serious design defects**. The architecture docs you added (`docs/architecture/issue-register.md`) already identify 43 issues including these — this review confirms them in code.
+| Check | Original result | Current result |
+|---|---|---|
+| `pnpm test` | ✅ 208 passed | ✅ 208 passed |
+| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors | ✅ **115 passed, 0 failed** |
+| `cargo check --workspace` | ❌ same 7 errors | ✅ clean (no warnings) |
+| Committed baseline (`fc8b6a2` + earlier) | ✅ was green (108 Rust tests) | ✅ still green |
+| Current working tree | 🔴 broken; do not commit as-is | 🟢 green; fixes applied |
+
+The in-progress "JS runtime wiring" is the right feature (it is our #1 gap from `tasklist.txt`), but the original implementation was **not compilable and had serious design defects**. The architecture docs you added (`docs/architecture/issue-register.md`) already identify 43 issues including these — this review confirmed them in code. All of the findings in this report have since been addressed; the remaining honest gaps are listed in **Fix status**.
 
 ---
 
@@ -107,3 +109,48 @@ After the change, `destroyHost()` calls `nativeRuntimeBridgeDestroy(runtimeBridg
 6. Add end-to-end tests before calling this done.
 
 Do not commit until `cargo test --workspace` is green and the "exactly once" event test passes.
+
+---
+
+## ✅ Fix status — 2026-11-22 (post-review)
+
+After the user explicitly asked to fix all P0/P1 findings, the following changes were applied:
+
+### P0 fixes
+
+| # | Finding | Fix applied |
+|---|---|---|
+| 1 | Workspace does not compile (7 errors) | Rewrote `runtime_controller.rs` as a slim, lifecycle-only state machine. No missing types/helpers/fields remain. `cargo check --workspace` is clean. |
+| 2 | Triple runtime ownership / use-after-move | `RuntimeController` no longer owns a runtime. **Single owner:** `RuntimeBridge` owns `Host + QuickJsEngine + AngNativeRuntime`. Removed the thread-local `CURRENT_ANGULAR_RUNTIME` ownership path. |
+| 3 | Three duplicate event dispatch paths | `Host::dispatch_event` now invokes **exactly one** pipeline: canonical thread-local JS dispatch first (returns immediately if it handled the event), legacy FFI `event_callback` only as fallback. `RuntimeController` dispatch code was removed entirely. Single event path confirmed. |
+| 4 | Cross-thread QuickJS unsound | `RuntimeBridge` stores the creating `ThreadId` and asserts it in `dispatch_event()` and `runtime_mut()`; cross-thread use panics instead of causing UB. Added `test_thread_affinity`. |
+| 5 | Android `destroyHost()` JNI global-ref leak | `nativeRuntimeBridgeDestroy` now also accepts `hostHandle` and releases the `ViewFactoryContext` + JNI global ref from `g_contexts` (bridge dropped first so callbacks cannot fire with a dangling context). Kotlin `destroyHost()` passes the handle. |
+
+### P1 fixes
+
+| # | Finding | Fix applied |
+|---|---|---|
+| 6 | Bundle source injected into JS string literal | Bundle loading is no longer done through `format!` in the controller; shells use `RuntimeBridge::runtime_mut().eval(raw_source)` — no string-literal injection. |
+| 7 | Microtasks LIFO + reentrancy panic | The microtask runtime was removed along with the controller rewrite; no borrow-held-while-running path remains. |
+| 8 | FFI null/UTF-8 guards + panic safety | All bridge `extern "C"` entry points now validate null pointers and UTF-8, and wrap work in `catch_unwind`. Invalid input returns 0 instead of dispatching. |
+| 9 | `resume()` double-call error | `resume()` is now idempotent (no-op when already `Running`). |
+
+### Additional fix found during verification
+
+- `install_dom_shims()` originally defined `window` *before* `console`/timers/`Event`/`fetch`/storage, causing a QuickJS `ScriptError` on undefined identifiers. Reordered so primitives are installed first and `window` last; native console backends are registered before the `console` shim.
+- `window.self = window` / `window.globalThis = window` / `globalThis = window` were **removed**: cyclic object graphs cause a stack overflow in rquickjs 0.5.1 debug builds during GC/Drop (confirmed experimentally at 1 MB and 8 MB stacks). Code documents this; Angular code must use `globalThis` instead of `window.self` for now. This is an **honest remaining limitation**, not a silent workaround.
+
+### Verification evidence
+
+- `cargo test --workspace`: **115 passed, 0 failed**
+- `cargo check --workspace`: clean, no warnings
+- `pnpm test`: **208 passed**
+
+### Honest remaining gaps (NOT claimed as fixed)
+
+- No end-to-end test yet that registers a JS listener → dispatches an event → asserts it fired exactly once. The single-path design is enforced structurally, but a dedicated E2E test is still recommended before declaring the runtime "production ready".
+- The DOM shims remain thin stubs (`appendChild` returns null, `setAttribute` no-ops) — a real Angular renderer still cannot build a DOM; Angular bootstrap in QuickJS is still missing (issue P0-06 in the register).
+- `window.self` is unavailable due to the rquickjs cyclic-GC limitation noted above.
+- Android JNI changes are source-reviewed only; **no Android/Gradle build was run** in this environment (no device/SDK verification).
+- iOS/Mac remains parked by the user; nothing here claims iOS verification.
+- `nativeHostDestroy` is now unused by Kotlin (the bridge owns the Host); it remains implemented as legacy API but must not be called on a bridge-owned host.

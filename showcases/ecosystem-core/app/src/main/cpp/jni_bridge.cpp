@@ -419,9 +419,21 @@ Java_com_angnative_app_JniBridge_nativeRuntimeBridgeCreate(JNIEnv* /*env*/, jobj
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDestroy(JNIEnv* env, jobject /*thiz*/, jlong handle) {
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDestroy(JNIEnv* env, jobject /*thiz*/,
+                                                            jlong handle, jlong hostHandle) {
   AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  // The bridge owns the Host. Destroy it first so no ViewFactory callback can
+  // fire with a dangling ViewFactoryContext, then release the JNI global ref.
+  // This also fixes the leak where the old Kotlin destroyHost() dropped the
+  // bridge but never cleared g_contexts / the global ref (review P1-08).
   angnative_runtime_bridge_destroy(b);
+  if (hostHandle != 0) {
+    auto it = g_contexts.find(hostHandle);
+    if (it != g_contexts.end()) {
+      destroyContext(env, it->second);
+      g_contexts.erase(it);
+    }
+  }
   LOGI("AngNative runtime bridge destroyed: %p", b);
 }
 

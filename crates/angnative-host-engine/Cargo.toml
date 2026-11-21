@@ -13,5 +13,4 @@ thiserror.workspace = true
 log.workspace = true
 rquickjs.workspace = true
 angnative-host-core = { path = "../angnative-host-core" }
-angnative-host-ffi = { path = "../angnative-host-ffi" }
 anyhow = "1.0"

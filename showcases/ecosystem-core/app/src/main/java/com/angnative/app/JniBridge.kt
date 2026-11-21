@@ -52,7 +52,7 @@ class JniBridge(private val context: Context) {
   
   // Runtime bridge methods (unified host + QuickJS runtime)
   external fun nativeRuntimeBridgeCreate(): Long
-  external fun nativeRuntimeBridgeDestroy(handle: Long)
+  external fun nativeRuntimeBridgeDestroy(handle: Long, hostHandle: Long)
   external fun nativeRuntimeBridgeDispatchEvent(handle: Long, nodeId: Long, eventName: String, payloadJson: String?): Int
   external fun nativeRuntimeBridgeGetHost(handle: Long): Long
 
@@ -120,7 +120,9 @@ class JniBridge(private val context: Context) {
 
   fun destroyHost() {
     if (runtimeBridgeHandle != 0L) {
-      nativeRuntimeBridgeDestroy(runtimeBridgeHandle)
+      // Pass hostHandle so C++ releases the ViewFactory JNI global ref and
+      // g_contexts entry as well — otherwise it leaks on every recreation.
+      nativeRuntimeBridgeDestroy(runtimeBridgeHandle, hostHandle)
       runtimeBridgeHandle = 0L
     }
     hostHandle = 0L
