@@ -50,6 +50,18 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             };
         }
 
+        // Single native event entry point. Rust dispatch_event calls this for
+        // each listener id; the Angular renderer installs the hook that maps
+        // the id back to its component callback.
+        if (typeof globalThis.na_onEvent === 'undefined') {
+            globalThis.na_onEvent = function (listenerId, payloadJson) {
+                var hook = globalThis.__angnativeDispatchListener;
+                if (typeof hook !== 'function') return 0;
+                hook(listenerId, payloadJson);
+                return 1;
+            };
+        }
+
         // Microtask queue — zoneless Angular change detection needs this.
         // A JS-level queue keeps the engine-neutral JsEngine trait simple and
         // avoids cyclic object graphs in QuickJS.
@@ -351,8 +363,25 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         function clearTimeout(id) {}
         function setInterval(handler, delay) { return 2; }
         function clearInterval(id) {}
-        function requestAnimationFrame(callback) { return 1; }
-        function cancelAnimationFrame(id) {}
+        // Angular's zoneless scheduler uses an rAF-vs-setTimeout race. Drive
+        // rAF from the same queue the host drains after each event, otherwise
+        // change detection never ticks in QuickJS.
+        var _angnativeRafId = 1;
+        var _angnativeRafQueue = new Map();
+        function requestAnimationFrame(callback) {
+            var id = _angnativeRafId++;
+            var run = function () {
+                if (!_angnativeRafQueue.has(id)) return;
+                _angnativeRafQueue.delete(id);
+                callback(0);
+            };
+            _angnativeRafQueue.set(id, run);
+            queueMicrotask(run);
+            return id;
+        }
+        function cancelAnimationFrame(id) {
+            _angnativeRafQueue.delete(id);
+        }
     "#)?;
 
     // EventTarget, Event, CustomEvent

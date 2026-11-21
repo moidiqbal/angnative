@@ -149,6 +149,20 @@ export class AngNativeRenderer implements Renderer2 {
   constructor(private readonly options: AngNativeRendererOptions = {}) {
     this.registry = new ElementRegistry();
     this.flush = options.flush ?? null;
+
+    // In native QuickJS, `na_onEvent(listenerId, payload)` is the single
+    // entry point from Rust. Route it back to this renderer's Angular
+    // callbacks. The shim defines na_onEvent; the renderer installs the hook.
+    const g = globalThis as any;
+    g.__angnativeDispatchListener = (listenerId: number, payloadJson: string) => {
+      let event: any = payloadJson;
+      try {
+        event = JSON.parse(payloadJson);
+      } catch {
+        // keep the raw string for non-JSON payloads
+      }
+      this.dispatchEvent(listenerId, event);
+    };
   }
 
   /* ---------- lifecycle ---------- */
@@ -514,6 +528,15 @@ export class AngNativeRenderer implements Renderer2 {
       this.listenerIndex.set(nodeKey, indexed);
     }
     indexed.add(listenerId);
+
+    // Register with the native runtime's single event registry (QuickJS only;
+    // the global is absent in Node tests). Rust dispatch_event then calls
+    // na_onEvent -> __angnativeDispatchListener -> this.dispatchEvent.
+    const nativeAdd = (globalThis as any).na_addEventListener;
+    if (typeof nativeAdd === 'function') {
+      nativeAdd(element ? element.id : 0, eventName, listenerId);
+    }
+
     this.recordMutation({
       kind: 'SetProperty',
       id: element ? element.id : 0,

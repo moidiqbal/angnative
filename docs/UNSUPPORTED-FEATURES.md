@@ -1,6 +1,6 @@
 # Unsupported / Not-Yet-Tested Feature Register
 
-**Date:** 2026-11-21. Maintained as part of Phase 7 deliverables.
+**Date:** 2026-11-21, updated 2026-11-22. Maintained as part of Phase 7 deliverables.
 **Rule:** "not yet tested" is never written as "works".
 
 ## Native renderer (all shells)
@@ -13,8 +13,9 @@
 | Rich text editing (Tiptap/CKEditor) | Native equivalent built | `showcases/ecosystem-richtext` — native Spannable editor; not unchanged Tiptap compatibility; no HTML import/export, no redo. |
 | Calendar (FullCalendar) | Native equivalent built | `showcases/ecosystem-calendar` — native Canvas month grid; month view only, no week/day/agenda, no event sync. |
 | Microfrontends (Native Federation) | Not yet tested | Requires JS runtime, absent on native shells. |
-| Angular bundle execution on native | Not implemented | QuickJS bridge scaffolding exists (`docs/EVENT-BRIDGE.md`), runtime integration pending. |
-| Angular `(click)` listener round trip on native | Partially implemented | FFI event bridge + QuickJS API exist; platform buttons still dispatch imperative Rust batches. |
+| Angular bundle execution on native | Implemented (bootstrap level) | Real AOT bundle runs in QuickJS; `angular_bootstrap_runs_in_quickjs` verified component construction + native `CreateNode` batches. See `docs/CODE-REVIEW-2026-11-22.md`. Full feature parity still absent (below). |
+| Angular `(click)` listener round trip on native | Implemented in QuickJS runtime (tested) | Renderer registers via `na_addEventListener`; `na_onEvent` routes Rust dispatch to Angular callback; acceptance test asserts one listener fired + new native batch. Showcase activity UI is still imperative Kotlin, so no on-device tap test of this path. |
+| Angular routing / HttpClient / forms / animations / i18n on native | Not implemented | Showcase UIs are imperative native reimplementations ("concept" demonstrations), not these Angular modules running in QuickJS. Large multi-sprint feature. |
 | iOS build / simulator run | Not tested | No macOS/Xcode in this environment. Code ready (`docs/IOS-BUILD.md`). |
 | Frame pacing / CPU benchmark | Emulator-only data captured | `docs/benchmarks/frame-pacing.json` — gfxinfo jank/p50/p95 for 4 showcases on SwiftShader emulator, single burst; physical-device multi-sample and CPU measurement still pending. |
 

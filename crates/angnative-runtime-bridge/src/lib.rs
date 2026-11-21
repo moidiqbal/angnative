@@ -362,6 +362,50 @@ mod tests {
             ),
             other => panic!("unexpected batch JSON: {other:?}"),
         }
+
+        // Full round trip: locate the Angular-registered listener from the
+        // emitted batch, dispatch a native event through the RuntimeBridge,
+        // and assert the component handler produced new native mutations.
+        let listener = bridge
+            .runtime_mut()
+            .eval(
+                r#"(function () {
+                    for (var i = 0; i < __angnativeBatches.length; i++) {
+                        var b = JSON.parse(__angnativeBatches[i]);
+                        for (var j = 0; j < b.commands.length; j++) {
+                            var c = b.commands[j];
+                            if (c.key && c.key.indexOf('listener:') === 0) {
+                                var parts = c.key.split(':');
+                                return c.id + '|' + parts[1] + '|' + parts[2];
+                            }
+                        }
+                    }
+                    return null;
+                })()"#,
+            )
+            .unwrap();
+        let JsValue::String(listener) = listener else {
+            panic!("no Angular listener registration found in the emitted batches");
+        };
+        let parts: Vec<&str> = listener.split('|').collect();
+        assert_eq!(parts.len(), 3, "bad listener descriptor: {listener}");
+        let node_id: u64 = parts[0].parse().expect("node id");
+        let event_name = parts[1];
+        let _listener_id: u64 = parts[2].parse().expect("listener id");
+
+        let before = batches;
+        let invoked = bridge
+            .dispatch_event(node_id, event_name, "{\"source\":\"native\"}")
+            .expect("native event dispatch must succeed");
+        assert_eq!(invoked, 1, "exactly one Angular listener must fire");
+        let after = match bridge.runtime_mut().eval("__angnativeBatches.length").unwrap() {
+            JsValue::Number(n) => n as u32,
+            other => panic!("unexpected batch count: {other:?}"),
+        };
+        assert!(
+            after > before,
+            "Angular click handler must emit new native mutations"
+        );
     }
 
     #[test]
