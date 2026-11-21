@@ -35,10 +35,9 @@ Raw JSON: `docs/benchmarks/*.json`.
 ### Physical-device run (OnePlus Open, Android 16) — DONE
 `docs/benchmarks/physical/README.md` + `results.json`: all 10 APKs installed/launched,
 WebViews=0 on every app. Real-GPU headline: **ecosystem-grid 170 frames, 1.76% jank,
-6 ms p50 / 20 ms p95** vs emulator 16.13% / 20 ms. Screenshots were re-captured successfully on the same device after dismissing the
-notification shade: `docs/benchmarks/physical/*-valid.png` (10 valid PNGs, foldable
-stdout-warning stripped by `scripts/capture-oneplus-shots.ps1`). Multi-sample averaging
-is still pending.
+6 ms p50 / 20 ms p95** vs emulator 16.13% / 20 ms. Clean screenshots for all 10 apps are kept in `docs/benchmarks/physical/*.png`
+(status bar + navbar cropped, strict foreground guard so notification shades are
+never captured). Multi-sample averaging is still pending.
 - CPU utilization during scroll
 - Warm start, multi-sample averages, physical device
 - WebView comparison builds (deliberately not built for native showcases)

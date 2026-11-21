@@ -57,22 +57,9 @@ Reports + screenshots: [`docs/benchmarks/physical/README.md`](docs/benchmarks/ph
 
 ---
 
-## 📸 Native showcase screenshots
+## 📱 Native showcases
 
-<p align="center">
-  <table align="center">
-    <tr>
-      <th align="center"><b>Android — 10k-row native grid (OnePlus Open)</b></th>
-      <th align="center"><b>Android — native Canvas charts</b></th>
-    </tr>
-    <tr>
-      <td align="center"><img src="docs/assets/oneplus-grid-cover.png" width="320" alt="OnePlus grid"/></td>
-      <td align="center"><img src="docs/assets/oneplus-charts.png" width="320" alt="OnePlus charts"/></td>
-    </tr>
-  </table>
-</p>
-
-All 10 showcase sources + prebuilt APKs: [`dist/device-testing/`](dist/device-testing/), [`showcases/`](showcases/).
+All 10 showcase sources + prebuilt APKs: [`dist/device-testing/`](dist/device-testing/), [`showcases/`](showcases/). Device benchmark numbers (no screenshots) are in [`docs/benchmarks/physical/README.md`](docs/benchmarks/physical/README.md).
 
 ---
 

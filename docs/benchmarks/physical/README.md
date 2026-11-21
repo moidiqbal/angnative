@@ -27,7 +27,7 @@
 ## Caveats — read before quoting
 - Single interaction burst per app; low frame counts (6–16) for some apps make their jank % statistically weak — do not compare those apps against each other.
 - All 10 APKs installed and launched successfully; **WebViews: 0** on every app (real device).
-- **Screenshots re-captured successfully** — the first capture attempt produced black frames (display OFF / notification shade). Re-capture with screen ON + SystemUI notification shade dismissed produced valid PNGs for all 10 apps: `docs/benchmarks/physical/*-valid.png` (script `scripts/capture-oneplus-shots.ps1`). Verified visually: `ecosystem-grid-valid.png` shows 10,000 rows with 771 recycled views and a readable table on the unfolded display; `ecosystem-charts-valid.png` shows the native Canvas donut chart with legend. Both show `WebViews: 0` in-app. On a foldable, `adb exec-out screencap -p` prepends a "Multiple displays" warning to stdout — the capture script strips everything before the PNG magic bytes (`89 50 4E 47`).
+- **Screenshots: all 10 apps** — clean PNGs under this folder. The capture scripts strip the foldable "Multiple displays" stdout warning, crop the status bar (140 px) and bottom navbar (130 px) to avoid personal information, and only save when `mCurrentFocus` belongs to the target app (a notification shade can never be captured). Verified: `ecosystem-grid.png` shows the 10,000-row virtualized table, `ecosystem-charts.png` the native Canvas donut, `ecosystem-richtext.png` the native Spannable editor, and `ecosystem-calendar.png` the native month grid — all with `WebViews: 0`. The recycle counter in a capture is a live value (51/119/…) and changes per run — not a fixed benchmark number.
 - The USB connection dropped repeatedly during the first run; gfxinfo numbers above were captured before each drop and are valid for the apps shown.
 - `results.json` is the machine-readable copy of this table.
 
@@ -35,6 +35,6 @@
 1. Reconnect USB, accept "Allow USB debugging" on the phone.
 2. `adb -s <serial> shell input keyevent KEYCODE_WAKEUP`
 3. Confirm `dumpsys power | grep mWakefulness` = Awake and `dumpsys display` shows `Display State=ON`.
-4. Dismiss notification shade (`input keyevent 3`).
-5. Launch app, then `adb -s <serial> exec-out screencap -p` and verify PNG magic bytes `89 50 4E 47`.
-6. For foldable-specific proof, capture both `-d <display-id>` values from `dumpsys SurfaceFlinger --display-id`.
+4. Collapse notifications (`input keyevent 111`, `cmd statusbar collapse`) and verify `mCurrentFocus` is the target app before saving.
+5. Capture, strip stdout warning before PNG magic bytes (`89 50 4E 47`), crop 140 px top + 130 px bottom.
+6. Scripts: `scripts/capture-clean-shots.ps1` (all 10) and `scripts/capture-missing-two.ps1` (strict foreground guard for the two that previously caught the shade).
