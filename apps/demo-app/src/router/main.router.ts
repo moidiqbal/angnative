@@ -66,11 +66,12 @@ bootstrapApplication(RouterAppComponent, {
   ],
 })
   .then((ref: ApplicationRef) => {
+    // Explicitly start navigation: APP_BOOTSTRAP_LISTENER does not fire in this
+    // minimal QuickJS runtime. NOTE: the resulting navigation still does not
+    // reach NavigationEnd here (see docs/UNSUPPORTED-FEATURES.md).
+    ref.injector.get(Router).initialNavigation();
     globalThis.__navigate = (url: string) =>
-      ref.injector.get(Router).navigateByUrl(url).then(
-        (ok: boolean) => { (globalThis as any).__navResult = 'ok:' + ok; },
-        (err: unknown) => { (globalThis as any).__navError = String((err as { message?: string })?.message ?? err); },
-      );
+      ref.injector.get(Router).navigateByUrl(url).then(() => undefined);
   })
   .catch((err: unknown) => {
     globalThis.__routerError = String((err as { message?: string })?.message ?? err);
