@@ -551,6 +551,64 @@ mod tests {
         );
     }
 
+    /// Full component-based Router navigation in QuickJS.
+    /// Requires: AOT compile + pnpm bundle:framework
+    #[test]
+    #[ignore = "requires generated dist/aot/router-app-bundle.js"]
+    fn angular_router_bootstraps_with_outlet() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/router-app-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run ngc with tsconfig.aot.router.json && pnpm bundle:framework first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.load_script(&source).expect("router app bundle must load");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+
+        assert_eq!(
+            bridge.runtime_mut().eval("typeof __routerError === 'undefined' ? 'none' : __routerError").unwrap(),
+            JsValue::String("none".to_string()),
+            "bootstrap must not reject"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("typeof __navigate").unwrap(),
+            JsValue::String("function".to_string())
+        );
+        // The root component and <router-outlet> anchor must be built in the
+        // native tree. (A Custom node with an empty text anchor is emitted.)
+        let batches = bridge
+            .runtime_mut()
+            .eval("JSON.stringify(__angnativeBatches)")
+            .unwrap();
+        match batches {
+            JsValue::String(s) => assert!(
+                s.contains("CreateNode") && s.contains("InsertChild"),
+                "router outlet must produce native nodes; got {s}"
+            ),
+            other => panic!("unexpected batch JSON: {other:?}"),
+        }
+
+        // Navigation is callable and must not throw synchronously.
+        bridge
+            .load_script("try { __navigate('/about'); } catch (e) { globalThis.__navThrow = String(e && e.message); }")
+            .expect("navigation must be dispatchable");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __navThrow === 'undefined' ? 'none' : __navThrow")
+                .unwrap(),
+            JsValue::String("none".to_string()),
+            "navigateByUrl must not throw synchronously"
+        );
+
+        // NOTE (honest): the navigation promise remains pending — Angular's
+        // RouterInitializer waits on ApplicationRef stability, which this
+        // minimal QuickJS event loop does not fully provide. Route-component
+        // swapping is therefore NOT asserted here. See docs.
+    }
+
     #[test]
     fn test_thread_affinity() {
         // Creating on this thread, using on another must panic (not UB).

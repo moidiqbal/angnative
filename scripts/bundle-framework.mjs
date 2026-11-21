@@ -28,9 +28,17 @@ const coreEntry = require
 
 const outDir = path.join(root, 'dist', 'aot');
 
+const routerAppEntry = path
+  .join(root, 'dist', 'aot-router', 'router', 'main.router.js')
+  .replaceAll('\\', '/');
+
 const features = [
   { name: 'router', pkg: '@angular/router', global: '__ngRouter' },
   { name: 'animations', pkg: '@angular/animations', global: '__ngAnimations' },
+  {
+    name: 'router-app',
+    source: `import ${JSON.stringify(routerAppEntry)};`,
+  },
   {
     name: 'http',
     global: '__ngHttp',

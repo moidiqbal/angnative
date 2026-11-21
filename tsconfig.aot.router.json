@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.aot.json",
+  "compilerOptions": {
+    "outDir": "dist/aot-router"
+  },
+  "files": [
+    "apps/demo-app/src/router/main.router.ts"
+  ],
+  "include": [
+    "apps/demo-app/src/router/**/*.ts"
+  ]
+}

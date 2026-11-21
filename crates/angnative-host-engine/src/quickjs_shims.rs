@@ -519,8 +519,23 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
 
     // Timer stubs (minimal)
     engine.eval(r#"
-        function setTimeout(handler, delay) { return 1; }
-        function clearTimeout(id) {}
+        // Drive one-shot timers from the host-drained microtask queue. Angular
+        // Router uses setTimeout for navigation scheduling; a no-op would leave
+        // navigation pending forever.
+        var _angTimerId = 1;
+        var _angTimerQueue = new Map();
+        function setTimeout(handler, delay) {
+            var id = _angTimerId++;
+            var run = function () {
+                if (!_angTimerQueue.has(id)) return;
+                _angTimerQueue.delete(id);
+                handler();
+            };
+            _angTimerQueue.set(id, run);
+            queueMicrotask(run);
+            return id;
+        }
+        function clearTimeout(id) { _angTimerQueue.delete(id); }
         function setInterval(handler, delay) { return 2; }
         function clearInterval(id) {}
         // Angular's zoneless scheduler uses an rAF-vs-setTimeout race. Drive

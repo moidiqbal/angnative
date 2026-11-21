@@ -141,6 +141,8 @@ export class AngNativeRenderer implements Renderer2 {
   /** `${nodeId}:${eventName}` → listener ids, for native event dispatch. */
   private readonly listenerIndex = new Map<string, Set<number>>();
   private nextListenerId = 1;
+  /** Synthetic root used when Angular passes a null host (e.g. router views). */
+  private readonly rootElement: NativeElement;
   readonly data: { [key: string]: any } = {};
   destroyNode: ((node: any) => void) | null = (node) => this.destroyNativeNode(node);
   private frameId = 0;
@@ -149,6 +151,9 @@ export class AngNativeRenderer implements Renderer2 {
   constructor(private readonly options: AngNativeRendererOptions = {}) {
     this.registry = new ElementRegistry();
     this.flush = options.flush ?? null;
+    // Router/embedded views may pass a null parent host. Anchor them to a
+    // synthetic root so appendChild/insertBefore never throw.
+    this.rootElement = new NativeElement(0, '#root', 'View');
 
     // In native QuickJS, `na_onEvent(listenerId, payload)` is the single
     // entry point from Rust. Route it back to this renderer's Angular
@@ -601,6 +606,7 @@ export class AngNativeRenderer implements Renderer2 {
   /* ---------- internals ---------- */
 
   private asElement(node: any): NativeElement {
+    if (node === null || node === undefined) return this.rootElement;
     if (node instanceof NativeElement) return node;
     if (node && typeof node === 'object' && 'id' in node) {
       return this.registry.get((node as NativeElement).id);
