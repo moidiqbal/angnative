@@ -2,8 +2,13 @@
  * main.router.ts — AOT demo for full Angular Router navigation in QuickJS.
  *
  * Bootstraps a standalone app with two routes and a <router-outlet>, using the
- * native renderer and zoneless change detection. Exposes __navigate and
- * __routerRef on globalThis so the Rust acceptance test can drive navigation.
+ * native renderer and zoneless change detection. Exposes __navigate on
+ * globalThis so the Rust acceptance test can attempt navigation.
+ *
+ * STATUS (honest): bootstrap and outlet anchor work. Navigation is requested
+ * (hasRequestedNavigation=true, 2 routes configured) but Angular Router never
+ * emits navigation events in this minimal QuickJS event loop; route-component
+ * swapping is therefore not verified. See docs/UNSUPPORTED-FEATURES.md.
  */
 import { Component, provideZonelessChangeDetection, type ApplicationRef } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
@@ -66,9 +71,7 @@ bootstrapApplication(RouterAppComponent, {
   ],
 })
   .then((ref: ApplicationRef) => {
-    // Explicitly start navigation: APP_BOOTSTRAP_LISTENER does not fire in this
-    // minimal QuickJS runtime. NOTE: the resulting navigation still does not
-    // reach NavigationEnd here (see docs/UNSUPPORTED-FEATURES.md).
+    // APP_BOOTSTRAP_LISTENER does not fire in this runtime; request explicitly.
     ref.injector.get(Router).initialNavigation();
     globalThis.__navigate = (url: string) =>
       ref.injector.get(Router).navigateByUrl(url).then(() => undefined);
