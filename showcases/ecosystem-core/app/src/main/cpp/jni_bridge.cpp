@@ -2,12 +2,16 @@
  * jni_bridge.cpp — JNI bridge between Android Kotlin and the Rust host.
  *
  * Implements the native methods declared in JniBridge.kt:
- *   - nativeHostCreate / nativeHostDestroy
+ *   - nativeRuntimeBridgeCreate / nativeRuntimeBridgeDestroy / ...GetHost
+ *   - nativeRuntimeBridgeDispatchEvent
  *   - nativeHostRegisterViewFactory
  *   - nativeHostProcessBatch
  *   - nativeHostRunLayout
  *   - nativeHostLastError
- *   - nativeHostNodeCount / nativeHostSnapshot
+ *   - nativeHostNodeCount / nativeHostSnapshot / nativeHostDispatchEvent
+ *
+ * NOTE: nativeHostCreate / nativeHostDestroy remain as LEGACY C exports but are
+ * no longer declared by Kotlin — the runtime bridge owns the Host.
  *
  * The 8 ViewFactory callbacks are real C function pointers that call back into
  * the JniBridge instance (held as a JNI global ref inside ViewFactoryContext).
@@ -43,7 +47,8 @@ struct ViewFactoryContext {
   jmethodID destroyView = nullptr;
 };
 
-// Keyed by host handle so nativeHostDestroy can release the context + global ref.
+// Keyed by host handle so nativeRuntimeBridgeDestroy can release the context +
+// JNI global ref (nativeHostDestroy only does this for the legacy path).
 std::unordered_map<jlong, ViewFactoryContext*> g_contexts;
 
 void destroyContext(JNIEnv* env, ViewFactoryContext* ctx) {
@@ -229,6 +234,9 @@ Java_com_angnative_app_JniBridge_nativeHostCreate(JNIEnv* /*env*/, jobject /*thi
   return reinterpret_cast<jlong>(host);
 }
 
+// LEGACY — only valid for hosts created by nativeHostCreate(). NEVER call this
+// with a bridge-owned host handle: the runtime bridge owns the Host and will
+// free it again (double-free). Kotlin no longer declares this entry point.
 extern "C" JNIEXPORT void JNICALL
 Java_com_angnative_app_JniBridge_nativeHostDestroy(JNIEnv* env, jobject /*thiz*/, jlong handle) {
   // Release the JNI global ref + context before destroying the Rust host.

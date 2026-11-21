@@ -28,7 +28,10 @@ thread_local! {
 
 /// Bridge — single authoritative owner of Host + QuickJS + Angular runtime.
 pub struct RuntimeBridge {
-    runtime: AngNativeRuntime<QuickJsEngine>,
+    // Boxed so the address stays stable when the bridge itself is moved into
+    // a Box by the C API. The thread-local dispatch pointer targets this
+    // allocation; pointing at an inline field would dangle after a move.
+    runtime: Box<AngNativeRuntime<QuickJsEngine>>,
     host: Host,
     owner_thread: ThreadId,
 }
@@ -37,15 +40,17 @@ impl RuntimeBridge {
     pub fn new() -> Result<Self, anyhow::Error> {
         let host = Host::new();
         let engine = QuickJsEngine::new()?;
-        let mut runtime = AngNativeRuntime::new(engine, RuntimeConfig::default());
+        let mut runtime = Box::new(AngNativeRuntime::new(engine, RuntimeConfig::default()));
         runtime.install_api()?;
-        // Shims are optional in this build path (host-engine exposes them); if a
-        // compatible helper exists, install it. Kept best-effort on purpose.
-        let _ = crate::install_shims(&mut runtime);
+        // Install the DOM/platform shims into the same engine so Angular code
+        // has `window`, `document`, timers and events available.
+        angnative_host_engine::quickjs_shims::install_dom_shims(runtime.engine())?;
 
         let owner_thread = thread::current().id();
         CURRENT_BRIDGE_RUNTIME.with(|rt| {
-            *rt.borrow_mut() = Some(&mut runtime as *mut AngNativeRuntime<QuickJsEngine>);
+            // Deref the Box: this address is stable even when the bridge is
+            // moved into another Box by the C API entry point.
+            *rt.borrow_mut() = Some(&mut *runtime as *mut AngNativeRuntime<QuickJsEngine>);
         });
         set_js_runtime_dispatch_for_thread(js_runtime_dispatch_callback);
 
@@ -71,7 +76,7 @@ impl RuntimeBridge {
 
     pub fn runtime_mut(&mut self) -> &mut AngNativeRuntime<QuickJsEngine> {
         self.assert_owner_thread();
-        &mut self.runtime
+        &mut *self.runtime
     }
 
     pub fn host_mut(&mut self) -> &mut Host {
@@ -122,12 +127,6 @@ extern "C" fn js_runtime_dispatch_callback(
             None => 0,
         }
     })
-}
-
-/// Compatibility shim installer — host-engine may or may not expose helpers
-/// depending on features; no-op when unavailable.
-fn install_shims(_runtime: &mut AngNativeRuntime<QuickJsEngine>) -> Result<(), anyhow::Error> {
-    Ok(())
 }
 
 #[repr(C)]
@@ -201,6 +200,53 @@ mod tests {
     fn test_dispatch_event_returns_zero_when_no_listeners() {
         let mut bridge = create_runtime_bridge().unwrap();
         assert_eq!(bridge.dispatch_event(1, "press", "{}").unwrap(), 0);
+    }
+
+    /// End-to-end proof of the single event pipeline (review P0-03):
+    /// a JS-registered listener must fire EXACTLY ONCE through both the direct
+    /// bridge path and the Host/thread-local path — never twice, never zero.
+    #[test]
+    fn test_event_dispatches_exactly_once_end_to_end() {
+        use angnative_host_engine::JsValue;
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.runtime_mut().eval(r#"
+            var _e2eCount = 0;
+            var _e2eIds = [];
+            function na_onEvent(listenerId, payloadJson) {
+                _e2eCount++;
+                _e2eIds.push(listenerId);
+            }
+            na_addEventListener(42, 'press', 7);
+        "#).unwrap();
+
+        // Path A: direct bridge dispatch (the Android JNI path).
+        assert_eq!(bridge.dispatch_event(42, "press", "{\"a\":1}").unwrap(), 1);
+        assert_eq!(
+            bridge.runtime_mut().eval("_e2eCount").unwrap(),
+            JsValue::Number(1.0)
+        );
+
+        // Path B: Host::dispatch_event -> thread-local JS callback (legacy
+        // shell path). Must invoke the listener once, not double-fire through
+        // both the JS callback and the legacy FFI callback.
+        assert_eq!(bridge.host_mut().dispatch_event(42, "press", "{\"a\":2}"), 1);
+        assert_eq!(
+            bridge.runtime_mut().eval("_e2eCount").unwrap(),
+            JsValue::Number(2.0)
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("_e2eIds.join(',')").unwrap(),
+            JsValue::String("7,7".to_string())
+        );
+
+        // Wrong node / event must not fire anything.
+        assert_eq!(bridge.dispatch_event(99, "press", "{}").unwrap(), 0);
+        assert_eq!(bridge.dispatch_event(42, "release", "{}").unwrap(), 0);
+        assert_eq!(
+            bridge.runtime_mut().eval("_e2eCount").unwrap(),
+            JsValue::Number(2.0)
+        );
     }
 
     #[test]

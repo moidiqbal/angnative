@@ -40,8 +40,9 @@ class JniBridge(private val context: Context) {
   }
 
   // Native methods loaded from libangnative.so
-  external fun nativeHostCreate(): Long
-  external fun nativeHostDestroy(handle: Long)
+  // NOTE: nativeHostCreate/nativeHostDestroy were removed — the runtime bridge
+  // owns the Host. Calling a standalone host destroy on a bridge-owned handle
+  // would double-free it. Use nativeRuntimeBridge* exclusively.
   external fun nativeHostRegisterViewFactory(handle: Long)
   external fun nativeHostProcessBatch(handle: Long, batchJson: String): String?
   external fun nativeHostRunLayout(handle: Long, width: Float, height: Float): String?

@@ -10,7 +10,7 @@
 | Check | Original result | Current result |
 |---|---|---|
 | `pnpm test` | ✅ 208 passed | ✅ 208 passed |
-| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors | ✅ **115 passed, 0 failed** |
+| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors | ✅ **119 passed, 0 failed** |
 | `cargo check --workspace` | ❌ same 7 errors | ✅ clean (no warnings) |
 | Committed baseline (`fc8b6a2` + earlier) | ✅ was green (108 Rust tests) | ✅ still green |
 | Current working tree | 🔴 broken; do not commit as-is | 🟢 green; fixes applied |
@@ -138,19 +138,28 @@ After the user explicitly asked to fix all P0/P1 findings, the following changes
 ### Additional fix found during verification
 
 - `install_dom_shims()` originally defined `window` *before* `console`/timers/`Event`/`fetch`/storage, causing a QuickJS `ScriptError` on undefined identifiers. Reordered so primitives are installed first and `window` last; native console backends are registered before the `console` shim.
-- `window.self = window` / `window.globalThis = window` / `globalThis = window` were **removed**: cyclic object graphs cause a stack overflow in rquickjs 0.5.1 debug builds during GC/Drop (confirmed experimentally at 1 MB and 8 MB stacks). Code documents this; Angular code must use `globalThis` instead of `window.self` for now. This is an **honest remaining limitation**, not a silent workaround.
+- `window.self = window` / `window.globalThis = window` / `globalThis = window` as **stored** references were removed: cyclic object graphs cause a stack overflow in rquickjs 0.5.1 during GC/Drop (confirmed in debug and release, 1 MB and 8 MB stacks). They are now exposed as **getters** instead (no stored cycle), which the `test_self_is_a_safe_getter` test verifies.
+
+### Gap coverage (follow-up on user request)
+
+All *actionable* gaps from the original list were closed:
+
+- **E2E "exactly once" test added** — `runtime-bridge::tests::test_event_dispatches_exactly_once_end_to_end` registers a JS listener, dispatches through both the direct bridge path and the `Host`/thread-local path, and asserts exactly one invocation per event (plus zero for wrong node/event).
+- **DOM shims are now functional** — a flat, ID-based registry replaces the old stubs: `appendChild`/`removeChild`/`insertBefore`, `setAttribute`/`getAttribute`/`removeAttribute`/`hasAttribute`, real `parentNode`/`children`/`sibling`/`textContent` getters, `getElementById`/`querySelector(All)`, and working `addEventListener`/`dispatchEvent`. Covered by `test_dom_tree_operations` and `test_dom_text_content_and_insert_before`. The flat design is forced by the rquickjs cycle limitation: element objects hold only a numeric `_domId`, never object ↔ object links.
+- **`window.self` restored** via getter (probe-tested safe); `window.window` and `window.globalThis` likewise.
+- **Dangling-pointer bug found and fixed** — `RuntimeBridge` now holds the runtime in a `Box` so the address stored in the thread-local dispatch pointer stays stable when the bridge is moved into a `Box` by the C API (`angnative_runtime_bridge_create`). Without this, every JNI-dispatched event would have dereferenced a dangling pointer.
+- **Bridge now installs the DOM shims** into its engine, so JS code actually has `window`/`document` available.
+- **Android JNI** — unused Kotlin `nativeHostCreate`/`nativeHostDestroy` declarations removed (bridge owns the Host; a standalone destroy would double-free). C++ legacy exports clearly marked. Added `scripts/check-jni-signatures.py`, a static check that every Kotlin `external fun` has a C++ JNI implementation with matching arity (11 declarations matched).
 
 ### Verification evidence
 
-- `cargo test --workspace`: **115 passed, 0 failed**
+- `cargo test --workspace`: **119 passed, 0 failed**
 - `cargo check --workspace`: clean, no warnings
 - `pnpm test`: **208 passed**
+- `python scripts/check-jni-signatures.py`: OK (11 declarations)
 
 ### Honest remaining gaps (NOT claimed as fixed)
 
-- No end-to-end test yet that registers a JS listener → dispatches an event → asserts it fired exactly once. The single-path design is enforced structurally, but a dedicated E2E test is still recommended before declaring the runtime "production ready".
-- The DOM shims remain thin stubs (`appendChild` returns null, `setAttribute` no-ops) — a real Angular renderer still cannot build a DOM; Angular bootstrap in QuickJS is still missing (issue P0-06 in the register).
-- `window.self` is unavailable due to the rquickjs cyclic-GC limitation noted above.
-- Android JNI changes are source-reviewed only; **no Android/Gradle build was run** in this environment (no device/SDK verification).
-- iOS/Mac remains parked by the user; nothing here claims iOS verification.
-- `nativeHostDestroy` is now unused by Kotlin (the bridge owns the Host); it remains implemented as legacy API but must not be called on a bridge-owned host.
+- **Angular bootstrap in QuickJS is still missing** (issue P0-06) — functional DOM shims are necessary but not sufficient to run a real Angular app.
+- **Android JNI is static-checked only; no Android/Gradle build was run** here (no device/SDK verification).
+- **iOS/Mac remains parked** by the user; nothing here claims iOS verification.
