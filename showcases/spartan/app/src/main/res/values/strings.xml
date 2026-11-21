@@ -1,0 +1,5 @@
+<resources>
+  <string name="app_name">AngNative Spartan UI Showcase (Native)</string>
+  <string name="demo_title">AngNative Demo</string>
+  <string name="demo_subtitle">Angular running natively — no WebView.</string>
+</resources>

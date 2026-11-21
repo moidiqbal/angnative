@@ -1,0 +1,8 @@
+<resources>
+  <style name="Theme.AngNative" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <item name="colorPrimary">#007AFF</item>
+    <item name="colorPrimaryDark">#0056B3</item>
+    <item name="colorAccent">#007AFF</item>
+    <item name="android:windowBackground">#FFFFFF</item>
+  </style>
+</resources>
