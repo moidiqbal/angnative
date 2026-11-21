@@ -444,6 +444,113 @@ mod tests {
         );
     }
 
+    /// Router API compatibility. Requires: pnpm bundle:framework
+    #[test]
+    #[ignore = "requires generated dist/aot/router-bundle.js"]
+    fn angular_router_loads_in_quickjs() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/router-bundle.js"
+        );
+        let source = std::fs::read_to_string(path).expect("run `pnpm bundle:framework` first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.load_script(&source).expect("router bundle must load");
+        let result = bridge
+            .load_script(
+                r#"[typeof __ngRouter.provideRouter,
+                    typeof __ngRouter.RouterModule,
+                    typeof __ngRouter.Router,
+                    typeof __ngRouter.ROUTES].join(',')"#,
+            )
+            .unwrap();
+        assert_eq!(
+            result,
+            JsValue::String("function,function,function,object".to_string())
+        );
+        // The history/location shims are the platform surface the Router uses.
+        bridge
+            .load_script("history.pushState(null, '', '/products/42');")
+            .unwrap();
+        assert_eq!(
+            bridge.runtime_mut().eval("location.pathname").unwrap(),
+            JsValue::String("/products/42".to_string())
+        );
+    }
+
+    /// Animations API compatibility. Requires: pnpm bundle:framework
+    #[test]
+    #[ignore = "requires generated dist/aot/animations-bundle.js"]
+    fn angular_animations_load_in_quickjs() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/animations-bundle.js"
+        );
+        let source = std::fs::read_to_string(path).expect("run `pnpm bundle:framework` first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.load_script(&source).expect("animations bundle must load");
+        let result = bridge
+            .load_script(
+                r#"[typeof __ngAnimations,
+                    typeof __ngAnimations.trigger,
+                    typeof __ngAnimations.style,
+                    typeof __ngAnimations.animate].join(',')"#,
+            )
+            .unwrap();
+        assert_eq!(
+            result,
+            JsValue::String("object,function,function,function".to_string())
+        );
+    }
+
+    /// HttpClient platform compatibility. Requires: pnpm bundle:framework
+    ///
+    /// Verifies the real @angular/common/http bundle loads and that the
+    /// host-wirable fetch surface returns a proper Response. Full DI-based
+    /// `HttpClient.get()` is not yet verified: FetchBackend needs platform
+    /// providers (NgZone/DestroyRef) that a bare EnvironmentInjector does not
+    /// supply in this runtime.
+    #[test]
+    #[ignore = "requires generated dist/aot/http-bundle.js"]
+    fn angular_http_platform_loads_in_quickjs() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/http-bundle.js"
+        );
+        let source = std::fs::read_to_string(path).expect("run `pnpm bundle:framework` first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.load_script(&source).expect("http bundle must load");
+
+        assert_eq!(
+            bridge
+                .load_script("[typeof __ngHttp.HttpClient, typeof __ngHttp.provideHttpClient].join(',')")
+                .unwrap(),
+            JsValue::String("function,function".to_string())
+        );
+
+        bridge
+            .load_script(
+                r#"
+                __angnativeRegisterFetchHandler(function (req) {
+                    return {
+                        status: 200,
+                        body: { message: 'hello-from-native', method: req.method }
+                    };
+                });
+                var _httpResponse = null;
+                fetch('/api/test').then(function (r) {
+                    return r.json().then(function (j) {
+                        _httpResponse = r.status + '|' + j.message + '|' + j.method;
+                    });
+                });
+            "#,
+            )
+            .expect("fetch shim must run");
+        assert_eq!(
+            bridge.runtime_mut().eval("_httpResponse").unwrap(),
+            JsValue::String("200|hello-from-native|GET".to_string())
+        );
+    }
+
     #[test]
     fn test_thread_affinity() {
         // Creating on this thread, using on another must panic (not UB).

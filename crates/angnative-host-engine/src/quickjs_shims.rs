@@ -41,6 +41,113 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             globalThis.WeakRef.prototype.deref = function () { return this._value; };
         }
 
+        // --- History / Location shims for @angular/router -----------------
+        // Flat state only (no object cycles — QuickJS cannot GC cycles here).
+        var _angOrigin = 'http://localhost';
+        var _histStack = [{ state: null, url: _angOrigin + '/' }];
+        var _histIndex = 0;
+        var _popListeners = [];
+
+        function _angParseUrl(url) {
+            var href = String(url || _angOrigin + '/');
+            // Strip the origin so pathname/search/hash match browser behaviour.
+            if (href.indexOf(_angOrigin) === 0) href = href.slice(_angOrigin.length) || '/';
+            var hashIdx = href.indexOf('#');
+            var hash = hashIdx >= 0 ? href.slice(hashIdx) : '';
+            var noHash = hashIdx >= 0 ? href.slice(0, hashIdx) : href;
+            var qIdx = noHash.indexOf('?');
+            var search = qIdx >= 0 ? noHash.slice(qIdx) : '';
+            var pathname = qIdx >= 0 ? noHash.slice(0, qIdx) : noHash;
+            return { href: href, pathname: pathname, search: search, hash: hash };
+        }
+
+        var _domLocation = Object.create(null);
+        function _domSyncLocation() {
+            var p = _angParseUrl(_histStack[_histIndex].url);
+            _domLocation.href = p.href;
+            _domLocation.pathname = p.pathname;
+            _domLocation.search = p.search;
+            _domLocation.hash = p.hash;
+            _domLocation.origin = _angOrigin;
+        }
+        _domSyncLocation();
+
+        function _domFirePop() {
+            var event = { type: 'popstate', state: _histStack[_histIndex].state };
+            for (var i = 0; i < _popListeners.length; i++) _popListeners[i](event);
+        }
+
+        var _domHistory = {
+            get length() { return _histStack.length; },
+            get state() { return _histStack[_histIndex].state; },
+            scrollRestoration: 'auto',
+            pushState: function (state, title, url) {
+                _histStack = _histStack.slice(0, _histIndex + 1);
+                var full = String(url).indexOf('http') === 0 ? String(url) : _angOrigin + String(url);
+                _histStack.push({ state: state, url: full });
+                _histIndex++;
+                _domSyncLocation();
+            },
+            replaceState: function (state, title, url) {
+                var full = String(url).indexOf('http') === 0 ? String(url) : _angOrigin + String(url);
+                _histStack[_histIndex] = { state: state, url: full };
+                _domSyncLocation();
+            },
+            back: function () {
+                if (_histIndex > 0) { _histIndex--; _domSyncLocation(); _domFirePop(); }
+            },
+            forward: function () {
+                if (_histIndex < _histStack.length - 1) { _histIndex++; _domSyncLocation(); _domFirePop(); }
+            },
+            go: function (delta) {
+                var next = _histIndex + (delta || 0);
+                if (next >= 0 && next < _histStack.length) {
+                    _histIndex = next; _domSyncLocation(); _domFirePop();
+                }
+            }
+        };
+        globalThis.location = _domLocation;
+        globalThis.history = _domHistory;
+
+        // --- fetch / HttpClient platform surface --------------------------
+        // A host (or test) can register handlers. Default is a 404 response so
+        // Angular's FetchBackend can initialize without a real network stack.
+        var _angFetchHandlers = [];
+        globalThis.__angnativeRegisterFetchHandler = function (handler) {
+            if (typeof handler === 'function') _angFetchHandlers.push(handler);
+        };
+        globalThis.fetch = function (url, options) {
+            var opts = options || {};
+            var request = {
+                url: String(url),
+                method: opts.method || 'GET',
+                headers: opts.headers || {},
+                body: opts.body === undefined ? null : opts.body
+            };
+            var result = null;
+            for (var i = 0; i < _angFetchHandlers.length; i++) {
+                result = _angFetchHandlers[i](request);
+                if (result) break;
+            }
+            var status = result && result.status ? result.status : 404;
+            var rawBody = result && result.body !== undefined ? result.body : '';
+            var bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
+            var response = {
+                ok: status >= 200 && status < 300,
+                status: status,
+                statusText: (result && result.statusText) || '',
+                headers: {
+                    get: function (name) {
+                        var h = (result && result.headers) || {};
+                        return h[String(name)] !== undefined ? h[String(name)] : null;
+                    }
+                },
+                text: function () { return Promise.resolve(bodyText); },
+                json: function () { return Promise.resolve(JSON.parse(bodyText)); }
+            };
+            return Promise.resolve(response);
+        };
+
         // Minimal i18n support: Angular AOT emits $localize tagged templates.
         // Translations are keyed the same way Angular's localize package uses
         // (message parts joined by \uFFFD<index>\uFFFD placeholders).
@@ -184,6 +291,29 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
                 for (var i = 0; i < ls.length; i++) ls[i].call(this, event);
                 return !event.defaultPrevented;
             },
+            // Web Animations API (no-op driver) for @angular/animations.
+            animate: function (keyframes, options) {
+                var player = {
+                    playState: 'running',
+                    currentTime: 0,
+                    play: function () { this.playState = 'running'; return this; },
+                    pause: function () { this.playState = 'paused'; return this; },
+                    finish: function () { this.playState = 'finished'; },
+                    cancel: function () { this.playState = 'idle'; },
+                    addEventListener: function () {},
+                    removeEventListener: function () {}
+                };
+                // Resolve with undefined: resolving with `player` would create a
+                // cyclic object graph and overflow rquickjs GC.
+                player.finished = new Promise(function (resolve) {
+                    queueMicrotask(function () {
+                        player.playState = 'finished';
+                        resolve(undefined);
+                    });
+                });
+                return player;
+            },
+            getAnimations: function () { return []; },
             // Angular's SharedStylesHost calls doc.head.querySelectorAll(...),
             // so elements need these too (not just `document`).
             querySelectorAll: function(selector) {
@@ -459,13 +589,6 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         CustomEvent.prototype = Object.create(Event.prototype);
     "#)?;
 
-    // fetch stub
-    engine.eval(r#"
-        function fetch(url, options) {
-            return Promise.reject(new Error('fetch not implemented'));
-        }
-    "#)?;
-
     // localStorage/sessionStorage stubs
     engine.eval(r#"
         var _storage = {
@@ -502,6 +625,16 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             CustomEvent: CustomEvent,
             document: document,
             queueMicrotask: queueMicrotask,
+            location: _domLocation,
+            history: _domHistory,
+            addEventListener: function (type, handler) {
+                if (type === 'popstate') _popListeners.push(handler);
+            },
+            removeEventListener: function (type, handler) {
+                if (type !== 'popstate') return;
+                var i = _popListeners.indexOf(handler);
+                if (i >= 0) _popListeners.splice(i, 1);
+            }
         };
         Object.defineProperty(window, 'self', { get: function() { return window; } });
         Object.defineProperty(window, 'window', { get: function() { return window; } });
@@ -692,6 +825,46 @@ mod tests {
         assert_eq!(
             engine.eval("_order.join(',')").unwrap(),
             crate::engine::JsValue::String("first,second,nested".to_string())
+        );
+    }
+
+    #[test]
+    fn test_history_and_location_routing_shims() {
+        let mut engine = installed();
+        engine.eval(r#"
+            var _popped = 'none';
+            window.addEventListener('popstate', function (e) {
+                _popped = e.state === null ? 'null' : JSON.stringify(e.state);
+            });
+            history.pushState(null, '', '/counter');
+            var p1 = location.pathname;
+            history.pushState({ id: 2 }, '', '/about?x=1');
+            var p2 = location.pathname + location.search;
+            history.back();
+            var p3 = location.pathname + '|' + _popped;
+        "#).unwrap();
+        assert_eq!(
+            engine.eval("[p1, p2, p3].join(',')").unwrap(),
+            crate::engine::JsValue::String("/counter,/about?x=1,/counter|null".to_string())
+        );
+    }
+
+    #[test]
+    fn test_web_animations_noop_driver() {
+        let mut engine = installed();
+        engine.eval(r#"
+            var el = document.createElement('div');
+            var anim = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 100 });
+            var _before = anim.playState;
+        "#).unwrap();
+        assert_eq!(
+            engine.eval("_before").unwrap(),
+            crate::engine::JsValue::String("running".to_string())
+        );
+        engine.drain_microtasks().unwrap();
+        assert_eq!(
+            engine.eval("anim.playState").unwrap(),
+            crate::engine::JsValue::String("finished".to_string())
         );
     }
 
