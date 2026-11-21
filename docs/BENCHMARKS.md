@@ -17,7 +17,9 @@
 Raw JSON: `docs/benchmarks/*.json`.
 
 ## Not yet measured (Phase 6 remaining)
-- Frame pacing / dropped frames (need `adb shell dumpsys gfxinfo` or Perfetto trace)
+- Frame pacing / dropped frames — `scripts/measure-frames.ps1` was added, but running it
+  required a stable emulator connection; the shared emulator repeatedly went `offline`
+  during collection, so **no frame stats were captured**. Do not claim any FPS number.
 - CPU utilization during scroll
 - Warm start, multi-sample averages, physical device
 - WebView comparison builds (deliberately not built for native showcases)
