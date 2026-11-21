@@ -181,6 +181,7 @@ If you can help, open an issue titled **"iOS Mac verification"** or reach out vi
 - [Benchmarks](docs/BENCHMARKS.md) + [physical-device results](docs/benchmarks/physical/README.md)
 - [Showcase tracker](docs/SHOWCASE-TRACKER.md), [Deliverables index](docs/DELIVERABLES.md), [Unsupported features](docs/UNSUPPORTED-FEATURES.md)
 - [Architecture](docs/ARCHITECTURE.md), [Requirements](docs/REQUIREMENTS.md), [Specifications](docs/SPECIFICATIONS.md), [Android build](docs/ANDROID-BUILD.md), [iOS build](docs/IOS-BUILD.md), [Event bridge](docs/EVENT-BRIDGE.md)
+- [Framework comparison (NativeScript / React Native / Flutter / Capacitor)](docs/COMPARISON.md) — includes honest gaps and AngNative-only measured numbers
 - ADRs: [0001 Taffy](docs/adr/0001-taffy-0151-layout-adapter.md), [0002 Zero WebView](docs/adr/0002-zero-webview-showcases.md), [0003 Labelling](docs/adr/0003-native-reimplementation-labelling.md), [0004 shared native UI core](docs/adr/0004-shared-native-ui-core.md)
 - Original review + remediation log: [PROJECT-REVIEW-2026-11-20.md](docs/PROJECT-REVIEW-2026-11-20.md)
 
