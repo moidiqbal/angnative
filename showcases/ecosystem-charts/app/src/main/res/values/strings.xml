@@ -1,0 +1,5 @@
+<resources>
+  <string name="app_name">AngNative Native Charts Showcase</string>
+  <string name="demo_title">AngNative Native Charts</string>
+  <string name="demo_subtitle">ECharts-style charts drawn with native Android Canvas — no WebView.</string>
+</resources>

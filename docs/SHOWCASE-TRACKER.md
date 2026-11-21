@@ -41,8 +41,18 @@ screenshots `docs/assets/showcase-<name>.png`, source `showcases/<name>/`.
 Build/verify scripts: `scripts/generate-showcase.ps1`, `scripts/build-showcases.ps1`,
 `scripts/verify-showcases.ps1`, `scripts/generate-showcase-reports.ps1`.
 
-## Phase 2 — Ecosystem showcases
-⬜ 11 categories pending (see mission brief). Build-time tools get validation suites, not APKs.
+## Phase 2 — Ecosystem showcases (2026-11-21)
+
+| Showcase | Package ID | Status |
+|---|---|---|
+| Native Grid (AG Grid equivalent) | `com.angnative.demo.ecosystem.grid` | ✅ APK built, installed, scrolled (177 views recycled), WebViews=0, report + source.zip |
+| Native Charts (ECharts equivalent) | `com.angnative.demo.ecosystem.charts` | ✅ APK built, installed, bar/line/donut via native Canvas, WebViews=0, report + source.zip |
+| Ecosystem Core (state/i18n/forms/animation) | `com.angnative.demo.ecosystem.core` | ✅ APK built, installed, native widgets + JNI, WebViews=0, report + source.zip |
+| Build-time tools (Nx/Angular CLI/Playwright/Vitest/Jest) | n/a | ✅ `scripts/validate-build-tools.mjs` → 25 PASS / 0 FAIL / 6 INFO; docs `BUILD-TOOLS-VALIDATION.md` |
+| Ecosystem compatibility matrix (11 categories) | n/a | ✅ `docs/ECOSYSTEM-COMPATIBILITY.md` (honest labels, no fabricated results) |
+
+Remaining categories (rich text, calendar, microfrontends, etc.) are documented in
+the compatibility matrix and tracked as native-port work; no APK claimed for them.
 
 ## Phase 3 — Reusable packages
 ⬜ `@angnative/ui-core`, adapter packages, native-grid/charts/animation/richtext — incremental only.

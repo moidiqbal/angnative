@@ -1,0 +1,5 @@
+<resources>
+  <string name="app_name">AngNative Native Grid Showcase</string>
+  <string name="demo_title">Native Virtualized Data Grid</string>
+  <string name="demo_subtitle">AG Grid-compatible native equivalent — no WebView.</string>
+</resources>
