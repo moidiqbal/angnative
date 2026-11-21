@@ -104,3 +104,27 @@ ALREADY COMPLETE (do not redo — just maintain)
 [x] Release v0.2.0 + tag pushed; GitHub Sponsors + Open Collective config
 [x] All 10 screenshots: status bar + navbar cropped, strict foreground guard
 ================================================================================
+
+
+Ab sahi roadmap de sakta hoon. Ye wo features hain jo abhi genuinely missing hain (already-done nahi):
+🔴 Tier 1 — sabse zyada impact
+1. JS runtime ko native shells me wire karna (sabse bada gap)
+Abhi native shells hand-built demo batches chalate hain — compiled Angular component andar nahi chalta. Event bridge scaffolding ban gayi hai (dispatch_event, na.addEventListener), par usse connect karne wala runtime bridge crate nahi hai. Ye ho jaye to "Angular component → native UI" asli ban jayega, button press (click) listener tak pahuchega.
+2. Multi-sample sustained-load benchmark
+Community reviewer ne yahi maanga tha ("Rust host under load"). Abhi 1 burst per app hai. 30–60s continuous scroll, memory growth tracking, cold/warm start distribution, CPU — ye numbers release me daale to credibility bahut badhegi.
+3. Shared virtualization primitive (na-data-grid)
+Grid showcase me real RecyclerView virtualization hai, par showcase-local hai. Usse native-ui-core me reusable component bana kar apps/demo-app me bhi use karna — to 10k rows har app me milenge.
+🟡 Tier 2 — middling
+4. Binary/zero-copy mutation protocol — abhi JSON hai. Length-prefixed binary codec (opcodes already spec me hain) se FFI overhead kam hoga.
+5. na-chart, na-calendar, na-rich-text primitives — abhi showcase me hain; package me promote karke Angular API dena.
+6. Runtime theming / dark mode toggle — DesignTokens presets hain, par runtime switch nahi.
+7. Foldable-aware layout (Jetpack WindowManager) — OnePlus Open par test hua, par hinge/posture-aware API nahi.
+8. Accessibility — TalkBack/VoiceOver labels, keyboard navigation (mission me tha, abhi nahi).
+🟢 Tier 3 — chhote par zaroori
+9. angnative test command — abhi sirf message print karta hai; actually pnpm test + cargo test spawn kare.
+10. HMR placeholder — dev.ts:175 me setTimeout placeholder hai; real incremental ngc.
+11. validate-build-tools.mjs ko CI me add karna — script hai, gate nahi.
+12. docs/CONTRIBUTORS.md — SPONSORS.md me promise kiya tha, file abhi nahi hai.
+13. Web demo ko AOT bundle par migrate — AOT ab real hai, par web adapter abhi JIT use karta hai.
+Meri recommendation: Tier 1 me se #1 (runtime wiring) sabse bada value hai — wo AngNative ko "demo" se "real framework" banata hai. #2 (benchmarks) cheapest aur credibility ke liye best.
+Bataiye kya start karoon? Ya aap kisi specificfeature par focus karna chahte hain?

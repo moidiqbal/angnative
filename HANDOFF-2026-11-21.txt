@@ -1,0 +1,201 @@
+================================================================================
+ANGNATIVE — FULL HANDOFF / CONTEXT (from the work session)
+Date: 2026-11-21 (Saturday)
+Repo: C:\Users\Moid Iqbal\Projects\angnative
+Branch: master | Latest commit: 144cab9 | Release: v0.2.0 (tagged + GitHub Release live)
+================================================================================
+
+--------------------------------------------------------------------------------
+0) HOW TO USE THIS FILE
+--------------------------------------------------------------------------------
+Agar kal naya session start karein to bas ye message bhejein:
+  "HANDOFF-2026-11-21.txt parho aur wahan se continue karo"
+Is file me sab kuch hai: kya kiya, kya pending hai, kaunse commands chalayein,
+kaunsi galtiyan hui thi aur kaise fix hui, aur kal ka pehla step kya hai.
+
+--------------------------------------------------------------------------------
+1) USER KA MISSION (original brief, summary)
+--------------------------------------------------------------------------------
+"Native Library Compatibility & APK Showcase Program" — comprehensive
+compatibility, demonstration aur benchmarking program for popular Angular UI
+libraries + ecosystem libraries. Deliverables: separate Android APK demos,
+complete source code, automated tests, compatibility reports.
+
+HARD CONSTRAINT: Zero WebView for all native-mode demonstrations. Capacitor,
+WebView, iframe, embedded browser engines — sab forbidden.
+
+Execution rules: incrementally kaam karo, pehle repo inspect, pehla end-to-end
+POC, shared infrastructure prefer karo, untested ko complete mat bolo, evidence-
+backed tracker rakho, agar library unchanged na chale to closest native equivalent
+banao aur limitation clearly likho.
+
+--------------------------------------------------------------------------------
+2) TIMELINE — aaj kya kya hua (chronological)
+--------------------------------------------------------------------------------
+[Review phase]
+- Project ka poorana review: "prototype with strong components but no integrated
+  product path". Kai stale claims the (Taffy 0.5.2 vs actual 0.15.1, Angular 19+
+  vs 22.2.5, API 35 vs 34, zero-copy jo nahi tha, etc.)
+- Rust compile errors the: services-core (9 lib + 13 test errors), ffi_spec (15).
+- host-view ke 4 tests fail the (flattening/recycling).
+
+[Core fixes]
+- services-core compile + 23 tests pass (conflict resolution observable, crypto
+  feature compile, empty-nonce panic fix, docs honest).
+- host-ffi: process_batch ab engine.run_batch() bhi call karta hai → nodeCount/
+  snapshot ab sahi. FFI test leak fix. 11 tests pass.
+- host-view: flattened node parent link + real recycle pool, 4 failing tests fix.
+- CLI syntax error fix (unterminated template literal commands.ts:75).
+- ESM .js extensions fix (cli.ts, commands.ts) → compiled CLI actually runs.
+
+[Platforms]
+- Android: JNI bridge poori tarah wired — 8 real callbacks, free_string, real
+  JNI global ref, snapshot-based layout, ops-driven NativeViewFactory, onNativePress.
+  Gradle 9.9.2/AGP 9.5.2/JDK 25 (latest) + Gradle 8.2/AGP 8.2/JDK 17 (legacy)
+  dono profiles build successful. Emulator AVD AngNative34 (API 34).
+- Desktop: winit+wgpu, WGSL shader fix (dynamic array index → arithmetic),
+  interactive button (hit-test + highlight + counter dots), 11 tests, window opens.
+- Web: @angnative/web package — DOM backend, renderer, bootstrap, primitives;
+  component selector fix, kebab-case style normalization; Playwright verified.
+- iOS: Swift 6 package + UInt64 ABI + 8 UIKit callbacks + tests, build script.
+  Mac nahi hai → NOT verified (user ne "chor dain" kaha).
+
+[AOT] — aaj hi fix hua
+- Problem: `npx ngc` workspace me shadowing 0.1.0 binary thi jo sirf plain JS emit
+  karti thi; Angular Ivy definitions nahi the.
+- Fix: scripts/compile-aot.mjs ab genuine @angular/compiler-cli ngc ko uske
+  package.json `bin.ngc` se resolve karta hai + Ivy verification.
+- CLI build ab dist/aot/main.js se bundle karta hai (pehle galat fixture path).
+- Verified: pnpm run compile:aot + node packages/cli/dist/cli.js build.
+
+[Showcases — 10 APKs]
+- Phase 1 UI: material, primeng, ngzorro, taiga, spartan
+  (com.angnative.demo.<name>) — native reimplementations, design language only.
+- Phase 2 ecosystem: ecosystem-grid (10k RecyclerView), ecosystem-charts (Canvas
+  bar/line/donut), ecosystem-core (state/i18n/forms/animation), ecosystem-richtext
+  (Spannable), ecosystem-calendar (Canvas month grid).
+- Har ek: APK + source.zip + compatibility-report.md in dist/showcases/<name>/.
+- Prebuilt copies: dist/device-testing/ (10 APKs + INSTALL.txt).
+
+[Physical device]
+- OnePlus Open CPH2551, Android 16, dual foldable displays (2268x2440 + 1116x2484).
+- 10/10 APKs install + launch, WebViews: 0 har app par.
+- Real GPU: grid 170 frames, 1.76% jank, 6ms p50 / 20ms p95 (emulator: 16.13%).
+- 10 clean screenshots: status bar 140px + navbar 130px crop, strict foreground
+  guard (notification shade kabhi capture na ho), PNG magic-byte stripping.
+
+[Release & community]
+- docs/VERIFICATION-REPORT.md, COMPATIBILITY-EVIDENCE.md, COMPARISON.md,
+  DELIVERABLES.md, UNSUPPORTED-FEATURES.md, ADRs 0002-0004, SHOWCASE-TRACKER.md.
+- Release v0.2.0 + tag pushed. GitHub Release live.
+- README rewrite with verified status, benchmarks, sponsor section.
+- .github/FUNDING.yml + docs/SPONSORS.md (GitHub Sponsors + Open Collective).
+- tasklist.txt + SOCIAL-v0.2.0.txt (aaj banaye).
+
+--------------------------------------------------------------------------------
+3) CURRENT VERIFIED STATE (evidence with commands)
+--------------------------------------------------------------------------------
+Toolchain (is machine par): pnpm 10.34.9, node v26.13.1, cargo 1.102.0-nightly,
+JDK 25 + JDK 17, Android SDK C:\Android\Sdk (API 34/36, NDK 27.2.12479018).
+
+Windows gotcha: rquickjs-sys build script ko `patch` chahiye. Winget wala patch.exe
+elevation mangta hai (error 740). Fix:
+  $env:PATH="C:\Program Files\Git\usr\bin;$env:PATH"
+Iske bina cargo build/test fail hote hain. Ye environment issue hai, code nahi.
+
+Verified results:
+  cargo build --workspace                        → Finished, 0 errors
+  cargo test --workspace                         → 108 passed, 0 failed
+  pnpm test                                      → 208 passed (16 files)
+  pnpm run compile:aot                           → "Ivy definitions verified"
+  node packages/cli/dist/cli.js build            → AOT + esbuild bundle
+  node scripts/check-size-budget.mjs             → GATE EXIT=0
+  cargo test --manifest-path crates/angnative-desktop/Cargo.toml → 11 passed
+
+--------------------------------------------------------------------------------
+4) IMPORTANT FILE PATHS
+--------------------------------------------------------------------------------
+STATUS.md                          — current truth snapshot
+docs/VERIFICATION-REPORT.md        — har command + result
+docs/COMPATIBILITY-EVIDENCE.md     — per-feature versions/API/tests/limits
+docs/COMPARISON.md                 — NativeScript/RN/Flutter/Capacitor — HONEST
+docs/BENCHMARKS.md                 — emulator + physical numbers + caveats
+docs/benchmarks/physical/README.md — OnePlus Open results
+docs/benchmarks/physical/*.png     — 10 clean screenshots
+docs/SPONSORS.md                   — Mac sponsorship ask
+docs/EVENT-BRIDGE.md               — JS runtime wiring pending work
+docs/UNSUPPORTED-FEATURES.md       — honest register
+docs/DELIVERABLES.md               — 10 deliverables index
+docs/adr/0001..0004                — architecture decisions
+tasklist.txt                       — aaj ka tasklist (ongoing → end)
+SOCIAL-v0.2.0.txt                  — LinkedIn/X/HN/Reddit ready posts
+scripts/capture-clean-shots.ps1    — clean screenshot script (top+bottom crop)
+scripts/capture-missing-two.ps1    — strict foreground guard script
+scripts/verify-oneplus.ps1         — physical device verification
+dist/device-testing/               — 10 APKs + INSTALL.txt
+
+--------------------------------------------------------------------------------
+5) GALTIYAN JO HUI THI (dobarana mat)
+--------------------------------------------------------------------------------
+- Package names me hyphen vs dot: asli package com.angnative.demo.ecosystem.grid
+  (dot), not ecosystem-grid. Galat package se launch fail hua → purana app screenshot
+  me dikh gaya. Script me explicit package map rakha hai.
+- Foldable par `adb exec-out screencap -p` stdout me "Multiple displays" warning
+  likh deta hai, uske baad PNG. Script warning ko PNG magic (89 50 4E 47) tak strip
+  karta hai. `-d <display-id>` se capture black frame deta tha.
+- Notification shade repeatedly khul jati thi → strict mCurrentFocus guard lagaya:
+  screenshot sirf tab save hoti hai jab focus target app ho aur NotificationShade na ho.
+- Sensitive personal info (notifications/status bar) → sab screenshots me crop kiya.
+  2 galat screenshots delete kiye the, strict guard se dobara capture kiye.
+- Verification agent ne emulator ke offline hone par gfxinfo ka 2-frame sample diya
+  tha — discard kiya, claim nahi kiya.
+
+--------------------------------------------------------------------------------
+6) KYA PENDING HAI (kal se kya karna hai)
+--------------------------------------------------------------------------------
+P0 iOS/Mac — code complete, Mac nahi. User ne "abhi chor dain" kaha. Sponsor call
+   README + docs/SPONSORS.md me hai. First action jab Mac mile:
+   ./scripts/build-ios-native.sh simulator
+   cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost
+
+P0 Native JS runtime wiring — sabse bada feature gap. Host FFI event bridge +
+   QuickJS API scaffolding exist, par runtime bridge crate nahi hai. Compiled
+   Angular bundle abhi native shells me execute nahi hota. Ref: docs/EVENT-BRIDGE.md
+
+P0 Social posts publish karna — SOCIAL-v0.2.0.txt ready. Pehle GitHub Sponsors
+   enable (github.com/sponsors/moidiqbal) + Open Collective create (slug: angnative).
+
+P1 Sustained-load benchmark — 30-60s scroll, memory growth, cold/warm distribution,
+   CPU, multi-sample averages. Community reviewer ne yahi maanga tha.
+
+P2 easy wins — CLI runTest() actual runner, HMR placeholder (dev.ts:175),
+   validate-build-tools ko CI me add, docs/CONTRIBUTORS.md, web demo ko AOT bundle.
+
+P3 features — binary protocol, na-data-grid/na-chart/na-calendar/na-rich-text
+   primitives promote, runtime theming, foldable APIs, accessibility, microfrontends.
+
+--------------------------------------------------------------------------------
+7) HONEST POSITION (community ke saath kya bolna hai)
+--------------------------------------------------------------------------------
+- NativeScript aaj bhi production Angular apps ke liye zyada mature hai — wo actually
+  compiled Angular code device par chalati hai. AngNative nahi (abhi).
+- DOM libraries (Material/PrimeNG/etc.) unchanged native par nahi chaltin — humare
+  showcases native reimplementations hain, clearly labelled.
+- Head-to-head benchmark NativeScript/Flutter/RN ke saath nahi kiya → "faster than X"
+  mat bolo. AngNative ke apne measured numbers alag section me hain.
+- iOS build/simulator verify nahi hua.
+- Ye honesty docs/COMPARISON.md me already likhi hai — usi ko follow karein.
+
+--------------------------------------------------------------------------------
+8) KAL KA PEHLA STEP (recommendation)
+--------------------------------------------------------------------------------
+Agar user bole "continue":
+1. HANDOFF file parha (yehi file).
+2. git status + git log -1 verify karein.
+3. P0 social setup (Sponsors + Collective) ya P0 runtime wiring me se kisi ek par
+   kaam shuru karein — user se poochh kar.
+4. Koi bhi naya claim tabhi karein jab command chalakar evidence ho.
+
+================================================================================
+END OF HANDOFF — 2026-11-21
+================================================================================
