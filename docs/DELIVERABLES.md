@@ -5,6 +5,7 @@
 ## 1. Showcase source code
 - `showcases/material/`, `showcases/primeng/`, `showcases/ngzorro/`, `showcases/taiga/`, `showcases/spartan/`
 - `showcases/ecosystem-grid/`, `showcases/ecosystem-charts/`, `showcases/ecosystem-core/`
+- `showcases/ecosystem-richtext/`, `showcases/ecosystem-calendar/`
 - `packages/native-ui-core/` — shared reusable Android library
 
 ## 2. Independently installable debug APKs

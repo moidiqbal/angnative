@@ -10,8 +10,8 @@
 | Third-party DOM libraries (Material, PrimeNG, NG-ZORRO, Taiga, Spartan) | Unsupported unchanged | Renderer only understands `na-*` → native widgets. Need native ports or adapters. |
 | AG Grid sorting / filtering / editing / pinning | Not implemented | Grid POC is read-only (`showcases/ecosystem-grid`). |
 | ECharts zoom / animation / full option schema | Not implemented | Native Canvas charts POC only. |
-| Rich text editing (Tiptap/CKEditor) | Not implemented | Needs native `EditText` spans editor. |
-| Calendar (FullCalendar) | Not implemented | Needs native month/week view. |
+| Rich text editing (Tiptap/CKEditor) | Native equivalent built | `showcases/ecosystem-richtext` — native Spannable editor; not unchanged Tiptap compatibility; no HTML import/export, no redo. |
+| Calendar (FullCalendar) | Native equivalent built | `showcases/ecosystem-calendar` — native Canvas month grid; month view only, no week/day/agenda, no event sync. |
 | Microfrontends (Native Federation) | Not yet tested | Requires JS runtime, absent on native shells. |
 | Angular bundle execution on native | Not implemented | QuickJS bridge scaffolding exists (`docs/EVENT-BRIDGE.md`), runtime integration pending. |
 | Angular `(click)` listener round trip on native | Partially implemented | FFI event bridge + QuickJS API exist; platform buttons still dispatch imperative Rust batches. |

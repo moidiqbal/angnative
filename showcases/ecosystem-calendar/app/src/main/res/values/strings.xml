@@ -1,0 +1,5 @@
+<resources>
+  <string name="app_name">AngNative Native Calendar Showcase</string>
+  <string name="demo_title">Native Month Calendar</string>
+  <string name="demo_subtitle">FullCalendar-style native equivalent — no WebView.</string>
+</resources>

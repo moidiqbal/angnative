@@ -15,7 +15,10 @@ This module is the Phase 3 consolidation of eight near-identical
 - **Does** preserve the exact eight JNI callback names and signatures used by
   the existing `JniBridge.kt` / `jni_bridge.cpp` in each showcase.
 - **Does** support theme overrides and a pluggable view-creation lambda, so a
-  showcase can brand individual widgets.
+  showcase can brand individual widgets. `DesignTokens.MATERIAL_3`, `PRIMENG`,
+  `NG_ZORRO`, `TAIGA` and `SPARTAN` are real `NativeUiTheme` presets that imitate
+  those libraries' visual languages on native widgets. They are native theme
+  values, NOT the third-party libraries themselves.
 - **Does NOT** contain a WebView, Capacitor, an Angular/JS runtime, or any
   layout engine of its own. Geometry comes from Rust layout results.
 - **Does NOT** contain Rust `.a`/`.so` libraries or JNI glue. The consuming app
@@ -36,6 +39,7 @@ android/                         standalone Gradle Android Library build
     src/main/java/com/angnative/ui/core/
       NativeViewFactory.kt       all eight callbacks + registry + styling
       NativeUiTheme.kt           overridable default colors/sizes
+      DesignTokens.kt            native theme presets: Material 3, PrimeNG, NG-ZORRO, Taiga, Spartan
       ViewTypes.kt               pure view_type -> widget-kind mapping
       StyleCodec.kt              pure-JVM dimension/color/text-size parsers
       PlatformOp.kt              typed ops + optional JSON replay decoder

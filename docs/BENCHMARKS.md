@@ -17,9 +17,12 @@
 Raw JSON: `docs/benchmarks/*.json`.
 
 ## Not yet measured (Phase 6 remaining)
-- Frame pacing / dropped frames — `scripts/measure-frames.ps1` was added, but running it
-  required a stable emulator connection; the shared emulator repeatedly went `offline`
-  during collection, so **no frame stats were captured**. Do not claim any FPS number.
+- Frame pacing / dropped frames — `scripts/measure-frames.ps1` was added, but the shared
+  emulator repeatedly went `offline`. A direct `dumpsys gfxinfo ... framestats` call did
+  return data for `ecosystem-grid`, but only **2 frames** with "100% janky / 950 ms"
+  from a non-foreground app on an offline device. That is an invalid sample, not a
+  performance result, so **no FPS / jank number is claimed**. Re-run on a stable
+  emulator or physical device before publishing frame-pacing figures.
 - CPU utilization during scroll
 - Warm start, multi-sample averages, physical device
 - WebView comparison builds (deliberately not built for native showcases)

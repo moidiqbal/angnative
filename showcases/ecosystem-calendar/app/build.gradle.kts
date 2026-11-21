@@ -1,0 +1,69 @@
+plugins {
+  // AGP 9+ compiles Kotlin natively — do NOT apply org.jetbrains.kotlin.android.
+  id("com.android.application")
+}
+
+android {
+  // JVM/Kotlin package stays com.angnative.app: the JNI exported symbols in
+  // jni_bridge.cpp are Java_com_angnative_app_JniBridge_*. Changing this would
+  // break the Rust host bridge. The INSTALLED package id is applicationId below.
+  namespace = "com.angnative.app"
+  // Latest stable toolchain: AGP 9.5 / Gradle 9.9 / JDK 25.
+  compileSdk = 36
+  buildToolsVersion = "37.0.0"
+  ndkVersion = "27.2.12479018"
+
+  defaultConfig {
+    applicationId = "com.angnative.demo.ecosystem.calendar"
+    minSdk = 24
+    targetSdk = 34
+    versionCode = 1
+    versionName = "0.1.0"
+
+    externalNativeBuild {
+      cmake {
+        arguments("-DANDROID_PLATFORM=android-24", "-DANDROID_STL=c++_shared")
+        abiFilters("arm64-v8a", "armeabi-v7a", "x86_64")
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+      version = "3.22.1"
+    }
+  }
+
+  buildTypes {
+    release {
+      isMinifyEnabled = false
+      isShrinkResources = false
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      signingConfig = signingConfigs.getByName("debug")
+    }
+    debug {
+      isDebuggable = true
+    }
+  }
+
+  compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+  }
+
+  // Kotlin jvmTarget now follows compileOptions.targetCompatibility (17).
+
+  packaging {
+    jniLibs {
+      pickFirsts.add("lib/**/*.so")
+    }
+  }
+}
+
+dependencies {
+  implementation("androidx.core:core-ktx:1.12.0")
+  implementation("androidx.appcompat:appcompat:1.6.1")
+  implementation("com.google.android.material:material:1.11.0")
+  implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+}

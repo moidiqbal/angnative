@@ -51,8 +51,11 @@ Build/verify scripts: `scripts/generate-showcase.ps1`, `scripts/build-showcases.
 | Build-time tools (Nx/Angular CLI/Playwright/Vitest/Jest) | n/a | ✅ `scripts/validate-build-tools.mjs` → 25 PASS / 0 FAIL / 6 INFO; docs `BUILD-TOOLS-VALIDATION.md` |
 | Ecosystem compatibility matrix (11 categories) | n/a | ✅ `docs/ECOSYSTEM-COMPATIBILITY.md` (honest labels, no fabricated results) |
 
-Remaining categories (rich text, calendar, microfrontends, etc.) are documented in
-the compatibility matrix and tracked as native-port work; no APK claimed for them.
+| Rich text | `com.angnative.demo.ecosystem.richtext` | ✅ APK built, installed, launched; native `SpannableString` editor (bold/italic/underline/bullet/color/size/link/undo); WebViews=0; report + source.zip |
+| Calendar | `com.angnative.demo.ecosystem.calendar` | ✅ APK built, installed, launched; native Canvas month grid with event dots/selection; WebViews=0; report + source.zip |
+
+Microfrontends remain documented in the compatibility matrix as `Not yet tested` (requires
+JS runtime); no APK claimed.
 
 ## Phase 3 — reusable infrastructure
 | Package | Status |
