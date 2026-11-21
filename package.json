@@ -16,6 +16,7 @@
     "compile:fixtures": "node scripts/compile-fixtures.mjs",
     "compile:aot": "node scripts/compile-aot.mjs",
     "bundle:quickjs": "node scripts/bundle-quickjs.mjs",
+    "bundle:forms": "node scripts/bundle-forms.mjs",
     "bundle:fixtures": "node -e \"import('./packages/cli/dist/bundle.js').then(m => m.bundleApp('packages/testing/fixtures/out/app.js', 'packages/testing/fixtures/out/bundle.js'))\"",
     "start": "pnpm --filter @angnative/web run build && node scripts/serve-web.mjs"
   },
@@ -31,8 +32,9 @@
   "author": "AngNative Team",
   "license": "MIT",
   "devDependencies": {
-    "@angular/core": "22.2.5",
     "@angular/compiler-cli": "22.2.5",
+    "@angular/core": "22.2.5",
+    "@angular/forms": "22.2.5",
     "@types/node": "22.19.0",
     "esbuild": "0.28.2",
     "typescript": "6.0.3",

@@ -408,6 +408,42 @@ mod tests {
         );
     }
 
+    /// Angular Forms compatibility (Phase 1). Requires:
+    ///   pnpm bundle:forms
+    #[test]
+    #[ignore = "requires generated dist/aot/forms-bundle.js"]
+    fn angular_forms_work_in_quickjs() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/forms-bundle.js"
+        );
+        let source = std::fs::read_to_string(path).expect("run `pnpm bundle:forms` first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.load_script(&source).expect("forms bundle must load");
+
+        let result = bridge
+            .load_script(
+                r#"
+                var f = new __ngForms.FormControl('', __ngForms.Validators.required);
+                var initial = f.value + '|' + f.invalid;
+                f.setValue('hello');
+                var updated = f.value + '|' + f.valid;
+                var g = new __ngForms.FormGroup({
+                    name: new __ngForms.FormControl('', __ngForms.Validators.required)
+                });
+                var groupInvalid = g.invalid;
+                g.get('name').setValue('AngNative');
+                var groupValid = g.valid;
+                [initial, updated, groupInvalid, groupValid].join(',')
+            "#,
+            )
+            .expect("forms API must run in QuickJS");
+        assert_eq!(
+            result,
+            JsValue::String("|true,hello|true,true,true".to_string())
+        );
+    }
+
     #[test]
     fn test_thread_affinity() {
         // Creating on this thread, using on another must panic (not UB).

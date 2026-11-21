@@ -41,6 +41,36 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             globalThis.WeakRef.prototype.deref = function () { return this._value; };
         }
 
+        // Minimal i18n support: Angular AOT emits $localize tagged templates.
+        // Translations are keyed the same way Angular's localize package uses
+        // (message parts joined by \uFFFD<index>\uFFFD placeholders).
+        if (typeof globalThis.$localize === 'undefined') {
+            var _angnativeTranslations = {};
+            globalThis.$localize = function (parts) {
+                var key = parts[0];
+                for (var k = 1; k < parts.length; k++) {
+                    key += '\uFFFD' + (k - 1) + '\uFFFD' + parts[k];
+                }
+                var out = _angnativeTranslations[key];
+                if (out === undefined) {
+                    out = '';
+                    for (var k = 0; k < parts.length; k++) out += parts[k];
+                }
+                for (var p = 1; p < arguments.length; p++) {
+                    var marker = '\uFFFD' + (p - 1) + '\uFFFD';
+                    while (out.indexOf(marker) >= 0) {
+                        out = out.replace(marker, String(arguments[p]));
+                    }
+                }
+                return out;
+            };
+            globalThis.$localize.loadTranslations = function (translations) {
+                for (var key in translations) {
+                    _angnativeTranslations[key] = translations[key];
+                }
+            };
+        }
+
         // Angular's dev-mode component timing calls performance.mark/measure.
         if (typeof performance === 'undefined') {
             globalThis.performance = {
@@ -662,6 +692,21 @@ mod tests {
         assert_eq!(
             engine.eval("_order.join(',')").unwrap(),
             crate::engine::JsValue::String("first,second,nested".to_string())
+        );
+    }
+
+    #[test]
+    fn test_localize_i18n_translations() {
+        let mut engine = installed();
+        engine.eval(r#"
+            $localize.loadTranslations({
+                "Hello \uFFFD0\uFFFD!": "Assalam-o-Alaikum \uFFFD0\uFFFD!"
+            });
+            var _greeting = $localize`Hello ${'AngNative'}!`;
+        "#).unwrap();
+        assert_eq!(
+            engine.eval("_greeting").unwrap(),
+            crate::engine::JsValue::String("Assalam-o-Alaikum AngNative!".to_string())
         );
     }
 
