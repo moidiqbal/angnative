@@ -6,54 +6,73 @@
 
 <p align="center">
   <b>The High-Performance Native Mobile & Desktop Runtime for Angular.</b><br/>
-  <i>True Native UI widgets. Zero WebViews. Powered by an ultra-fast Rust Host Engine & Taffy Layout.</i>
+  <i>True Native UI widgets. Zero WebViews. Powered by a Rust Host Engine &amp; Taffy Layout.</i>
 </p>
 
 <p align="center">
+  <a href="https://github.com/moidiqbal/angnative/releases/tag/v0.2.0"><img src="https://img.shields.io/badge/release-v0.2.0-brightgreen?style=for-the-badge" alt="Release"/></a>
   <a href="https://github.com/moidiqbal/angnative/actions/workflows/ci.yml"><img src="https://github.com/moidiqbal/angnative/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
-  <a href="https://angular.dev"><img src="https://img.shields.io/badge/Angular-22+-DD0031?style=for-the-badge&logo=angular&logoColor=white" alt="Angular"/></a>
-  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.80+-orange?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"/></a>
-  <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Android-17%20Ready-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Android"/></a>
-  <a href="https://developer.apple.com/ios/"><img src="https://img.shields.io/badge/iOS-arm64-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS"/></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"/></a>
+  <a href="https://angular.dev"><img src="https://img.shields.io/badge/Angular-22%2B-DD0031?style=for-the-badge&logo=angular&logoColor=white" alt="Angular"/></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-nightly-orange?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"/></a>
+  <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Android-API%2034-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Android"/></a>
+  <a href="https://github.com/moidiqbal/angnative/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
+
+> **Latest release: [`v0.2.0`](https://github.com/moidiqbal/angnative/releases/tag/v0.2.0)** — Rust core, Angular renderer, Android + desktop + web adapters, production AOT, 10 native showcase APKs, and physical-device benchmarks. iOS shell is code-complete but Mac build verification is still pending.
 
 ---
 
 ## ⚡ Why AngNative?
 
-For over a decade, **Angular** has been the enterprise gold standard for web applications. Yet on mobile, developers were forced to compromise: either wrap apps in sluggish **WebViews** (Cordova, Capacitor, Ionic) or abandon TypeScript and Angular altogether for Flutter (Dart) or React Native.
+Angular developers should not have to choose between WebViews and abandoning TypeScript. AngNative runs a custom Angular `Renderer2` over a Rust host engine: template mutations become `CommandBatch`es, a shadow tree is maintained in Rust, Taffy computes Flexbox/Grid layout, and platform shells render real native widgets via C-FFI/JNI — **no WebView, no DOM, no embedded browser in native mode**.
 
-**AngNative eliminates the compromise.**
-
-AngNative executes your Angular components and reactive signals on an embedded JS runtime, synchronizes a high-throughput shadow tree inside an ultra-fast **Rust Host Engine**, computes Flexbox/Grid layouts via **Taffy**, and renders **100% native platform UI widgets** (`android.widget.*`, `UIKit.*`) via C-FFI / JNI bridges. Mutations cross the boundary as JSON batches (zero-copy transport is planned, not yet implemented).
+> Honest note: mutations cross the FFI boundary as JSON batches. Zero-copy transport and a binary protocol are planned, not implemented. Angular component execution inside native shells needs the embedded JS runtime wiring (see [`docs/EVENT-BRIDGE.md`](docs/EVENT-BRIDGE.md)); the native showcases therefore use the verified Rust-driven `na-*` pipeline, and third-party DOM libraries are represented by clearly labelled **native reimplementations** (see [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)).
 
 ---
 
-## 📸 Live Demo Showcase
+## ✅ Verified status (v0.2.0)
 
-The Android shell is a functional Gradle project (API 34) with a hand-built Kotlin demo view. Native view mounting from Rust is still being wired — see [`docs/PROJECT-REVIEW-2026-11-20.md`](docs/PROJECT-REVIEW-2026-11-20.md) for the verified status.
+Full evidence: [`docs/VERIFICATION-REPORT.md`](docs/VERIFICATION-REPORT.md) · [`docs/COMPATIBILITY-EVIDENCE.md`](docs/COMPATIBILITY-EVIDENCE.md)
+
+| Component | Status | Proof |
+|---|---|---|
+| Rust host crates + engine | ✅ | `cargo test --workspace` → **108 passed** |
+| Angular renderer / contract / testing | ✅ | `pnpm test` → **208 passed** (16 files) |
+| Production AOT (`ngc` + esbuild) | ✅ | `pnpm run compile:aot`, `angnative build`; Ivy `ɵɵdefineComponent` verified in `dist/aot/` |
+| Android shell (10 APKs) | ✅ | built, installed and launched on emulator **and OnePlus Open (Android 16)**; `WebViews: 0` on every app |
+| Desktop shell (winit + wgpu) | ✅ | 11 tests; window opens; interactive button; shader fix |
+| Web adapter (`@angnative/web`) | ✅ | DOM backend + Playwright verified render/click |
+| iOS shell | 🟡 code complete | Swift 6 package + UIKit bridge; **Mac/Xcode build not run** |
+| Size budget gate | ✅ | `GATE EXIT=0`, 203 B gzip / 60 KB |
+
+### Performance (real hardware, OnePlus Open, Android 16)
+
+| Benchmark | Emulator (SwiftShader) | OnePlus Open (real GPU) |
+|---|---:|---:|
+| 10,000-row virtualized grid jank | 16.13% | **1.76%** |
+| Grid p50 frame time | 20 ms | **6 ms** |
+| Views recycled during scroll test | 177 | **771** |
+
+Reports + screenshots: [`docs/benchmarks/physical/README.md`](docs/benchmarks/physical/README.md), [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+
+---
+
+## 📸 Native showcase screenshots
 
 <p align="center">
   <table align="center">
     <tr>
-      <th align="center"><b>1. Initial View (Rendered via Rust &amp; Taffy)</b></th>
-      <th align="center"><b>2. Button Tap (Synced with Rust Host Shadow Tree)</b></th>
+      <th align="center"><b>Android — 10k-row native grid (OnePlus Open)</b></th>
+      <th align="center"><b>Android — native Canvas charts</b></th>
     </tr>
     <tr>
-      <td align="center">
-        <img src="docs/assets/demo-initial.png" width="360" alt="Initial Screen"/>
-        <br/>
-        <i>Top-aligned Material 3 card, Native text, and Action button</i>
-      </td>
-      <td align="center">
-        <img src="docs/assets/demo-clicked.png" width="360" alt="Clicked State Screen"/>
-        <br/>
-        <i>Interactive bounce animation, click counter &amp; event sync badge</i>
-      </td>
+      <td align="center"><img src="docs/assets/oneplus-grid-cover.png" width="320" alt="OnePlus grid"/></td>
+      <td align="center"><img src="docs/assets/oneplus-charts.png" width="320" alt="OnePlus charts"/></td>
     </tr>
   </table>
 </p>
+
+All 10 showcase sources + prebuilt APKs: [`dist/device-testing/`](dist/device-testing/), [`showcases/`](showcases/).
 
 ---
 
@@ -62,46 +81,28 @@ The Android shell is a functional Gradle project (API 34) with a hand-built Kotl
 ```
 +-------------------------------------------------------------+
 |                      Angular 22+ App                        |
-|        (Signals, Zoneless, Dependency Injection, DI)        |
+|        (Signals, Zoneless, Dependency Injection)             |
 +-------------------------------------------------------------+
-                              |
-                     @angnative/core
+                      @angnative/core
               (Custom Renderer2 & Shadow Tree)
-                              |  Batch Mutation Buffer
-                              v
+                               |  CommandBatch JSON
+                               v
 +-------------------------------------------------------------+
 |                      Rust Host Engine                       |
-|   crates/angnative-host-core   |   crates/angnative-host-ffi|
-|   crates/angnative-host-layout (Taffy 0.15.1 Flexbox/Grid)   |
-|   crates/angnative-host-view   |   crates/angnative-services|
+|  host-core (mutations) | host-view (ops) | host-layout (Taffy 0.15.1)
+|  host-ffi (C ABI)      | host-engine (QuickJS) | services-core
 +-------------------------------------------------------------+
-                              |
-          +-------------------+-------------------+
-          | Zero-Copy JNI                         | C-FFI / Swift
-          v                                       v
-+-----------------------+               +-----------------------+
-|    Android Shell      |               |       iOS Shell       |
-|  (Native View Hierarchy,              |   (UIKit / Metal UI,  |
-|   Material 3 Surface) |               |    Mach-O arm64)      |
-+-----------------------+               +-----------------------+
+          | JNI / C-FFI          | C-ABI          | DOM backend
+          v                      v                v
++-------------------+  +-------------------+  +-------------------+
+| Android shell     |  | iOS / Desktop     |  | @angnative/web    |
+| native View tree  |  | UIKit / wgpu      |  | DOM (browser)     |
++-------------------+  +-------------------+  +-------------------+
 ```
 
 ---
 
-## ✨ Key Features
-
-- 🎯 **Pure Native Widgets (No WebViews)**: Buttons are real `android.widget.Button` / `UIButton`. Text is real `android.widget.TextView` / `UILabel`. 60–120 FPS buttery smooth scrolling.
-- 🦀 **Rust Core Engine**: Ultra-low memory footprint, lightning-fast mutation batching, and strict memory safety.
-- 📐 **Taffy 0.15.1 Layout**: High-performance CSS Flexbox & CSS Grid computation directly in Rust before touching the UI thread.
-- ⚡ **Angular 22 Ready**: Full support for Angular Signals (`signal()`, `computed()`, `effect()`), modern control flow (`@if`, `@for`), and zoneless change detection (Angular's `provideZonelessChangeDetection()`).
-- 🌉 **Zero-Copy FFI**: Fast mutation batch serialization using byte buffers over JNI on Android and direct C-ABI on iOS/Desktop.
-- 📱 **Cross-Platform**: Android (API 34 shell), iOS (shell in progress — Mac build verification pending), Desktop (Win32/macOS/Linux, in development), and `@angnative/web` DOM fallback adapter (available).
-
----
-
 ## 🧩 Writing an AngNative Component
-
-Developing with AngNative feels identical to standard modern Angular, using native semantic tags:
 
 ```typescript
 import { Component, signal } from '@angular/core';
@@ -113,137 +114,87 @@ import { NaViewComponent, NaTextComponent, NaButtonComponent } from '@angnative/
   imports: [NaViewComponent, NaTextComponent, NaButtonComponent],
   template: `
     <na-view style="flex-direction: column; padding: 24px; gap: 16px;">
-      <na-text style="font-size: 28px; font-weight: bold; color: #1E293B;">
-        AngNative Demo
-      </na-text>
-      
-      <na-text style="font-size: 18px; color: #64748B;">
-        Clicks: {{ count() }}
-      </na-text>
-
-      <na-button 
-        (click)="increment()"
-        style="background-color: #4F46E5; border-radius: 12px; padding: 14px 20px;">
-        <na-text style="color: #FFFFFF; font-weight: 600;">
-          Tap Me! 🚀
-        </na-text>
+      <na-text style="font-size: 28px; font-weight: bold;">AngNative Demo</na-text>
+      <na-text style="font-size: 18px;">Clicks: {{ count() }}</na-text>
+      <na-button (click)="increment()" style="background-color: #4F46E5; padding: 14px 20px;">
+        <na-text style="color: #FFFFFF;">Tap Me! 🚀</na-text>
       </na-button>
     </na-view>
   `
 })
 export class CounterComponent {
   count = signal(0);
-
-  increment() {
-    this.count.update(c => c + 1);
-  }
+  increment() { this.count.update(c => c + 1); }
 }
 ```
 
 ---
 
-## 📦 Workspace Architecture
+## 📦 Workspace
 
 ```
 angnative/
-├── Cargo.toml                    # Rust workspace configuration
-├── package.json                  # pnpm monorepo workspace
-├── crates/                       # 🦀 Rust Core Crates
-│   ├── angnative-host-core/      # Mutation protocol, shadow DOM & element registry
-│   ├── angnative-host-engine/    # QuickJS runtime & embedded JS executor
-│   ├── angnative-host-ffi/       # C-ABI and JNI bindings with exported C header
-│   ├── angnative-host-layout/    # Taffy 0.15.1 Flexbox/Grid adapter & text measurer
-│   ├── angnative-host-view/      # View factory, view tree, and op emitter
-│   ├── angnative-services-core/  # Capabilities, crypto, diagnostics, and sync
-│   └── angnative-desktop/        # Native desktop shell (Windows, macOS, Linux)
-├── packages/                     # 🅰️ Angular & TypeScript Packages
-│   ├── core/                     # Custom Angular Renderer2 & NativeElement runtime
-│   ├── common/                   # Native primitives (<na-view>, <na-text>, <na-button>)
-│   ├── contract/                 # Binary mutation protocol schema & event specs
-│   ├── platform/                 # Native Angular platform bootstrap
-│   ├── cli/                      # CLI tools (init, build, run, doctor, inspect)
-│   └── testing/                  # Conformance test suites and mutation teeth
-├── platforms/                    # 📱 Native Platform Shells
-│   ├── android/                  # Android Studio project, JNI bridge, Kotlin UI runtime
-│   └── ios/                      # iOS SwiftPM shell & Darwin SDK toolchain
-└── apps/
-    └── demo-app/                 # Standalone Angular Native application
+├── crates/            # Rust host core, layout, view, ffi, engine, services, desktop
+├── packages/          # core, common, contract, platform, cli, testing, web, native-ui-core
+├── platforms/         # android (JNI + Kotlin), ios (Swift 6 + UIKit)
+├── showcases/         # 10 native showcase projects (5 UI + 5 ecosystem)
+├── scripts/           # build, verify, benchmark, AOT helpers
+├── dist/              # AOT output, size reports, device-testing APKs
+└── docs/              # architecture, compatibility, benchmarks, ADRs, tracker
 ```
 
 ---
 
-## 🛠️ Quick Start
+## 🛠️ Quick start / reproduce
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) v20+ and [pnpm](https://pnpm.io/) v9+
-- [Rust](https://rustup.rs/) 1.80+ (`rustup target add aarch64-linux-android x86_64-linux-android`)
-- Android Studio / SDK (API 34+) & NDK 26+
+```powershell
+# Windows: put Git's patch.exe first on PATH (rquickjs-sys build script)
+$env:PATH="C:\Program Files\Git\usr\bin;$env:PATH"
 
-### 1. Clone & Install
-```bash
-git clone https://github.com/moidiqbal/angnative.git
-cd angnative
-
-# Install JS dependencies
 pnpm install
-
-# Build Rust crates
+pnpm run compile:aot            # real Angular ngc, Ivy verified
+node packages/cli/dist/cli.js build
 cargo build --workspace
+cargo test --workspace          # 108 tests
+pnpm test                       # 208 tests
+node scripts/check-size-budget.mjs
 ```
 
-### 2. Run Android Demo App
+Run Android demo: `pwsh -File scripts/build-android-stack.ps1 -Stack latest` then `./gradlew assembleDebug` in `platforms/android/` — or install a prebuilt APK from [`dist/device-testing/`](dist/device-testing/).
+
+iOS (requires a Mac):
 ```bash
-# Build Rust host FFI library for Android targets
-./scripts/build-android-native.sh
-
-# Open and run platforms/android in Android Studio, or via CLI:
-cd platforms/android
-./gradlew installDebug
+./scripts/build-ios-native.sh simulator
+cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost
 ```
 
 ---
 
-## 🗺️ Platform Support Matrix
+## 🍎 Help us finish iOS — sponsors / Mac needed
 
-| Platform | Target Runtime | Layout Engine | Status |
-| :--- | :--- | :--- | :--- |
-| **Android** | Kotlin + Android View Hierarchy / Jetpack | Rust Taffy + JNI | 🟡 Shell builds; Rust→native view wiring in progress (API 34) |
-| **iOS** | Swift + UIKit / Metal | Rust Taffy + C-FFI | 🟡 Toolchain & Mach-O arm64 Ready |
-| **Desktop** | Win32 / AppKit / Wayland | Rust Taffy + Winit | 🟡 In Development |
-| **Web** | `@angnative/web` DOM renderer (Angular 22) | CSS Flexbox / DOM | ✅ Available (`pnpm start`) |
+The iOS shell is **code-complete** (Swift 6 SwiftPM package, C-ABI bridge with `UInt64` node ids, 8 UIKit view-factory callbacks, demo + tests) but we do not have a Mac/Xcode in the current development environment, so no simulator run has happened.
 
----
+We are looking for:
+- **A Mac with Xcode** (even a macOS CI runner or a short loan/test session) to run [`scripts/build-ios-native.sh`](scripts/build-ios-native.sh), `swift test`, and the Simulator demo.
+- **Sponsorship** for a macOS mini / GitHub Actions macOS runner / Apple Developer Program so iOS can be verified and released with the same evidence bar as Android.
 
-## 📖 In-Depth Documentation
-
-Explore the official engineering documentation in the [`docs/`](docs/) directory:
-- [Architecture Blueprint](docs/ARCHITECTURE.md) — Comprehensive technical design & FFI specifications
-- [Requirements & SLAs](docs/REQUIREMENTS.md) — Functional/non-functional requirements & performance SLAs
-- [Technical Specifications](docs/SPECIFICATIONS.md) — Mutation protocol opcodes & supported Taffy CSS styles
-- [Android Build Guide](docs/ANDROID-BUILD.md) — Detailed NDK, JNI, and Gradle build instructions
-- [Size Budget Policy](docs/R8-SIZE-BUDGET.md) — R8, Proguard, and stripped native binary budgets
-- [Project Roadmap](docs/ROADMAP.md) — Phased delivery plan
+If you can help, open an issue titled **"iOS Mac verification"** or reach out via the repository. Contributors who provide Mac time will be credited in `docs/CONTRIBUTORS.md` and the release notes.
 
 ---
 
-## 🤝 Contributing
+## 📖 Documentation
 
-Contributions are warmly welcome! Whether you are an Angular expert, a Rustacean, or a mobile platform engineer:
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'feat: add some amazing feature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- [Verification report](docs/VERIFICATION-REPORT.md) — every command and result
+- [Compatibility evidence](docs/COMPATIBILITY-EVIDENCE.md) — per-library versions, APIs, tests, limits
+- [Library compatibility](docs/COMPATIBILITY.md) and [11-category ecosystem matrix](docs/ECOSYSTEM-COMPATIBILITY.md)
+- [Benchmarks](docs/BENCHMARKS.md) + [physical-device results](docs/benchmarks/physical/README.md)
+- [Showcase tracker](docs/SHOWCASE-TRACKER.md), [Deliverables index](docs/DELIVERABLES.md), [Unsupported features](docs/UNSUPPORTED-FEATURES.md)
+- [Architecture](docs/ARCHITECTURE.md), [Requirements](docs/REQUIREMENTS.md), [Specifications](docs/SPECIFICATIONS.md), [Android build](docs/ANDROID-BUILD.md), [iOS build](docs/IOS-BUILD.md), [Event bridge](docs/EVENT-BRIDGE.md)
+- ADRs: [0001 Taffy](docs/adr/0001-taffy-0151-layout-adapter.md), [0002 Zero WebView](docs/adr/0002-zero-webview-showcases.md), [0003 Labelling](docs/adr/0003-native-reimplementation-labelling.md), [0004 shared native UI core](docs/adr/0004-shared-native-ui-core.md)
+- Original review + remediation log: [PROJECT-REVIEW-2026-11-20.md](docs/PROJECT-REVIEW-2026-11-20.md)
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
-
----
-
-<p align="center">
-  Built with ❤️ by <a href="https://github.com/moidiqbal">Moid Iqbal</a> and the open-source community.
-</p>
+MIT — see [`LICENSE`](LICENSE). Third-party libraries referenced in compatibility reports remain under their own licenses; no third-party UI library code is bundled into native showcases.
