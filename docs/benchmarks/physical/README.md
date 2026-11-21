@@ -27,8 +27,8 @@
 ## Caveats — read before quoting
 - Single interaction burst per app; low frame counts (6–16) for some apps make their jank % statistically weak — do not compare those apps against each other.
 - All 10 APKs installed and launched successfully; **WebViews: 0** on every app (real device).
-- **Screenshots are NOT valid** — at capture time the device display was `state=OFF` / notification shade focused, so `inner.png` files are black. They are retained for traceability but must not be used as UI proof. Re-capture requires screen ON + shade dismissed + stable USB.
-- The USB connection dropped repeatedly during collection; gfxinfo numbers above were captured before each drop and are valid for the apps shown.
+- **Screenshots re-captured successfully** — the first capture attempt produced black frames (display OFF / notification shade). Re-capture with screen ON + SystemUI notification shade dismissed produced valid PNGs for all 10 apps: `docs/benchmarks/physical/*-valid.png` (script `scripts/capture-oneplus-shots.ps1`). Verified visually: `ecosystem-grid-valid.png` shows 10,000 rows with 771 recycled views and a readable table on the unfolded display; `ecosystem-charts-valid.png` shows the native Canvas donut chart with legend. Both show `WebViews: 0` in-app. On a foldable, `adb exec-out screencap -p` prepends a "Multiple displays" warning to stdout — the capture script strips everything before the PNG magic bytes (`89 50 4E 47`).
+- The USB connection dropped repeatedly during the first run; gfxinfo numbers above were captured before each drop and are valid for the apps shown.
 - `results.json` is the machine-readable copy of this table.
 
 ## To re-capture screenshots later
