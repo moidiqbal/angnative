@@ -117,6 +117,7 @@ export function canonicalElementTag(tag: string): string {
       return ELEMENT_TAGS.scrollView;
     case 'native-text-input':
     case 'text-input':
+    case 'input':
       return ELEMENT_TAGS.textInput;
     case 'na-button':
     case 'native-button':

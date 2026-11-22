@@ -133,6 +133,17 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         globalThis.location = _domLocation;
         globalThis.history = _domHistory;
 
+        // Angular Forms' DefaultValueAccessor asks the DOM adapter for the
+        // user agent to decide composition-event mode. A flat primitive-only
+        // object is enough; no object back-references (rquickjs GC limit).
+        if (typeof globalThis.navigator === 'undefined') {
+            globalThis.navigator = {
+                userAgent: 'AngNative QuickJS',
+                language: 'en-US',
+                platform: 'AngNative'
+            };
+        }
+
         // Close the renderer -> native pipeline: the Angular renderer's flush
         // handler publishes batches through this hook. Route them into the
         // Host's real batch processor (registered by the runtime bridge).
@@ -897,6 +908,7 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             queueMicrotask: queueMicrotask,
             location: _domLocation,
             history: _domHistory,
+            navigator: navigator,
             addEventListener: function (type, handler) {
                 if (type === 'popstate') _popListeners.push(handler);
             },
@@ -1000,6 +1012,19 @@ mod tests {
 
         let result = engine.eval("typeof Event").unwrap();
         assert_eq!(result, crate::engine::JsValue::String("function".to_string()));
+    }
+
+    #[test]
+    fn test_navigator_user_agent_shim() {
+        let mut engine = installed();
+        assert_eq!(
+            engine.eval("window.navigator.userAgent").unwrap(),
+            crate::engine::JsValue::String("AngNative QuickJS".to_string())
+        );
+        assert_eq!(
+            engine.eval("navigator === window.navigator").unwrap(),
+            crate::engine::JsValue::Boolean(true)
+        );
     }
 
     #[test]

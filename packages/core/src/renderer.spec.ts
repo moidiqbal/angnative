@@ -3,6 +3,7 @@ import {
   AngNativeRenderer,
   AngNativeRendererFactory2,
   bootstrapNativeAngular,
+  canonicalElementTag,
   tagToNodeType,
 } from './renderer';
 import { NativeElement, ElementRegistry } from './native-element';
@@ -27,6 +28,12 @@ describe('tagToNodeType (mirrors Rust NodeType::from_tag)', () => {
   it('defaults unknown to Custom', () => {
     expect(tagToNodeType('na-foo')).toBe('Custom');
     expect(tagToNodeType('custom-tag')).toBe('Custom');
+  });
+});
+
+describe('canonicalElementTag', () => {
+  it('maps HTML input to the native text input primitive', () => {
+    expect(canonicalElementTag('input')).toBe('na-text-input');
   });
 });
 

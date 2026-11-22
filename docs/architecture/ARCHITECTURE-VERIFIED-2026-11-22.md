@@ -153,20 +153,20 @@ for opt-in use only.
 
 | Check | Result |
 |---|---|
-| `cargo test --workspace` | 132 passed |
-| `cargo test -p angnative-runtime-bridge -- --ignored` | 6 acceptance tests passed |
-| `pnpm test` | 219 passed |
+| `cargo test --workspace` | 133 passed |
+| `cargo test -p angnative-runtime-bridge -- --ignored` | 7 acceptance tests passed |
+| `pnpm test` | 220 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
 | Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
-| `python scripts/check-ffi-declarations.py` | 12 JNI methods, 9 Swift bindings, 20 header declarations |
+| `python scripts/check-ffi-declarations.py` | 11 JNI methods, 9 Swift bindings, 20 header declarations |
 | All 10 Android `assembleDebug` | SUCCESS observed during development; no CI Android job and no retained build log |
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
 | CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
 
-The six acceptance tests require regenerated `dist/aot/*` bundles, which are
+The seven acceptance tests require regenerated `dist/aot/*` bundles, which are
 gitignored. Reproduce locally with:
-`pnpm compile:aot && pnpm compile:aot:router && pnpm bundle:quickjs &&
-pnpm bundle:forms && pnpm bundle:framework`, then
+`pnpm compile:aot && pnpm compile:aot:router && pnpm compile:aot:forms &&
+pnpm bundle:quickjs && pnpm bundle:forms && pnpm bundle:framework`, then
 `cargo test -p angnative-runtime-bridge -- --ignored`. Workspace packages
 (`@angnative/contract`, `core`, `platform`) must be rebuilt first — a stale
 `packages/platform/dist` was a real past source of incorrect behavior.
@@ -221,8 +221,20 @@ but is relevant when reasoning about event handling.
    test `quickjs_engine_cyclic_value_does_not_overflow` covers truncation.
 5. **iOS parity**: Swift bindings still wrap the legacy host; nothing here
    claims iOS execution.
-6. Template-driven `ngModel` bindings and AOT i18n markers in real templates
-   are unverified.
+6. **AOT i18n markers in real templates** are unverified.
+7. **Template-driven `ngModel` — RESOLVED**: the AOT fixture
+   `apps/demo-app/src/forms/main.forms.ts` uses `FormsModule` and
+   `[ngModel]`/`(ngModelChange)` on a plain `<input>`. `canonicalElementTag()`
+   now maps `input` to `na-text-input`, and a flat `navigator.userAgent` shim
+   satisfies Angular's `DefaultValueAccessor` composition-mode check without
+   object cycles. Ignored acceptance test
+   `angular_template_driven_forms_round_trip_in_quickjs` asserts: (1) the JS
+   model setter updates the native input `value` property and interpolated text
+   node; (2) a Rust-dispatched native `input` event with
+   `{"target":{"value":"typed-from-native"}}` fires exactly one Angular
+   listener and updates the component model. Angular intentionally does not
+   write the CVA value back for a user-originated event, so the test asserts the
+   native label update rather than a duplicate input-property write.
 
 ---
 

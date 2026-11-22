@@ -21,7 +21,7 @@
 - [x] Build the Android shell on Windows: SDK/NDK 27.2 + CMake 3.22.1 + JDK 17 installed; Rust host libs rebuilt for 3 ABIs; `./gradlew assembleDebug` **BUILD SUCCESSFUL**; `app-debug.apk` (21.9 MB) contains `libangnative.so` + `libangnative_host_ffi.so` for arm64-v8a, armeabi-v7a and x86_64.
 - [x] Install/launch the APK on an Android 34 x86_64 emulator and verify the click round trip visually: the demo renders from Rust `PlatformOp`s and "Click Me!" updates the Rust-hosted output node to "Hello World!" (screenshots in `docs/assets/android-demo*.png`).
 - [x] Native event bridge scaffolding: FFI `set_event_callback` / `add|remove|dispatch_event` with tests, plus QuickJS-side `na.addEventListener` / `na.removeEventListener` / `dispatch_event` API (`docs/EVENT-BRIDGE.md`).
-- [x] Full Angular listener round trip **in the embedded runtime**: `angnative-runtime-bridge` + real AOT bundle in QuickJS, 6 ignored acceptance tests pass (`docs/CODE-REVIEW-2026-11-22.md`).
+- [x] Full Angular listener round trip **in the embedded runtime**: `angnative-runtime-bridge` + real AOT bundle in QuickJS, 7 ignored acceptance tests pass (`docs/CODE-REVIEW-2026-11-22.md`).
 - [ ] Load that bundle in a **shipping native shell on-device** and tap a real widget — still outstanding; shells remain imperative.
 - [x] Enforce size budgets with `check-rust-size.mjs` and R8/Proguard optimizations.
 

@@ -3,7 +3,7 @@
 AngNative is MIT-licensed and built in public. Everything except **iOS/macOS
 verification** is implemented, tested and released in [`v0.2.0`](https://github.com/moidiqbal/angnative/releases/tag/v0.2.0):
 
-- Rust host engine (132 tests + 6 QuickJS acceptance tests), Angular 22 renderer (219 tests), production AOT
+- Rust host engine (133 tests + 7 QuickJS acceptance tests), Angular 22 renderer (220 tests), production AOT
 - 10 native showcase APKs, Zero WebView, verified on a **OnePlus Open** (grid: 1.76% jank / 6 ms p50)
 - Desktop (winit + wgpu) and web adapter running
 

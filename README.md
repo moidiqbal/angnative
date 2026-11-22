@@ -36,8 +36,8 @@ Full evidence: [`docs/VERIFICATION-REPORT.md`](docs/VERIFICATION-REPORT.md) · [
 
 | Component | Status | Proof |
 |---|---|---|
-| Rust host crates + engine | ✅ | `cargo test --workspace` → **132 passed**; the 6 ignored Angular-in-QuickJS acceptance tests pass when `dist/aot` bundles are generated |
-| Angular renderer / contract / testing | ✅ | `pnpm test` → **208 passed** (16 files) |
+| Rust host crates + engine | ✅ | `cargo test --workspace` → **133 passed**; the 7 ignored Angular-in-QuickJS acceptance tests pass when `dist/aot` bundles are generated |
+| Angular renderer / contract / testing | ✅ | `pnpm test` → **220 passed** (16 files) |
 | Production AOT (`ngc` + esbuild) | ✅ | `pnpm run compile:aot`, `angnative build`; Ivy `ɵɵdefineComponent` verified in `dist/aot/` |
 | Android shell (10 APKs) | ✅ | built, installed and launched on emulator **and OnePlus Open (Android 16)**; `WebViews: 0` on every app |
 | Desktop shell (winit + wgpu) | ✅ | 11 tests; window opens; interactive button; shader fix |
@@ -142,8 +142,8 @@ pnpm install
 pnpm run compile:aot            # real Angular ngc, Ivy verified
 node packages/cli/dist/cli.js build
 cargo build --workspace
-cargo test --workspace          # 132 tests (+ 6 --ignored acceptance tests)
-pnpm test                       # 219 tests
+cargo test --workspace          # 133 tests (+ 7 --ignored acceptance tests)
+pnpm test                       # 220 tests
 node scripts/check-size-budget.mjs
 ```
 

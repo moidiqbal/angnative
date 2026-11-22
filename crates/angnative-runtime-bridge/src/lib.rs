@@ -516,6 +516,128 @@ mod tests {
         );
     }
 
+    /// Template-driven Forms compatibility. Requires:
+    ///   pnpm compile:aot:forms && pnpm bundle:framework
+    #[test]
+    #[ignore = "requires generated dist/aot/forms-app-bundle.js"]
+    fn angular_template_driven_forms_round_trip_in_quickjs() {
+        let handle = std::thread::Builder::new()
+            .name("forms-test-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_angular_template_driven_forms_round_trip_in_quickjs)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_angular_template_driven_forms_round_trip_in_quickjs() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/forms-app-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm compile:aot:forms && pnpm bundle:framework` first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.load_script(&source).expect("forms AOT bundle must load");
+
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __formsError === 'undefined' ? null : __formsError")
+                .unwrap(),
+            JsValue::Null,
+            "Forms AOT bootstrap rejected"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("__formsModel()").unwrap(),
+            JsValue::String("initial".to_string())
+        );
+
+        // Locate the DefaultValueAccessor input listener emitted by Angular.
+        let listener = bridge
+            .runtime_mut()
+            .eval(
+                r#"(function () {
+                    for (var i = 0; i < __angnativeBatches.length; i++) {
+                        var b = JSON.parse(__angnativeBatches[i]);
+                        for (var j = 0; j < b.commands.length; j++) {
+                            var c = b.commands[j];
+                            if (c.key && c.key.indexOf('listener:input:') === 0) {
+                                var parts = c.key.split(':');
+                                return c.id + '|' + parts[1] + '|' + parts[2];
+                            }
+                        }
+                    }
+                    return null;
+                })()"#,
+            )
+            .unwrap();
+        let JsValue::String(listener) = listener else {
+            panic!("no ngModel input listener registration found in the emitted batches");
+        };
+        let parts: Vec<&str> = listener.split('|').collect();
+        assert_eq!(parts.len(), 3, "bad listener descriptor: {listener}");
+        let input_node_id: u64 = parts[0].parse().expect("node id");
+        assert_eq!(parts[1], "input");
+
+        // JS model -> native tree.
+        bridge
+            .load_script("__setFormsModel('set-from-js'); 0;")
+            .expect("model setter must run");
+        assert_eq!(
+            bridge.runtime_mut().eval("__formsModel()").unwrap(),
+            JsValue::String("set-from-js".to_string())
+        );
+        let snapshot = bridge.host_mut().engine().snapshot();
+        let input_node = snapshot
+            .nodes
+            .iter()
+            .find(|node| node.id == input_node_id)
+            .expect("native input node missing");
+        assert_eq!(
+            input_node.tag, "na-text-input",
+            "<input> must map to the native text input primitive"
+        );
+        assert_eq!(
+            input_node.properties.get("value").and_then(|v| v.as_str()),
+            Some("set-from-js"),
+            "native input value must reflect the JS model"
+        );
+        assert!(
+            snapshot
+                .nodes
+                .iter()
+                .any(|node| node.text_content.as_deref() == Some("set-from-js")),
+            "interpolated native text must reflect the JS model"
+        );
+
+        // Native input event -> Angular ngModel -> component model.
+        let invoked = bridge
+            .dispatch_event(
+                input_node_id,
+                "input",
+                r#"{"target":{"value":"typed-from-native"}}"#,
+            )
+            .expect("native input event dispatch must succeed");
+        assert_eq!(invoked, 1, "exactly one ngModel input listener must fire");
+        bridge.load_script("__flushForms(); 0;").unwrap();
+        assert_eq!(
+            bridge.runtime_mut().eval("__formsModel()").unwrap(),
+            JsValue::String("typed-from-native".to_string()),
+            "native input event must update the ngModel-backed component model"
+        );
+        // Angular does not write the CVA value back for a user-originated
+        // input event; the native widget already holds the typed value. The
+        // observable model and its interpolated native label must still update.
+        let snapshot = bridge.host_mut().engine().snapshot();
+        assert!(
+            snapshot
+                .nodes
+                .iter()
+                .any(|node| node.text_content.as_deref() == Some("typed-from-native")),
+            "interpolated native text must reflect the event-driven model update"
+        );
+    }
+
     /// Router API compatibility. Requires: pnpm bundle:framework
     #[test]
     #[ignore = "requires generated dist/aot/router-bundle.js"]

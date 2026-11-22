@@ -12,7 +12,7 @@
  */
 
 import { execFileSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { createRequire } from 'module';
 import { dirname, join, resolve } from 'path';
 
@@ -49,21 +49,30 @@ try {
   process.exit(1);
 }
 
-// Verify real AOT output — at least one Ivy component definition.
-const outDir = join(process.cwd(), 'dist', 'aot');
+// Verify real AOT output — at least one Ivy component definition. The output
+// directory comes from the tsconfig so router/forms fixtures are checked too.
+const tsconfig = JSON.parse(readFileSync(AOT_TSCONFIG, 'utf-8'));
+const outDir = resolve(process.cwd(), tsconfig.compilerOptions?.outDir ?? 'dist/aot');
 if (!existsSync(outDir)) {
-  console.error('error: AOT output directory missing');
+  console.error(`error: AOT output directory missing: ${outDir}`);
   process.exit(1);
 }
-let ivyFound = false;
-for (const file of ['app.component.js', 'counter.component.js']) {
-  const path = join(outDir, file);
-  if (existsSync(path) && /defineComponent|ɵɵdefineComponent/.test(readFileSync(path, 'utf-8'))) {
-    ivyFound = true;
-    break;
+
+function hasIvyDefinition(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (hasIvyDefinition(path)) return true;
+    } else if (entry.name.endsWith('.js')) {
+      if (/ɵɵdefineComponent|defineComponent/.test(readFileSync(path, 'utf-8'))) {
+        return true;
+      }
+    }
   }
+  return false;
 }
-if (!ivyFound) {
+
+if (!hasIvyDefinition(outDir)) {
   console.error('error: AOT output has no Ivy component definitions — compiler was not real ngc');
   process.exit(1);
 }

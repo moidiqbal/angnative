@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.aot.json",
+  "compilerOptions": {
+    "outDir": "dist/aot-forms"
+  },
+  "files": [
+    "apps/demo-app/src/forms/main.forms.ts"
+  ],
+  "include": [
+    "apps/demo-app/src/forms/**/*.ts"
+  ]
+}

@@ -2,7 +2,7 @@
 
 **Status (2026-11-22):** Implemented and verified in-process. `angnative-runtime-bridge`
 owns Host + QuickJS + `AngNativeRuntime`, a real Angular AOT bundle boots, and a native
-event reaches the Angular listener (6 ignored acceptance tests pass —
+event reaches the Angular listener (7 ignored acceptance tests pass —
 `cargo test -p angnative-runtime-bridge -- --ignored`). Loading that bundle inside a
 shipping native shell on-device is the remaining integration step. See
 `docs/CODE-REVIEW-2026-11-22.md` for the full evidence and honest gaps.
@@ -73,9 +73,10 @@ Still open (honest):
   `platforms/android` still use the legacy host + imperative batches. iOS has no
   runtime-bridge bindings. Until a shell loads the bundle and a tap reaches Angular,
   the framework-level claim is "verified in the embedded runtime," not "runs natively."
-- **Animation-engine integration, template-driven `ngModel`, and AOT i18n
-  markers** remain unverified. DI-based `HttpClient.get()` is now verified in
-  the embedded QuickJS runtime by `angular_http_platform_loads_in_quickjs`
-  (see `UNSUPPORTED-FEATURES.md` and
+- **Animation-engine integration and AOT i18n markers** remain unverified.
+  DI-based `HttpClient.get()` is verified by
+  `angular_http_platform_loads_in_quickjs`, and template-driven `ngModel` is
+  verified by `angular_template_driven_forms_round_trip_in_quickjs` (see
+  `UNSUPPORTED-FEATURES.md` and
   `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`).
 - The web adapter already has a complete DOM-based click path.
