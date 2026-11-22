@@ -43,10 +43,10 @@ QuickJS and mutate a native view tree, on an Android emulator.
    (or a checked-out sample like a Angular Material dashboard) without editing
    its components.
 2. **Full Angular surface on native.** Routing is verified in QuickJS (F7 resolved
-   with cycle-free AbortController, URL shim, and Renderer2 parent fix);
-   template-driven forms, HttpClient via DI, the real animation engine and i18n
-   markers remain unverified. Showcase UIs remain imperative native
-   reimplementations.
+   with cycle-free AbortController, URL shim, and Renderer2 parent fix), and DI-based
+   `HttpClient.get()` is verified by `angular_http_platform_loads_in_quickjs`.
+   Template-driven forms, the real animation engine and i18n markers remain
+   unverified. Showcase UIs remain imperative native reimplementations.
 3. **One-command CLI flow.** `angnative build` bundles, but `angnative run/test/
    inspect` are placeholders; there is no "ship to device" command.
 4. **iOS.** Swift bindings still wrap the legacy host; nothing claims iOS

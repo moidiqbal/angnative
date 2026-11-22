@@ -43,10 +43,22 @@ const features = [
   {
     name: 'http',
     global: '__ngHttp',
+    // @angular/common/http re-exports the token as the mangled
+    // `ɵHTTP_FETCH_MAX_RESPONSE_SIZE`; core exports the injector scope token as
+    // `ɵINJECTOR_SCOPE`. Both come from the same pnpm-resolved module instance
+    // as the providers below, so token identity is preserved.
     source: `import * as http from ${JSON.stringify(httpEntry)};
-import { createEnvironmentInjector, runInInjectionContext, provideZonelessChangeDetection, DestroyRef, Injector } from ${JSON.stringify(coreEntry)};
+import * as core from ${JSON.stringify(coreEntry)};
 globalThis.__ngHttp = Object.assign({}, http, {
-  createEnvironmentInjector, runInInjectionContext, provideZonelessChangeDetection, DestroyRef, Injector
+  createEnvironmentInjector: core.createEnvironmentInjector,
+  runInInjectionContext: core.runInInjectionContext,
+  provideZonelessChangeDetection: core.provideZonelessChangeDetection,
+  DestroyRef: core.DestroyRef,
+  Injector: core.Injector,
+  EnvironmentInjector: core.EnvironmentInjector,
+  PendingTasks: core.PendingTasks,
+  INJECTOR_SCOPE: core.ɵINJECTOR_SCOPE,
+  HTTP_FETCH_MAX_RESPONSE_SIZE: http.ɵHTTP_FETCH_MAX_RESPONSE_SIZE
 });`,
   },
 ];

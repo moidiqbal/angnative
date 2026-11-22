@@ -145,12 +145,97 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             };
         }
 
+        // --- UTF-8 codecs -------------------------------------------------
+        // QuickJS-ng has no TextEncoder/TextDecoder. Angular's FetchBackend
+        // always decodes the response body through TextDecoder, so both are
+        // required for DI-based HttpClient. Pure functions, no object cycles.
+        function _angUtf8Encode(str) {
+            var s = String(str);
+            var out = [];
+            for (var i = 0; i < s.length; i++) {
+                var c = s.charCodeAt(i);
+                if (c < 0x80) {
+                    out.push(c);
+                } else if (c < 0x800) {
+                    out.push(0xC0 | (c >> 6), 0x80 | (c & 0x3F));
+                } else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) {
+                    var c2 = s.charCodeAt(++i);
+                    var cp = 0x10000 + ((c - 0xD800) << 10) + (c2 - 0xDC00);
+                    out.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F),
+                             0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
+                } else {
+                    out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F),
+                             0x80 | (c & 0x3F));
+                }
+            }
+            return new Uint8Array(out);
+        }
+
+        function _angUtf8Decode(input) {
+            if (input === null || input === undefined) return '';
+            var bytes = (input instanceof Uint8Array)
+                ? input
+                : new Uint8Array(input.buffer || input);
+            var out = '';
+            var i = 0;
+            while (i < bytes.length) {
+                var b = bytes[i++];
+                var cp;
+                if (b < 0x80) {
+                    cp = b;
+                } else if (b < 0xE0) {
+                    cp = ((b & 0x1F) << 6) | (bytes[i++] & 0x3F);
+                } else if (b < 0xF0) {
+                    cp = ((b & 0x0F) << 12) | ((bytes[i++] & 0x3F) << 6) |
+                         (bytes[i++] & 0x3F);
+                } else {
+                    cp = ((b & 0x07) << 18) | ((bytes[i++] & 0x3F) << 12) |
+                         ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F);
+                }
+                out += String.fromCodePoint(cp);
+            }
+            return out;
+        }
+
+        if (typeof globalThis.TextEncoder === 'undefined') {
+            globalThis.TextEncoder = function TextEncoder() {};
+            globalThis.TextEncoder.prototype.encode = function (str) {
+                return _angUtf8Encode(str);
+            };
+        }
+        if (typeof globalThis.TextDecoder === 'undefined') {
+            globalThis.TextDecoder = function TextDecoder(encoding) {
+                this.encoding = encoding || 'utf-8';
+            };
+            globalThis.TextDecoder.prototype.decode = function (input) {
+                return _angUtf8Decode(input);
+            };
+        }
+
         // --- fetch / HttpClient platform surface --------------------------
         // A host (or test) can register handlers. Default is a 404 response so
         // Angular's FetchBackend can initialize without a real network stack.
+        //
+        // Angular's FetchBackend does NOT call response.text()/json(): it reads
+        // `response.body.getReader()` and decodes Uint8Array chunks through
+        // TextDecoder. The response therefore exposes a minimal ReadableStream
+        // shaped reader and a Headers-shaped plain object (enumerable header
+        // names for `new HttpHeaders(obj)`, non-enumerable `get`).
         var _angFetchHandlers = [];
         globalThis.__angnativeRegisterFetchHandler = function (handler) {
             if (typeof handler === 'function') _angFetchHandlers.push(handler);
+        };
+        // Shared Headers-shaped prototype. `get` uses `this`, so instances hold
+        // no closure back-reference to themselves (no GC cycle).
+        var _angHeadersProto = {
+            get: function (name) {
+                var key = String(name).toLowerCase();
+                for (var k in this) {
+                    if (Object.prototype.hasOwnProperty.call(this, k) &&
+                        k.toLowerCase() === key) return this[k];
+                }
+                return null;
+            }
         };
         globalThis.fetch = function (url, options) {
             var opts = options || {};
@@ -168,15 +253,51 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             var status = result && result.status ? result.status : 404;
             var rawBody = result && result.body !== undefined ? result.body : '';
             var bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
+            var rawHeaders = (result && result.headers) || {};
+
+            // Enumerable own string values so Angular's HttpHeaders(Object.entries)
+            // path works; `get` lives on a shared prototype (never a closure
+            // over the instance — that would create a GC cycle).
+            var headerMap = Object.create(_angHeadersProto);
+            for (var hk in rawHeaders) {
+                if (!Object.prototype.hasOwnProperty.call(rawHeaders, hk)) continue;
+                var hv = rawHeaders[hk];
+                headerMap[String(hk)] = Array.isArray(hv) ? hv.join(', ') : String(hv);
+            }
+            if (headerMap['content-type'] === undefined &&
+                headerMap['Content-Type'] === undefined) {
+                headerMap['content-type'] = 'application/json';
+            }
+
+            var bytes = _angUtf8Encode(bodyText);
+            var offset = 0;
+            var reader = {
+                read: function () {
+                    if (offset >= bytes.length) {
+                        return Promise.resolve({ done: true, value: undefined });
+                    }
+                    var chunk = bytes.slice(offset);
+                    offset = bytes.length;
+                    return Promise.resolve({ done: false, value: chunk });
+                },
+                cancel: function () {
+                    offset = bytes.length;
+                    return Promise.resolve();
+                },
+                releaseLock: function () {}
+            };
+
             var response = {
                 ok: status >= 200 && status < 300,
                 status: status,
                 statusText: (result && result.statusText) || '',
-                headers: {
-                    get: function (name) {
-                        var h = (result && result.headers) || {};
-                        return h[String(name)] !== undefined ? h[String(name)] : null;
-                    }
+                url: String(url),
+                redirected: false,
+                type: 'basic',
+                headers: headerMap,
+                body: {
+                    getReader: function () { return reader; },
+                    cancel: function () { return reader.cancel(); }
                 },
                 text: function () { return Promise.resolve(bodyText); },
                 json: function () { return Promise.resolve(JSON.parse(bodyText)); }
@@ -1015,6 +1136,53 @@ mod tests {
             engine.eval("anim.playState").unwrap(),
             crate::engine::JsValue::String("finished".to_string())
         );
+    }
+
+    #[test]
+    fn test_fetch_response_readable_stream_and_text_decoder() {
+        let mut engine = installed();
+        // Angular's FetchBackend reads response.body.getReader() and decodes
+        // Uint8Array chunks through TextDecoder. Exercise that exact shape.
+        engine.eval(r#"
+            __angnativeRegisterFetchHandler(function (req) {
+                return {
+                    status: 201,
+                    body: { message: 'héllo', method: req.method }
+                };
+            });
+            var _fetchCheck = null;
+            fetch('/api/x').then(function (r) {
+                var reader = r.body.getReader();
+                return reader.read().then(function (chunk) {
+                    var text = new TextDecoder().decode(chunk.value);
+                    var parsed = JSON.parse(text);
+                    _fetchCheck = r.status + '|' + r.ok + '|' + parsed.message +
+                        '|' + parsed.method + '|' +
+                        r.headers.get('content-type');
+                });
+            });
+        "#).unwrap();
+        engine.drain_microtasks().unwrap();
+        assert_eq!(
+            engine.eval("_fetchCheck").unwrap(),
+            crate::engine::JsValue::String(
+                "201|true|héllo|GET|application/json".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_text_encoder_decoder_roundtrip() {
+        let mut engine = installed();
+        let result = engine.eval(r#"
+            (function () {
+                var s = 'aé€𝄞z';
+                var bytes = new TextEncoder().encode(s);
+                return new TextDecoder().decode(bytes) === s &&
+                    bytes.length === 11;
+            })()
+        "#).unwrap();
+        assert_eq!(result, crate::engine::JsValue::Boolean(true));
     }
 
     #[test]

@@ -153,7 +153,7 @@ for opt-in use only.
 
 | Check | Result |
 |---|---|
-| `cargo test --workspace` | 129 passed |
+| `cargo test --workspace` | 132 passed |
 | `cargo test -p angnative-runtime-bridge -- --ignored` | 6 acceptance tests passed |
 | `pnpm test` | 219 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
@@ -196,14 +196,29 @@ but is relevant when reasoning about event handling.
    done. A cross-thread call panics by design (caught by the C shim → 0).
 3. **Angular animation engine integration**: only the API + a no-op
    `Element.animate()` driver are verified, not the real engine.
-4. **DI-based `HttpClient.get()`**: bundle and fetch surface verified; full DI
-   request is blocked by `FetchBackend` platform-provider requirements (NG0201).
-   Investigation so far: `createEnvironmentInjector(providers, parent)` requires
-   an explicit parent (a bare call was the original mistake), and `FetchBackend`
-   also needs `NgZone`, `DestroyRef` and `HTTP_FETCH_MAX_RESPONSE_SIZE`. Supplying
-   a parent from `Injector.create` plus `provideZonelessChangeDetection()` and a
-   `DestroyRef` value still yields NG0201, so the exact missing provider remains
-   unidentified. The stock FetchBackend path is not claimed as working.
+4. **DI-based `HttpClient.get()` — RESOLVED (NG0201)**: the real
+   `@angular/common/http` bundle loads and a DI-resolved `HttpClient` performs
+   `get('/api/x')` through `HttpHandler`/`FetchBackend`. The failure sequence was
+   instrumented with Angular 22 dev-mode errors: first
+   `InjectionToken HTTP_FETCH_MAX_RESPONSE_SIZE`, then `PendingTasks`, then
+   `InjectionToken REQUESTS_CONTRIBUTE_TO_STABILITY`. Root cause:
+   `createEnvironmentInjector()` creates an R3Injector with scope
+   `{'environment'}`; its parent was a plain `Injector.create()` with no `root`
+   scope, so every `providedIn: 'root'` token was unresolvable. The fix supplies
+   `{provide: INJECTOR_SCOPE, useValue: 'root'}` from the same pnpm-resolved
+   `@angular/core` instance, matching Angular's own `internalCreateApplication`
+   root-injector pattern. `scripts/bundle-framework.mjs` exports
+   `core.ɵINJECTOR_SCOPE` as `INJECTOR_SCOPE` and
+   `http.ɵHTTP_FETCH_MAX_RESPONSE_SIZE` as `HTTP_FETCH_MAX_RESPONSE_SIZE` from
+   that single instance, preserving token identity. The QuickJS shims now also
+   provide UTF-8 `TextEncoder`/`TextDecoder` and `Response.body.getReader()`
+   because `FetchBackend` decodes stream chunks rather than calling
+   `response.json()`. Evidence: ignored acceptance test
+   `angular_http_platform_loads_in_quickjs` asserts the native fetch body
+   (`hello-from-native|GET`) and `HttpResponse.status === 200`. The converter in
+   `quickjs.rs` is depth-limited because returning a cyclic RxJS `Subscription`
+   previously overflowed rquickjs; the test returns a primitive and a new unit
+   test `quickjs_engine_cyclic_value_does_not_overflow` covers truncation.
 5. **iOS parity**: Swift bindings still wrap the legacy host; nothing here
    claims iOS execution.
 6. Template-driven `ngModel` bindings and AOT i18n markers in real templates

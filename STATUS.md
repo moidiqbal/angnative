@@ -1,8 +1,8 @@
 # AngNative — Current Status (single source of truth)
 
-**Last verified:** 2026-11-21
+**Last verified:** 2026-11-22
 **Repo:** `C:\Users\Moid Iqbal\Projects\angnative`
-**Branch:** `master` (working tree has uncommitted changes — see `git status`)
+**Branch:** `master`
 
 > This file exists because an older status list claimed that `@angnative/web`,
 > the iOS shell and the Windows desktop app "were not created". That list is
@@ -19,7 +19,7 @@ plus `dom-backend.spec.ts` and `web.spec.ts`.
 ```powershell
 Get-ChildItem packages\web\src -File          # shows all files above
 pnpm --filter @angnative/web test             # 2 files / 6 tests passed
-pnpm test                                     # 16 files / 208 tests passed
+pnpm test                                     # 16 files / 219 tests passed
 ```
 
 Browser verification (Playwright/Chromium) — no console errors:
@@ -86,20 +86,21 @@ elevation (error 740). Git's copy does not. Workaround:
 ```powershell
 $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
 cargo build --workspace
-cargo test --workspace   # 124 tests pass, including host-engine and desktop (11)
+cargo test --workspace   # 132 tests pass, including host-engine and desktop (11)
 ```
 
 ## Verification summary
 
 | Item | Status |
 |---|---|
-| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **124 tests pass** (with Git `patch.exe` on PATH — see note above) |
-| JS/TS (16 spec files) | ✅ 208 tests pass |
+| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **132 tests pass** (with Git `patch.exe` on PATH — see note above) |
+| JS/TS (16 spec files) | ✅ 219 tests pass |
 | Android JNI + emulator run | ✅ verified |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified |
 | iOS shell | ⚠️ code complete, Mac build pending |
 | Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; single event path; 6 ignored acceptance tests pass (Angular bootstrap + click round trip + forms/router/animations/http) once `dist/aot` bundles exist; on-device shell loading still pending (`docs/EVENT-BRIDGE.md`) |
+| Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |
 | Production AOT (`pnpm run compile:aot`, `angnative build`) | ✅ real Angular `ngc` (not shadowed 0.1.0 binary), Ivy definitions verified in `dist/aot/`, esbuild bundle produced |
 
 Full history: `docs/PROJECT-REVIEW-2026-11-20.md`

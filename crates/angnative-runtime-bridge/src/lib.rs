@@ -576,14 +576,34 @@ mod tests {
 
     /// HttpClient platform compatibility. Requires: pnpm bundle:framework
     ///
-    /// Verifies the real @angular/common/http bundle loads and that the
-    /// host-wirable fetch surface returns a proper Response. Full DI-based
-    /// `HttpClient.get()` is not yet verified: FetchBackend needs platform
-    /// providers (NgZone/DestroyRef) that a bare EnvironmentInjector does not
-    /// supply in this runtime.
+    /// Verifies the real @angular/common/http bundle loads, that the
+    /// host-wirable fetch surface returns a proper Response, and that
+    /// DI-based `HttpClient.get()` resolves and delivers the native body.
+    ///
+    /// Root cause of the former NG0201 (verified against Angular 22 source):
+    /// `createEnvironmentInjector()` builds an R3Injector whose scopes are
+    /// `{'environment'}`. Its parent was a plain `Injector.create()`, which has
+    /// no `root` scope, so every `providedIn: 'root'` token was unresolvable.
+    /// The first missing token was `HTTP_FETCH_MAX_RESPONSE_SIZE` (injected by
+    /// FetchBackend), followed by `PendingTasks` and
+    /// `REQUESTS_CONTRIBUTE_TO_STABILITY`. Angular's own
+    /// `internalCreateApplication` creates the root injector with
+    /// `{provide: INJECTOR_SCOPE, useValue: 'root'}`; doing the same here makes
+    /// all root-scoped providers resolve from the same pnpm module instance.
     #[test]
     #[ignore = "requires generated dist/aot/http-bundle.js"]
     fn angular_http_platform_loads_in_quickjs() {
+        // Angular's DI/HttpClient graph is large; run on a dedicated thread
+        // with a 32 MB stack (same pattern as the router acceptance test).
+        let handle = std::thread::Builder::new()
+            .name("http-test-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_angular_http_platform_loads_in_quickjs)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_angular_http_platform_loads_in_quickjs() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../dist/aot/http-bundle.js"
@@ -622,12 +642,63 @@ mod tests {
             JsValue::String("200|hello-from-native|GET".to_string())
         );
 
-        // NOTE (honest): DI-based HttpClient.get() is still blocked by NG0201.
-        // Investigated: createEnvironmentInjector requires an explicit parent
-        // (Injector.create), and FetchBackend additionally needs NgZone /
-        // DestroyRef / HTTP_FETCH_MAX_RESPONSE_SIZE. Supplying parent + tokens
-        // still yields NG0201, so the exact missing provider is not yet known.
-        // Bundle load and the fetch platform surface are verified above.
+        // DI-based HttpClient.get(): same fetch handler, but through the real
+        // Angular HttpHandler/FetchBackend pipeline. `HttpClient.get()` defaults
+        // to observe:'body', so `next` receives the decoded native body.
+        bridge
+            .load_script(
+                r#"
+                var _httpDiBody = null;
+                var _httpDiStatus = null;
+                var _httpDiError = null;
+                try {
+                    var _httpParent = __ngHttp.Injector.create({ providers: [] });
+                    var _httpEnv = __ngHttp.createEnvironmentInjector([
+                        __ngHttp.provideZonelessChangeDetection(),
+                        __ngHttp.provideHttpClient(),
+                        { provide: __ngHttp.INJECTOR_SCOPE, useValue: 'root' }
+                    ], _httpParent);
+                    var _httpClient = _httpEnv.get(__ngHttp.HttpClient);
+                    _httpClient.get('/api/x').subscribe({
+                        next: function (body) {
+                            _httpDiBody = (body && body.message) + '|' +
+                                (body && body.method);
+                        },
+                        error: function (err) {
+                            _httpDiError = String(err && err.message || err);
+                        }
+                    });
+                    _httpClient.get('/api/x', { observe: 'response' }).subscribe({
+                        next: function (res) {
+                            if (res && res.type === 4) _httpDiStatus = res.status;
+                        },
+                        error: function (err) {
+                            _httpDiError = String(err && err.message || err);
+                        }
+                    });
+                } catch (e) {
+                    _httpDiError = String(e && e.message || e);
+                }
+                0; // return a primitive: subscribe() returns a cyclic Subscription
+            "#,
+            )
+            .expect("HttpClient.get must be dispatchable");
+
+        assert_eq!(
+            bridge.runtime_mut().eval("_httpDiError").unwrap(),
+            JsValue::Null,
+            "DI-based HttpClient.get must not error"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("_httpDiBody").unwrap(),
+            JsValue::String("hello-from-native|GET".to_string()),
+            "HttpClient.get must deliver the host fetch handler body"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("_httpDiStatus").unwrap(),
+            JsValue::Number(200.0),
+            "HttpResponse status must come from the native fetch handler"
+        );
     }
 
     /// Full component-based Router navigation in QuickJS.

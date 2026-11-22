@@ -189,6 +189,17 @@ impl<'js> rquickjs::IntoJs<'js> for JsValue {
 
 /// Convert a rquickjs Value to our JsValue. Reads only; no Ctx needed.
 fn qjs_value_to_js_value(value: &QjsValue<'_>) -> JsValue {
+    qjs_value_to_js_value_at(value, 0)
+}
+
+/// Maximum depth walked when converting a JS value into the owned `JsValue`
+/// tree. JS values can be cyclic (e.g. an RxJS `Subscription`, which references
+/// its own parent/children). rquickjs cannot represent cycles and an unbounded
+/// walk would recurse until the native stack overflows, so deeper values are
+/// truncated to `Null` instead of crashing the runtime.
+const MAX_JS_CONVERSION_DEPTH: usize = 16;
+
+fn qjs_value_to_js_value_at(value: &QjsValue<'_>, depth: usize) -> JsValue {
     if value.is_undefined() || value.is_null() {
         return JsValue::Null;
     }
@@ -201,13 +212,16 @@ fn qjs_value_to_js_value(value: &QjsValue<'_>) -> JsValue {
     if let Some(s) = value.as_string() {
         return s.to_string().map(JsValue::String).unwrap_or(JsValue::Null);
     }
+    if depth >= MAX_JS_CONVERSION_DEPTH {
+        return JsValue::Null;
+    }
     if value.is_array() {
         if let Some(arr) = value.as_array() {
             let mut out = Vec::new();
             for i in 0..arr.len() {
                 let item: Result<QjsValue, _> = arr.get(i);
                 out.push(
-                    item.map(|v| qjs_value_to_js_value(&v))
+                    item.map(|v| qjs_value_to_js_value_at(&v, depth + 1))
                         .unwrap_or(JsValue::Null),
                 );
             }
@@ -220,7 +234,7 @@ fn qjs_value_to_js_value(value: &QjsValue<'_>) -> JsValue {
             if let Ok(ks) = k.to_string() {
                 let val: Result<QjsValue, _> = obj.get(k.clone());
                 if let Ok(v) = val {
-                    map.insert(ks, qjs_value_to_js_value(&v));
+                    map.insert(ks, qjs_value_to_js_value_at(&v, depth + 1));
                 }
             }
         }
@@ -317,6 +331,21 @@ mod tests {
     fn quickjs_engine_gc() {
         let mut engine = QuickJsEngine::new().unwrap();
         assert!(engine.gc().is_ok());
+    }
+
+    #[test]
+    fn quickjs_engine_cyclic_value_does_not_overflow() {
+        let mut engine = QuickJsEngine::new().unwrap();
+        // A self-referential object graph must be truncated, not crash the
+        // native stack (rquickjs cannot represent cycles).
+        let result = engine.eval(r#"var o = { name: 'cycle' }; o.self = o; o;"#).unwrap();
+        match result {
+            JsValue::Object(map) => assert_eq!(
+                map.get("name"),
+                Some(&JsValue::String("cycle".to_string()))
+            ),
+            other => panic!("expected truncated object, got {other:?}"),
+        }
     }
 
     #[test]
