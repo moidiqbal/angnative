@@ -4,8 +4,8 @@
 owns Host + QuickJS + `AngNativeRuntime`, a real Angular AOT bundle boots, and a native
 event reaches the Angular listener (10 ignored tests pass — 9 Angular acceptance tests
 plus 1 RxJS spot-check — via `cargo test -p angnative-runtime-bridge -- --ignored`).
-The cross-thread C ABI fix is now verified on an Android 14 emulator with real wrong-thread
-JNI calls; physical-device verification is still outstanding. Loading that bundle inside a
+The cross-thread C ABI fix is now verified on an Android 14 emulator and on the physical
+OnePlus Open (Android 16, arm64-v8a) with real wrong-thread JNI calls. Loading that bundle inside a
 shipping native shell on-device is the remaining integration step. See
 `docs/CODE-REVIEW-2026-11-22.md` for the full evidence and honest gaps.
 
@@ -55,7 +55,7 @@ native button click (Kotlin / Swift / winit)
   → component (click) handler runs
 ```
 
-## Cross-thread safety (verified on host + Android emulator; NOT on physical device)
+## Cross-thread safety (verified on host, Android emulator, and physical OnePlus Open)
 
 `RuntimeBridge` records its creating `ThreadId`. Rust callers hit
 `assert_owner_thread()` and panic loudly on misuse (`test_thread_affinity`).
@@ -93,11 +93,15 @@ and rerunning the instrumentation test produced the pass. Evidence:
 `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md` and
 `docs/evidence/android-thread-affinity-emulator.html`.
 
-**Still not verified on a physical device.** At the time of the run,
-`adb devices -l` showed only `emulator-5554`; the OnePlus Open was not attached.
-No wrong-thread JNI call has been executed on a physical device. Separately,
-no Android UI-thread marshalling is implemented in the JNI callbacks (which only
-`AttachCurrentThread` for Rust→Kotlin view callbacks), and
+**Verified on the physical OnePlus Open.** After USB reconnection and RSA
+authorization, `adb devices -l` showed `b6640c8f` (`CPH2551`, Android 16,
+arm64-v8a). Running the same suite with `$env:ANDROID_SERIAL = 'b6640c8f'`
+selected `CPH2551 - 16` and reported 2 tests, 0 failures. Evidence:
+`docs/evidence/ANDROID-THREAD-AFFINITY-ONEPLUS.md` and
+`docs/evidence/android-thread-affinity-oneplus.html`.
+
+Separately, no Android UI-thread marshalling is implemented in the JNI callbacks
+(which only `AttachCurrentThread` for Rust→Kotlin view callbacks), and
 `EcosystemCoreActivity` still loads the AOT bundle and immediately destroys the
 bridge, leaving no live listener for a native tap. Those remain concrete open
 tasks, not claims.
@@ -126,7 +130,7 @@ Still open (honest):
   static runtime-bridge bindings only (no Swift compile or simulator/device run
   on this host). Until a shell keeps the bridge alive and a tap reaches
   Angular, the framework-level claim is "verified in the embedded runtime," not
-  "runs natively." See the cross-thread section above for the physical-device gap.
+  "runs natively." See the cross-thread section above for the remaining UI-thread / live-tap gap.
 - **Animation-engine integration** is now verified with deterministic three-sample
   interpolation (`angular_animation_engine_interpolates_native_styles`); real-time
   easing fidelity is still unverified. DI-based `HttpClient.get()` is verified by

@@ -63,6 +63,7 @@ Retained report: `docs/evidence/android-thread-affinity-emulator.html`
 
 ## Honest scope
 
-Physical-device verification is **not** claimed. At the time of this run,
-`adb devices -l` showed no OnePlus Open; only `emulator-5554` was attached.
-No wrong-thread JNI call has been executed on a physical device.
+At the time of this run, `adb devices -l` showed no OnePlus Open; only
+`emulator-5554` was attached, so this file claims only emulator verification.
+The same instrumentation suite was later run on the physical OnePlus Open; see
+`docs/evidence/ANDROID-THREAD-AFFINITY-ONEPLUS.md`.
