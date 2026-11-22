@@ -23,14 +23,46 @@ import { counter, increment, decrement, reset, isEven } from './counter-signal';
   imports: [NaView, NaText, NaButton],
   template: `
     <na-view [style.flexDirection]="'column'" [style.padding]="'16px'">
-      <na-text [style.fontSize]="'24px'" [style.fontWeight]="'bold'">Counter</na-text>
-      <na-text [text]="counterDisplay()"></na-text>
-      <na-view [style.flexDirection]="'row'" [style.gap]="'8px'" [style.marginTop]="'12px'">
-        <na-button (click)="decrement()">−</na-button>
-        <na-button (click)="reset()">reset</na-button>
-        <na-button (click)="increment()">+</na-button>
+      <na-text
+        [style.width]="'160px'"
+        [style.height]="'30px'"
+        [style.fontSize]="'24px'"
+        [style.fontWeight]="'bold'"
+      >Counter</na-text>
+      <na-text
+        [style.width]="'120px'"
+        [style.height]="'28px'"
+        [text]="counterDisplay()"
+      ></na-text>
+      <na-view
+        [style.width]="'160px'"
+        [style.height]="'40px'"
+        [style.flexDirection]="'row'"
+        [style.gap]="'8px'"
+        [style.marginTop]="'12px'"
+      >
+        <na-button
+          [style.width]="'48px'"
+          [style.height]="'36px'"
+          (click)="decrement()"
+        >−</na-button>
+        <na-button
+          [style.width]="'48px'"
+          [style.height]="'36px'"
+          (click)="reset()"
+        >reset</na-button>
+        <na-button
+          [style.width]="'48px'"
+          [style.height]="'36px'"
+          (click)="increment()"
+        >+</na-button>
       </na-view>
-      <na-text [style.color]="isEven() ? 'green' : 'red'" [style.marginTop]="'8px'">
+      <na-text
+        [style.width]="'80px'"
+        [style.height]="'20px'"
+        [style.color]="isEven() ? 'green' : 'red'"
+        [style.marginTop]="'8px'"
+      >
         {{ isEven() ? 'even' : 'odd' }}
       </na-text>
     </na-view>

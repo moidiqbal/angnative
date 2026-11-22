@@ -119,6 +119,22 @@ describe('AngNativeRenderer mutation batching', () => {
     expect(setWidth.value).toBe('200px');
   });
 
+  it('canonicalizes kebab style keys before recording SetStyle', () => {
+    const el = renderer.createElement(null, 'na-view');
+    renderer.setStyle(el, 'flex-direction', 'row');
+    renderer.setStyle(el, 'font-size', '24px');
+    renderer.setStyle(el, 'margin-top', '12px');
+
+    const keys = lastBatch().commands
+      .filter((command: any) => command.kind === 'SetStyle')
+      .map((command: any) => command.key);
+    expect(keys).toContain('flexDirection');
+    expect(keys).toContain('fontSize');
+    expect(keys).toContain('marginTop');
+    expect(keys).not.toContain('flex-direction');
+    expect((el as any).styles.get('flexDirection')).toBe('row');
+  });
+
   it('animate() emits interpolated native style mutations and a finish event', async () => {
     const el = renderer.createElement(null, 'na-view');
     let finished = 0;

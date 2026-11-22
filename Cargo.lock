@@ -157,6 +157,7 @@ dependencies = [
  "angnative-host-view",
  "anyhow",
  "log",
+ "serde_json",
 ]
 
 [[package]]

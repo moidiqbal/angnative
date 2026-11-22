@@ -950,6 +950,184 @@ mod tests {
         }
     }
 
+    /// Flagship presentation regression: the real AOT bundle must produce
+    /// distinct, non-overlapping layout frames for the Angular counter row.
+    /// Requires the generated bundle:
+    ///   pnpm compile:aot && pnpm bundle:quickjs
+    #[test]
+    #[ignore = "requires generated dist/aot/quickjs-bundle.js"]
+    fn angular_counter_layout_has_non_overlapping_frames() {
+        use angnative_host_core::{NodeSnapshot, TreeSnapshot};
+        use angnative_host_ffi::bridge::{Host, LayoutNodeInputJson, LayoutRequestJson};
+
+        fn node_id_for(
+            snapshot: &TreeSnapshot,
+            predicate: impl Fn(&NodeSnapshot) -> bool,
+        ) -> u64 {
+            snapshot
+                .nodes
+                .iter()
+                .find(|node| predicate(node))
+                .unwrap_or_else(|| panic!("expected native node for predicate"))
+                .id
+        }
+
+        fn button_id_for(snapshot: &TreeSnapshot, text_id: u64) -> u64 {
+            let text_node = snapshot
+                .nodes
+                .iter()
+                .find(|node| node.id == text_id)
+                .expect("button text node");
+            let parent_id = text_node.parent_id.expect("button text must have a parent");
+            let parent = snapshot
+                .nodes
+                .iter()
+                .find(|node| node.id == parent_id)
+                .expect("button parent node");
+            assert_eq!(parent.tag, "na-button", "button label must be wrapped by na-button");
+            parent_id
+        }
+
+        fn rect_of(rects: &[serde_json::Value], node_id: u64) -> (f32, f32, f32, f32) {
+            let rect = rects
+                .iter()
+                .find(|rect| rect["node_id"].as_u64() == Some(node_id))
+                .unwrap_or_else(|| panic!("no layout rect for node {node_id}"));
+            (
+                rect["x"].as_f64().expect("x") as f32,
+                rect["y"].as_f64().expect("y") as f32,
+                rect["width"].as_f64().expect("width") as f32,
+                rect["height"].as_f64().expect("height") as f32,
+            )
+        }
+
+        /// Layout frames are parent-relative; sum ancestors for a screen-space
+        /// rectangle before checking overlap.
+        fn absolute_rect_for(
+            snapshot: &TreeSnapshot,
+            rects: &[serde_json::Value],
+            node_id: u64,
+        ) -> (f32, f32, f32, f32) {
+            let mut x = 0.0;
+            let mut y = 0.0;
+            let mut current = Some(node_id);
+            while let Some(id) = current {
+                let (dx, dy, _, _) = rect_of(rects, id);
+                x += dx;
+                y += dy;
+                current = snapshot
+                    .nodes
+                    .iter()
+                    .find(|node| node.id == id)
+                    .and_then(|node| node.parent_id);
+            }
+            let (_, _, width, height) = rect_of(rects, node_id);
+            (x, y, width, height)
+        }
+
+        fn overlaps(a: &(f32, f32, f32, f32), b: &(f32, f32, f32, f32)) -> bool {
+            a.0 < b.0 + b.2
+                && b.0 < a.0 + a.2
+                && a.1 < b.1 + b.3
+                && b.1 < a.1 + a.3
+        }
+
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/quickjs-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm compile:aot && pnpm bundle:quickjs` first");
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge.load_script(&source).expect("bundle must parse and run");
+
+        let snapshot = bridge.host_mut().engine().snapshot();
+        assert!(
+            snapshot.nodes.iter().any(|node| node.id == 1),
+            "Angular root node 1 missing from host snapshot"
+        );
+
+        let inputs = snapshot
+            .nodes
+            .iter()
+            .map(|node| LayoutNodeInputJson {
+                node_id: node.id,
+                styles: node.styles.clone(),
+                children: node.children.clone(),
+            })
+            .collect();
+        let request = LayoutRequestJson {
+            root_id: 1,
+            nodes: inputs,
+            available_width: 411.0,
+            available_height: 800.0,
+        };
+        let request_json = serde_json::to_string(&request).expect("request must serialize");
+
+        let mut host = Host::new();
+        let response_json = host
+            .run_layout_json(&request_json)
+            .expect("layout must succeed with canonicalized styles");
+        let response: serde_json::Value =
+            serde_json::from_str(&response_json).expect("layout response must be JSON");
+        assert!(
+            response.get("error").is_none(),
+            "layout returned an error: {response_json}"
+        );
+        let rects = response
+            .get("nodes")
+            .and_then(|nodes| nodes.as_array())
+            .expect("layout response must contain nodes");
+
+        let count_text_id = node_id_for(&snapshot, |node| {
+            node.text_content.as_deref() == Some("Count: 0")
+        });
+        let minus_text_id = node_id_for(&snapshot, |node| {
+            matches!(node.text_content.as_deref(), Some("−") | Some("-"))
+        });
+        let reset_text_id = node_id_for(&snapshot, |node| {
+            node.text_content.as_deref() == Some("reset")
+        });
+        let plus_text_id = node_id_for(&snapshot, |node| {
+            node.text_content.as_deref() == Some("+")
+        });
+
+        let count = absolute_rect_for(&snapshot, rects, count_text_id);
+        let minus = absolute_rect_for(&snapshot, rects, button_id_for(&snapshot, minus_text_id));
+        let reset = absolute_rect_for(&snapshot, rects, button_id_for(&snapshot, reset_text_id));
+        let plus = absolute_rect_for(&snapshot, rects, button_id_for(&snapshot, plus_text_id));
+
+        let controls = [
+            ("Count: 0", count),
+            ("minus", minus),
+            ("reset", reset),
+            ("plus", plus),
+        ];
+        for (label, rect) in &controls {
+            assert!(
+                rect.2 > 0.0 && rect.3 > 0.0,
+                "{label} has zero layout size: {rect:?}"
+            );
+        }
+        for i in 0..controls.len() {
+            for j in (i + 1)..controls.len() {
+                assert!(
+                    !overlaps(&controls[i].1, &controls[j].1),
+                    "{} overlaps {}: {:?} / {:?}",
+                    controls[i].0,
+                    controls[j].0,
+                    controls[i].1,
+                    controls[j].1
+                );
+            }
+        }
+        assert!(
+            minus.0 < reset.0 && reset.0 < plus.0,
+            "button row lost left-to-right order: minus={minus:?} reset={reset:?} plus={plus:?}"
+        );
+    }
+
     /// Angular Forms compatibility (Phase 1). Requires:
     ///   pnpm bundle:forms
     #[test]

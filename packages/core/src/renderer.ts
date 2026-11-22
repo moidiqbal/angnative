@@ -28,7 +28,11 @@ type RenderDebugInfo = unknown;
 import type { ElementContract } from '@angnative/contract/elements';
 import { ELEMENT_TAGS, getContract, isKnownElement } from '@angnative/contract/elements';
 import type { StyleMap } from '@angnative/contract/style';
-import { validateStyleMap, parseStyleValue } from '@angnative/contract/style';
+import {
+  getStyleProperty,
+  validateStyleMap,
+  parseStyleValue,
+} from '@angnative/contract/style';
 import type { Command } from '@angnative/contract/protocol';
 import { createBatch, encodeBatch } from '@angnative/contract/protocol';
 import {
@@ -519,11 +523,14 @@ export class AngNativeRenderer implements Renderer2, AnimationHost {
     const element = this.asElement(el);
     // Validate + canonicalize against the style table (§5.3: unknown → throw).
     const canonical = parseStyleValue(style, String(value ?? ''));
-    element.setStyle(style, canonical);
+    // Angular AOT emits kebab keys (`flex-direction`); the native style table
+    // and Rust layout host use camelCase. Emit the canonical key everywhere.
+    const key = getStyleProperty(style)?.name ?? style;
+    element.setStyle(key, canonical);
     this.recordMutation({
       kind: 'SetStyle',
       id: element.id,
-      key: style,
+      key,
       value: canonical,
     });
     this.maybeFlush();
@@ -531,11 +538,12 @@ export class AngNativeRenderer implements Renderer2, AnimationHost {
 
   removeStyle(el: any, style: string, flags?: RendererStyleFlags2): void {
     const element = this.asElement(el);
-    element.removeStyle(style);
+    const key = getStyleProperty(style)?.name ?? style;
+    element.removeStyle(key);
     this.recordMutation({
       kind: 'SetStyle',
       id: element.id,
-      key: style,
+      key,
       value: '',
     });
     this.maybeFlush();

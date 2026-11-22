@@ -138,10 +138,12 @@ class NativeViewFactory(
   }
 
   /** Apply a LayoutResponseJson to the registry: { "nodes": [rects] }. */
-  fun applyLayoutResult(layoutJson: String) {
+  fun applyLayoutResult(layoutJson: String): Boolean {
     try {
       val response = JSONObject(layoutJson)
-      val rects = response.optJSONArray("nodes") ?: return
+      if (response.has("error")) return false
+      val rects = response.optJSONArray("nodes") ?: return false
+      if (rects.length() == 0) return false
       for (i in 0 until rects.length()) {
         val rect = rects.getJSONObject(i)
         onNativeSetFrame(
@@ -152,8 +154,10 @@ class NativeViewFactory(
           rect.optDouble("height").toFloat()
         )
       }
+      return true
     } catch (e: Exception) {
-      // Layout error surfaced in the host's last_error; nothing to apply.
+      // Caller logs bridge.lastError(); report the failed apply explicitly.
+      return false
     }
   }
 

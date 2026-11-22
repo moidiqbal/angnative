@@ -63892,11 +63892,14 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
     constructor(id, tag, nodeType) {
       this.id = id;
       this.tag = tag;
-      this.nodeType = nodeType;
+      this.nativeNodeType = nodeType;
+      this.nodeType = tag === "#text" ? 3 : tag === "#comment" ? 8 : 1;
+      this.animationHostId = 0;
       this.parentId = null;
       this.children = [];
       this.properties = /* @__PURE__ */ new Map();
       this.styles = /* @__PURE__ */ new Map();
+      this.style = {};
       this.textContent = null;
     }
     /** Apply a default style map (from the element contract). */
@@ -63904,14 +63907,29 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
       for (const [key, value] of Object.entries(defaults)) {
         if (!this.styles.has(key)) {
           this.styles.set(key, value);
+          this.style[key] = value;
         }
       }
     }
     setStyle(key, value) {
       this.styles.set(key, value);
+      this.style[key] = value;
+    }
+    /**
+     * Web Animations API entry point used by Angular's `WebAnimationsDriver`.
+     * The implementation is a flat global hook keyed by numeric ids; storing a
+     * renderer closure here would create a QuickJS object cycle.
+     */
+    animate(keyframes, options) {
+      const globals = globalThis;
+      const hook = globals["__angnativeAnimateElement"];
+      if (typeof hook !== "function")
+        return null;
+      return hook(this.animationHostId, this.id, keyframes, options);
     }
     removeStyle(key) {
       this.styles.delete(key);
+      delete this.style[key];
     }
     setProperty(key, value) {
       this.properties.set(key, value);
@@ -63992,7 +64010,219 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
     }
   };
 
+  // packages/core/dist/animation.js
+  var GLOBAL_HOSTS = "__angnativeAnimationHosts";
+  var GLOBAL_ANIMATE = "__angnativeAnimateElement";
+  var SAMPLE_OFFSETS = [0, 0.5, 1];
+  function globalObject() {
+    return globalThis;
+  }
+  function hostMap() {
+    const globals = globalObject();
+    const existing = globals[GLOBAL_HOSTS];
+    if (existing instanceof Map) {
+      return existing;
+    }
+    const created = /* @__PURE__ */ new Map();
+    globals[GLOBAL_HOSTS] = created;
+    return created;
+  }
+  function registerAnimationHost(host) {
+    hostMap().set(host.animationHostId, host);
+    const globals = globalObject();
+    if (typeof globals[GLOBAL_ANIMATE] !== "function") {
+      globals[GLOBAL_ANIMATE] = function(hostId, nodeId, keyframes, options) {
+        const target = hostMap().get(hostId);
+        return target ? target.animateElement(nodeId, keyframes, options) : null;
+      };
+    }
+  }
+  function unregisterAnimationHost(host) {
+    hostMap().delete(host.animationHostId);
+  }
+  function normalizeKeyframes(input2) {
+    if (!Array.isArray(input2))
+      return [];
+    const frames = input2.map((raw, index) => {
+      const source = raw && typeof raw === "object" ? raw : {};
+      const rawOffset = source["offset"];
+      const offset = typeof rawOffset === "number" && Number.isFinite(rawOffset) ? rawOffset : input2.length === 1 ? 1 : index / (input2.length - 1);
+      const styles = {};
+      for (const [key, value] of Object.entries(source)) {
+        if (key === "offset" || key === "easing")
+          continue;
+        if (typeof value === "string" || typeof value === "number") {
+          styles[key] = value;
+        }
+      }
+      return { offset, styles };
+    });
+    frames.sort((a, b) => a.offset - b.offset);
+    return frames;
+  }
+  function numericPart(value) {
+    var _a13;
+    const match = /^(-?(?:\d+\.?\d*|\.\d+))([a-z%]*)$/i.exec(String(value).trim());
+    if (!match)
+      return null;
+    const amount = Number(match[1]);
+    if (!Number.isFinite(amount))
+      return null;
+    return { amount, unit: (_a13 = match[2]) != null ? _a13 : "" };
+  }
+  function interpolate(from2, to, t) {
+    const start = numericPart(from2);
+    const end = numericPart(to);
+    if (start && end && start.unit === end.unit) {
+      const amount = start.amount + (end.amount - start.amount) * t;
+      return `${Number(amount.toFixed(4))}${start.unit}`;
+    }
+    return t < 0.5 ? String(from2) : String(to);
+  }
+  function valueAt(property2, offset, frames) {
+    const relevant = frames.filter((frame) => Object.hasOwn(frame.styles, property2));
+    if (relevant.length === 0)
+      return void 0;
+    let before = relevant[0];
+    let after = relevant[relevant.length - 1];
+    for (const frame of relevant) {
+      if (frame.offset <= offset)
+        before = frame;
+      if (frame.offset >= offset) {
+        after = frame;
+        break;
+      }
+    }
+    const start = before.styles[property2];
+    if (before === after || before.offset === after.offset)
+      return String(start);
+    const span = after.offset - before.offset;
+    const t = Math.min(1, Math.max(0, (offset - before.offset) / span));
+    return interpolate(start, after.styles[property2], t);
+  }
+  function sampleFrames(frames) {
+    const properties = /* @__PURE__ */ new Set();
+    for (const frame of frames) {
+      for (const key of Object.keys(frame.styles))
+        properties.add(key);
+    }
+    return SAMPLE_OFFSETS.map((offset) => {
+      const styles = {};
+      for (const property2 of properties) {
+        const value = valueAt(property2, offset, frames);
+        if (value !== void 0)
+          styles[property2] = value;
+      }
+      return { offset, styles };
+    });
+  }
+  function createNativeAnimationPlayer(nodeId, rawKeyframes, rawOptions, setStyle) {
+    const frames = normalizeKeyframes(rawKeyframes);
+    const samples = sampleFrames(frames);
+    const options = rawOptions && typeof rawOptions === "object" ? rawOptions : {};
+    const rawDuration = options["duration"];
+    const duration = typeof rawDuration === "number" && Number.isFinite(rawDuration) ? Math.max(0, rawDuration) : 0;
+    const listeners = [];
+    let playState = "idle";
+    let currentTime = 0;
+    let finishFired = false;
+    let resolveFinished;
+    const finished = new Promise((resolve) => {
+      resolveFinished = resolve;
+    });
+    function applySample(sample) {
+      for (const [property2, value] of Object.entries(sample.styles)) {
+        setStyle(property2, value);
+      }
+    }
+    function emitFinish() {
+      if (finishFired)
+        return;
+      finishFired = true;
+      playState = "finished";
+      resolveFinished == null ? void 0 : resolveFinished();
+      for (const listener2 of listeners.slice())
+        listener2();
+    }
+    function scheduleFinish() {
+      const queue = globalObject()["queueMicrotask"];
+      if (typeof queue === "function")
+        queue(emitFinish);
+      else
+        emitFinish();
+    }
+    function applyPosition(position) {
+      if (samples.length === 0)
+        return;
+      let closest = samples[0];
+      for (const sample of samples) {
+        if (Math.abs(sample.offset - position) < Math.abs(closest.offset - position)) {
+          closest = sample;
+        }
+      }
+      applySample(closest);
+    }
+    const player = {
+      playState: "idle",
+      currentTime,
+      finished,
+      play() {
+        finishFired = false;
+        playState = "running";
+        for (const sample of samples)
+          applySample(sample);
+        currentTime = duration;
+        playState = "finished";
+        scheduleFinish();
+        return player;
+      },
+      pause() {
+        playState = "paused";
+        return player;
+      },
+      finish() {
+        const final = samples[samples.length - 1];
+        if (final)
+          applySample(final);
+        currentTime = duration;
+        emitFinish();
+      },
+      cancel() {
+        playState = "idle";
+        currentTime = 0;
+        finishFired = false;
+      },
+      addEventListener(type, listener2) {
+        if (type === "finish" && !listeners.includes(listener2))
+          listeners.push(listener2);
+      },
+      removeEventListener(type, listener2) {
+        if (type !== "finish")
+          return;
+        const index = listeners.indexOf(listener2);
+        if (index >= 0)
+          listeners.splice(index, 1);
+      }
+    };
+    Object.defineProperty(player, "playState", {
+      get: () => playState,
+      enumerable: true,
+      configurable: true
+    });
+    Object.defineProperty(player, "currentTime", {
+      get: () => currentTime,
+      set: (value) => {
+        currentTime = typeof value === "number" && Number.isFinite(value) ? value : 0;
+        applyPosition(currentTime / Math.max(duration, 1));
+      },
+      enumerable: true,
+      configurable: true
+    });
+    return player;
+  }
+
   // packages/core/dist/renderer.js
+  var nextAnimationHostId = 1;
   function tagToNodeType(tag) {
     switch (tag.toLowerCase()) {
       case "na-view":
@@ -64009,6 +64239,7 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
       case "na-button":
       case "native-button":
       case "button":
+      case "na-pressable":
         return "Button";
       case "na-image":
       case "native-image":
@@ -64024,6 +64255,12 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
       case "native-input":
       case "input":
         return "TextInput";
+      case "na-list":
+        return "Custom:na-list";
+      case "na-switch":
+        return "Custom:na-switch";
+      case "na-activity-indicator":
+        return "Custom:na-activity-indicator";
       default:
         return "Custom";
     }
@@ -64048,11 +64285,19 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
         return ELEMENT_TAGS.scrollView;
       case "native-text-input":
       case "text-input":
+      case "input":
         return ELEMENT_TAGS.textInput;
       case "na-button":
       case "native-button":
       case "button":
+      case "na-pressable":
         return ELEMENT_TAGS.pressable;
+      case "na-list":
+        return ELEMENT_TAGS.list;
+      case "na-switch":
+        return ELEMENT_TAGS.switch;
+      case "na-activity-indicator":
+        return ELEMENT_TAGS.activityIndicator;
       default:
         return tag;
     }
@@ -64070,8 +64315,11 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
       this.frameId = 0;
       this.flushed = false;
       this.registry = new ElementRegistry();
+      this.animationHostId = nextAnimationHostId++;
+      registerAnimationHost(this);
       this.flush = (_a13 = options.flush) != null ? _a13 : null;
       this.rootElement = new NativeElement(0, "#root", "View");
+      this.rootElement.animationHostId = this.animationHostId;
       const g = globalThis;
       g.__angnativeDispatchListener = (listenerId, payloadJson) => {
         let event = payloadJson;
@@ -64082,8 +64330,20 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
         this.dispatchEvent(listenerId, event);
       };
     }
+    /**
+     * AnimationHost implementation. Called through the flat global hook from
+     * `NativeElement.animate`; the returned player writes styles back through
+     * this renderer so every interpolated frame becomes a native mutation.
+     */
+    animateElement(nodeId, keyframes, options) {
+      const element2 = this.registry.get(nodeId);
+      if (!element2)
+        return null;
+      return createNativeAnimationPlayer(nodeId, keyframes, options, (property2, value) => this.setStyle(element2, property2, value));
+    }
     /* ---------- lifecycle ---------- */
     destroy() {
+      unregisterAnimationHost(this);
       this.mutations.length = 0;
       this.listeners.clear();
       this.listenerIndex.clear();
@@ -64105,6 +64365,7 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
       const nodeType = tagToNodeType(canonicalTag);
       const id = this.registry.allocateId();
       const element2 = new NativeElement(id, canonicalTag, nodeType);
+      element2.animationHostId = this.animationHostId;
       element2.applyDefaults(contract.defaultStyles);
       this.registry.register(element2);
       this.recordMutation({ kind: "CreateNode", id, nodeType });
@@ -64127,6 +64388,7 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
     createComment(value, debugInfo) {
       const id = this.registry.allocateId();
       const element2 = new NativeElement(id, "#comment", "Custom");
+      element2.animationHostId = this.animationHostId;
       element2.setTextContent(value);
       this.registry.register(element2);
       this.recordMutation({
@@ -64204,11 +64466,16 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
       this.maybeFlush();
     }
     removeChild(parent, oldChild) {
-      const parentEl = this.asElement(parent);
       const childEl = this.asElement(oldChild);
-      if (childEl.parentId !== parentEl.id) {
-        throw new Error(`Element ${childEl.id} is not a child of element ${parentEl.id}`);
+      if (!childEl || childEl.parentId === null) {
+        return;
       }
+      let parentEl = parent === null || parent === void 0 ? null : this.asElement(parent);
+      if (!parentEl || parentEl.id === 0 || parentEl.id !== childEl.parentId) {
+        parentEl = this.registry.get(childEl.parentId);
+      }
+      if (!parentEl)
+        return;
       childEl.parentId = null;
       parentEl.removeChildId(childEl.id);
       this.recordMutation({
@@ -64305,24 +64572,28 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
       this.maybeFlush();
     }
     setStyle(el, style, value, flags) {
+      var _a13, _b8;
       const element2 = this.asElement(el);
       const canonical = parseStyleValue(style, String(value != null ? value : ""));
-      element2.setStyle(style, canonical);
+      const key = (_b8 = (_a13 = getStyleProperty(style)) == null ? void 0 : _a13.name) != null ? _b8 : style;
+      element2.setStyle(key, canonical);
       this.recordMutation({
         kind: "SetStyle",
         id: element2.id,
-        key: style,
+        key,
         value: canonical
       });
       this.maybeFlush();
     }
     removeStyle(el, style, flags) {
+      var _a13, _b8;
       const element2 = this.asElement(el);
-      element2.removeStyle(style);
+      const key = (_b8 = (_a13 = getStyleProperty(style)) == null ? void 0 : _a13.name) != null ? _b8 : style;
+      element2.removeStyle(key);
       this.recordMutation({
         kind: "SetStyle",
         id: element2.id,
-        key: style,
+        key,
         value: ""
       });
       this.maybeFlush();
@@ -64866,7 +65137,7 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
   __publicField(_CounterComponent, "\u0275fac", function CounterComponent_Factory(__ngFactoryType__) {
     return new (__ngFactoryType__ || _CounterComponent)();
   });
-  __publicField(_CounterComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _CounterComponent, selectors: [["demo-counter"]], decls: 13, vars: 20, consts: [[3, "text"], [3, "click"]], template: function CounterComponent_Template(rf, ctx) {
+  __publicField(_CounterComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _CounterComponent, selectors: [["demo-counter"]], decls: 13, vars: 48, consts: [[3, "text"], [3, "click"]], template: function CounterComponent_Template(rf, ctx) {
     if (rf & 1) {
       \u0275\u0275elementStart(0, "na-view")(1, "na-text");
       \u0275\u0275text(2, "Counter");
@@ -64897,13 +65168,20 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
     if (rf & 2) {
       \u0275\u0275styleProp("flex-direction", "column")("padding", "16px");
       \u0275\u0275advance();
-      \u0275\u0275styleProp("font-size", "24px")("font-weight", "bold");
+      \u0275\u0275styleProp("width", "160px")("height", "30px")("font-size", "24px")("font-weight", "bold");
       \u0275\u0275advance(2);
+      \u0275\u0275styleProp("width", "120px")("height", "28px");
       \u0275\u0275property("text", ctx.counterDisplay());
       \u0275\u0275advance();
-      \u0275\u0275styleProp("flex-direction", "row")("gap", "8px")("margin-top", "12px");
-      \u0275\u0275advance(7);
-      \u0275\u0275styleProp("color", ctx.isEven() ? "green" : "red")("margin-top", "8px");
+      \u0275\u0275styleProp("width", "160px")("height", "40px")("flex-direction", "row")("gap", "8px")("margin-top", "12px");
+      \u0275\u0275advance();
+      \u0275\u0275styleProp("width", "48px")("height", "36px");
+      \u0275\u0275advance(2);
+      \u0275\u0275styleProp("width", "48px")("height", "36px");
+      \u0275\u0275advance(2);
+      \u0275\u0275styleProp("width", "48px")("height", "36px");
+      \u0275\u0275advance(2);
+      \u0275\u0275styleProp("width", "80px")("height", "20px")("color", ctx.isEven() ? "green" : "red")("margin-top", "8px");
       \u0275\u0275advance();
       \u0275\u0275textInterpolate1(" ", ctx.isEven() ? "even" : "odd", " ");
     }
@@ -64917,7 +65195,7 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
   __publicField(_AppComponent, "\u0275fac", function AppComponent_Factory(__ngFactoryType__) {
     return new (__ngFactoryType__ || _AppComponent)();
   });
-  __publicField(_AppComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _AppComponent, selectors: [["demo-app"]], decls: 6, vars: 12, template: function AppComponent_Template(rf, ctx) {
+  __publicField(_AppComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _AppComponent, selectors: [["demo-app"]], decls: 6, vars: 20, template: function AppComponent_Template(rf, ctx) {
     if (rf & 1) {
       \u0275\u0275elementStart(0, "na-view")(1, "na-text");
       \u0275\u0275text(2, "AngNative Demo");
@@ -64931,9 +65209,9 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
     if (rf & 2) {
       \u0275\u0275styleProp("flex-direction", "column")("padding", "24px")("gap", "16px");
       \u0275\u0275advance();
-      \u0275\u0275styleProp("font-size", "20px")("font-weight", "bold");
+      \u0275\u0275styleProp("width", "220px")("height", "28px")("font-size", "20px")("font-weight", "bold");
       \u0275\u0275advance(2);
-      \u0275\u0275styleProp("color", "#666");
+      \u0275\u0275styleProp("width", "320px")("height", "20px")("color", "#666");
     }
   }, dependencies: [NaViewComponent, NaTextComponent, CounterComponent], encapsulation: 2 }));
   var AppComponent = _AppComponent;

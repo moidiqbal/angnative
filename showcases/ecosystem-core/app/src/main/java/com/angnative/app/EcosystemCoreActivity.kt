@@ -222,7 +222,12 @@ class EcosystemCoreActivity : AppCompatActivity() {
             // Layout is produced by the Rust host, not guessed here.
             val w = resources.displayMetrics.widthPixels / resources.displayMetrics.density
             val h = 600f
-            bridge.runLayout(w, h)?.let { factory.applyLayoutResult(it) }
+            val layoutJson = bridge.runLayout(w, h)
+            val applied = factory.applyLayoutResult(layoutJson)
+            android.util.Log.i("AngNative", "Angular layout applied=$applied json=$layoutJson")
+            if (!applied) {
+                android.util.Log.w("AngNative", "Angular layout error: ${bridge.lastError()}")
+            }
 
             val plusId = factory.findButtonIdByText("+")
             statusLabel.text = "Angular in Rust: nodes=${bridge.nodeCount()} rc=$rc plusNode=$plusId"

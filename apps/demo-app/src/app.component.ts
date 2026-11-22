@@ -15,8 +15,17 @@ import { CounterComponent } from './counter.component';
   imports: [NaView, NaText, CounterComponent],
   template: `
     <na-view [style.flexDirection]="'column'" [style.padding]="'24px'" [style.gap]="'16px'">
-      <na-text [style.fontSize]="'20px'" [style.fontWeight]="'bold'">AngNative Demo</na-text>
-      <na-text [style.color]="'#666'">Angular running natively — no WebView.</na-text>
+      <na-text
+        [style.width]="'220px'"
+        [style.height]="'28px'"
+        [style.fontSize]="'20px'"
+        [style.fontWeight]="'bold'"
+      >AngNative Demo</na-text>
+      <na-text
+        [style.width]="'320px'"
+        [style.height]="'20px'"
+        [style.color]="'#666'"
+      >Angular running natively — no WebView.</na-text>
       <demo-counter></demo-counter>
     </na-view>
   `,
