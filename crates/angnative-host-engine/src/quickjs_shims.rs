@@ -333,9 +333,12 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
                 }
                 for (var p = 1; p < arguments.length; p++) {
                     var marker = '\uFFFD' + (p - 1) + '\uFFFD';
-                    while (out.indexOf(marker) >= 0) {
-                        out = out.replace(marker, String(arguments[p]));
-                    }
+                    // Single-pass replacement. Angular AOT passes the literal
+                    // placeholder marker as the interpolation argument and
+                    // substitutes the real value later in ɵɵi18nApply; a
+                    // `while (indexOf(marker) >= 0) replace(...)` loop would
+                    // never terminate when argument === marker.
+                    out = out.split(marker).join(String(arguments[p]));
                 }
                 return out;
             };
@@ -744,6 +747,21 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         }
     "#)?;
 
+    // DOM node type constants. Angular's i18n instructions compare
+    // `node.nodeType` against these globals when creating text/comment nodes.
+    // A plain constants object is enough; no object graph/cycles.
+    engine.eval(r#"
+        var Node = {
+            ELEMENT_NODE: 1,
+            TEXT_NODE: 3,
+            COMMENT_NODE: 8,
+            DOCUMENT_NODE: 9,
+            DOCUMENT_FRAGMENT_NODE: 11,
+            DOCUMENT_POSITION_CONTAINED_BY: 16
+        };
+        globalThis.Node = Node;
+    "#)?;
+
     // EventTarget, Event, CustomEvent
     engine.eval(r#"
         class EventTarget {
@@ -1028,6 +1046,19 @@ mod tests {
     }
 
     #[test]
+    fn test_dom_node_constants_shim() {
+        let mut engine = installed();
+        assert_eq!(
+            engine.eval("Node.TEXT_NODE").unwrap(),
+            crate::engine::JsValue::Number(3.0)
+        );
+        assert_eq!(
+            engine.eval("globalThis.Node === Node").unwrap(),
+            crate::engine::JsValue::Boolean(true)
+        );
+    }
+
+    #[test]
     fn test_self_is_a_safe_getter() {
         let mut engine = installed();
         // No cyclic object graph: `self`/`window`/`globalThis` are computed.
@@ -1218,10 +1249,18 @@ mod tests {
                 "Hello \uFFFD0\uFFFD!": "Assalam-o-Alaikum \uFFFD0\uFFFD!"
             });
             var _greeting = $localize`Hello ${'AngNative'}!`;
+            // Angular AOT passes the literal placeholder through $localize and
+            // substitutes the real value later via ɵɵi18nApply. This must not
+            // loop forever or consume the placeholder.
+            var _aot_placeholder = $localize`Hello ${"\uFFFD0\uFFFD"}!`;
         "#).unwrap();
         assert_eq!(
             engine.eval("_greeting").unwrap(),
             crate::engine::JsValue::String("Assalam-o-Alaikum AngNative!".to_string())
+        );
+        assert_eq!(
+            engine.eval("_aot_placeholder").unwrap(),
+            crate::engine::JsValue::String("Assalam-o-Alaikum \u{FFFD}0\u{FFFD}!".to_string())
         );
     }
 

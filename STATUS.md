@@ -86,22 +86,23 @@ elevation (error 740). Git's copy does not. Workaround:
 ```powershell
 $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
 cargo build --workspace
-cargo test --workspace   # 133 tests pass, including host-engine and desktop (11)
+cargo test --workspace   # 134 tests pass, including host-engine and desktop (11)
 ```
 
 ## Verification summary
 
 | Item | Status |
 |---|---|
-| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **133 tests pass** (with Git `patch.exe` on PATH — see note above) |
+| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **134 tests pass** (with Git `patch.exe` on PATH — see note above) |
 | JS/TS (16 spec files) | ✅ 220 tests pass |
 | Android JNI + emulator run | ✅ verified |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified |
 | iOS shell | ⚠️ code complete, Mac build pending |
-| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; single event path; 7 ignored acceptance tests pass (Angular bootstrap + click round trip + forms/ngModel/router/animations/http/router app) once `dist/aot` bundles exist; on-device shell loading still pending (`docs/EVENT-BRIDGE.md`) |
+| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; single event path; 8 ignored acceptance tests pass (Angular bootstrap + click round trip + forms/ngModel/router/animations/http/router app/i18n) once `dist/aot` bundles exist; on-device shell loading still pending (`docs/EVENT-BRIDGE.md`) |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |
 | Template-driven `ngModel` in QuickJS | ✅ verified by ignored acceptance test `angular_template_driven_forms_round_trip_in_quickjs`: AOT `FormsAppComponent` uses `FormsModule`/`ngModel` on `<input>`; JS model changes emit native `SetProperty`/text mutations, and a Rust-dispatched native `input` event updates the model. `<input>` now maps to the `na-text-input` primitive; `navigator.userAgent` shim added for Angular's DefaultValueAccessor. |
+| AOT i18n markers in QuickJS | ✅ verified by ignored acceptance test `angular_aot_i18n_translated_text_in_native_tree`: `tsconfig.aot.i18n.json` compiles `<na-text i18n>Hello {{ name }}!</na-text>` to `$localize` + `ɵɵi18n`/`ɵɵi18nExp`; a registered translation renders `Assalam-o-Alaikum AngNative!` in the native tree. Root causes: `$localize` placeholder self-substitution loop and missing `Node` DOM constants. |
 | Production AOT (`pnpm run compile:aot`, `angnative build`) | ✅ real Angular `ngc` (not shadowed 0.1.0 binary), Ivy definitions verified in `dist/aot/`, esbuild bundle produced |
 
 Full history: `docs/PROJECT-REVIEW-2026-11-20.md`

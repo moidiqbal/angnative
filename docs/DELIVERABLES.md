@@ -24,7 +24,7 @@ All were installed and launched on emulator API 34; `WebViews: 0` verified.
 
 ## 5. Automated test suites
 - `pnpm test` → 208 JS tests pass
-- `cargo test --workspace` → 133 Rust tests pass (Windows: put Git's `patch.exe` first on PATH); `cargo test -p angnative-runtime-bridge -- --ignored` → 7 acceptance tests pass
+- `cargo test --workspace` → 134 Rust tests pass (Windows: put Git's `patch.exe` first on PATH); `cargo test -p angnative-runtime-bridge -- --ignored` → 8 acceptance tests pass
 - `packages/native-ui-core` Gradle `test` → 6 JUnit tests pass
 - `scripts/verify-web.py` (Playwright) → web adapter render + click verified
 - `scripts/verify-showcases.ps1` → APK install/launch/WebView checks

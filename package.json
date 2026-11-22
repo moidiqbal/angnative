@@ -17,6 +17,7 @@
     "compile:aot": "node scripts/compile-aot.mjs",
     "compile:aot:router": "node scripts/compile-aot.mjs tsconfig.aot.router.json",
     "compile:aot:forms": "node scripts/compile-aot.mjs tsconfig.aot.forms.json",
+    "compile:aot:i18n": "node scripts/compile-aot.mjs tsconfig.aot.i18n.json",
     "bundle:quickjs": "node scripts/bundle-quickjs.mjs",
     "bundle:forms": "node scripts/bundle-forms.mjs",
     "bundle:framework": "node scripts/bundle-framework.mjs",

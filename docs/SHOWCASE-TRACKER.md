@@ -15,7 +15,7 @@
 | Build system | Gradle 9.9.2 / AGP 9.5.2 / JDK 25 (latest profile) **or** Gradle 8.2 / AGP 8.2 / JDK 17 (legacy) |
 | Android SDK | `C:\Android\Sdk`, API 34/36, NDK 27.2.12479018 |
 | Web adapter | `@angnative/web` — DOM path only, explicitly NOT used for native APKs |
-| Existing tests | 133 Rust tests (+7 ignored acceptance, all passing); 220 JS tests; Android emulator UI + click verified |
+| Existing tests | 134 Rust tests (+8 ignored acceptance, all passing); 220 JS tests; Android emulator UI + click verified |
 
 ### DOM-dependent libraries — verdict before implementation
 Angular Material, PrimeNG, NG-ZORRO, Taiga UI, Spartan UI, AG Grid, ECharts,

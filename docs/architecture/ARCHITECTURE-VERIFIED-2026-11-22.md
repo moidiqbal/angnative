@@ -153,8 +153,8 @@ for opt-in use only.
 
 | Check | Result |
 |---|---|
-| `cargo test --workspace` | 133 passed |
-| `cargo test -p angnative-runtime-bridge -- --ignored` | 7 acceptance tests passed |
+| `cargo test --workspace` | 134 passed |
+| `cargo test -p angnative-runtime-bridge -- --ignored` | 8 acceptance tests passed |
 | `pnpm test` | 220 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
 | Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
@@ -163,10 +163,11 @@ for opt-in use only.
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
 | CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
 
-The seven acceptance tests require regenerated `dist/aot/*` bundles, which are
+The eight acceptance tests require regenerated `dist/aot/*` bundles, which are
 gitignored. Reproduce locally with:
 `pnpm compile:aot && pnpm compile:aot:router && pnpm compile:aot:forms &&
-pnpm bundle:quickjs && pnpm bundle:forms && pnpm bundle:framework`, then
+pnpm compile:aot:i18n && pnpm bundle:quickjs && pnpm bundle:forms &&
+pnpm bundle:framework`, then
 `cargo test -p angnative-runtime-bridge -- --ignored`. Workspace packages
 (`@angnative/contract`, `core`, `platform`) must be rebuilt first — a stale
 `packages/platform/dist` was a real past source of incorrect behavior.
@@ -221,7 +222,19 @@ but is relevant when reasoning about event handling.
    test `quickjs_engine_cyclic_value_does_not_overflow` covers truncation.
 5. **iOS parity**: Swift bindings still wrap the legacy host; nothing here
    claims iOS execution.
-6. **AOT i18n markers in real templates** are unverified.
+6. **AOT i18n markers — RESOLVED**: the AOT fixture
+   `apps/demo-app/src/i18n/main.i18n.ts` uses `<na-text i18n>Hello {{ name }}!</na-text>`.
+   `tsconfig.aot.i18n.json` emits `$localize`, `ɵɵi18n`, `ɵɵi18nExp` and
+   `ɵɵi18nApply` into `dist/aot-i18n/i18n/main.i18n.js`. The first run hung
+   because the `$localize` shim replaced the `\uFFFD0\uFFFD` marker in a
+   `while (indexOf(marker) >= 0)` loop while AOT passed that same marker as the
+   interpolation argument; it is now a single-pass `split(marker).join(...)`, so
+   Angular's later `ɵɵi18nApply` performs the real substitution. The second run
+   failed with `ReferenceError: Node is not defined` in `applyCreateOpCodes`;
+   a flat `Node` constants shim (no object cycles) fixes it. Ignored acceptance
+   test `angular_aot_i18n_translated_text_in_native_tree` registers the Angular
+   i18n key before bundle evaluation and asserts the native tree contains the
+   translated, interpolated text `Assalam-o-Alaikum AngNative!`.
 7. **Template-driven `ngModel` — RESOLVED**: the AOT fixture
    `apps/demo-app/src/forms/main.forms.ts` uses `FormsModule` and
    `[ngModel]`/`(ngModelChange)` on a plain `<input>`. `canonicalElementTag()`

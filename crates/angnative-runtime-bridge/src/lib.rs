@@ -638,6 +638,69 @@ mod tests {
         );
     }
 
+    /// AOT i18n markers in a real template. Requires:
+    ///   pnpm compile:aot:i18n && pnpm bundle:framework
+    #[test]
+    #[ignore = "requires generated dist/aot/i18n-app-bundle.js"]
+    fn angular_aot_i18n_translated_text_in_native_tree() {
+        let handle = std::thread::Builder::new()
+            .name("i18n-test-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_angular_aot_i18n_translated_text_in_native_tree)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_angular_aot_i18n_translated_text_in_native_tree() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/i18n-app-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm compile:aot:i18n && pnpm bundle:framework` first");
+        assert!(
+            source.contains("$localize"),
+            "AOT bundle must contain the $localize marker emitted by ngc"
+        );
+        assert!(
+            source.contains("i18nExp"),
+            "AOT bundle must contain Angular's i18n template instruction"
+        );
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        // Register before evaluating the bundle: ngc initializes the i18n
+        // message constant while defining the component.
+        bridge
+            .load_script(
+                r#"
+                $localize.loadTranslations({
+                    ':\u241F371b83d16c77b75bbf80d741d66e73c5a7b9eaea\u241F1363615954628417873:Hello \uFFFD0\uFFFD:INTERPOLATION:!': 'Assalam-o-Alaikum \uFFFD0\uFFFD!'
+                });
+                0;
+            "#,
+            )
+            .expect("translation registration must run");
+
+        bridge.load_script(&source).expect("i18n AOT bundle must load");
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __i18nError === 'undefined' ? null : __i18nError")
+                .unwrap(),
+            JsValue::Null,
+            "i18n AOT bootstrap rejected"
+        );
+
+        let snapshot = bridge.host_mut().engine().snapshot();
+        assert!(
+            snapshot.nodes.iter().any(|node| {
+                node.text_content.as_deref() == Some("Assalam-o-Alaikum AngNative!")
+            }),
+            "native tree must contain the translated, interpolated text node; got {:?}",
+            snapshot.nodes.iter().map(|n| n.text_content.clone()).collect::<Vec<_>>()
+        );
+    }
+
     /// Router API compatibility. Requires: pnpm bundle:framework
     #[test]
     #[ignore = "requires generated dist/aot/router-bundle.js"]

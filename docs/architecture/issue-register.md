@@ -325,7 +325,7 @@
 |------|----------|--------|
 | **Gate A** | All P0 issues resolved | 🟡 In Progress |
 | **Gate B** | Runtime lifecycle deterministic | ⬜ Pending |
-| **Gate C** | Angular bootstrap + execution verified **in QuickJS** (7 acceptance tests) | ✅ Passed in-process |
+| **Gate C** | Angular bootstrap + execution verified **in QuickJS** (8 acceptance tests) | ✅ Passed in-process |
 | **Gate D** | Android E2E round-trip verified | ⬜ Pending |
 | **Gate E** | All tests pass | ⬜ Pending |
 | **Gate F** | Engine abstraction complete | ⬜ Pending |

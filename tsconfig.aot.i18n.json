@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.aot.json",
+  "compilerOptions": {
+    "outDir": "dist/aot-i18n"
+  },
+  "angularCompilerOptions": {
+    "i18n": {
+      "sourceLocale": "en-US"
+    }
+  },
+  "files": [
+    "apps/demo-app/src/i18n/main.i18n.ts"
+  ],
+  "include": [
+    "apps/demo-app/src/i18n/**/*.ts"
+  ]
+}
