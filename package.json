@@ -22,6 +22,7 @@
     "bundle:quickjs": "node scripts/bundle-quickjs.mjs",
     "bundle:forms": "node scripts/bundle-forms.mjs",
     "bundle:framework": "node scripts/bundle-framework.mjs",
+    "bundle:third-party": "node scripts/bundle-third-party.mjs",
     "bundle:fixtures": "node -e \"import('./packages/cli/dist/bundle.js').then(m => m.bundleApp('packages/testing/fixtures/out/app.js', 'packages/testing/fixtures/out/bundle.js'))\"",
     "start": "pnpm --filter @angnative/web run build && node scripts/serve-web.mjs"
   },

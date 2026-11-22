@@ -7,7 +7,8 @@
 
 | Feature | Status | Reason / next step |
 |---|---|---|
-| Third-party DOM libraries (Material, PrimeNG, NG-ZORRO, Taiga, Spartan) | Unsupported unchanged | Renderer only understands `na-*` → native widgets. Need native ports or adapters. |
+| Third-party DOM libraries (Material, PrimeNG, NG-ZORRO, Taiga, Spartan) | Unsupported unchanged | Renderer only understands `na-*` → native widgets. Need native ports or adapters. None of these libraries is installed in this repo, so no unchanged-library run was attempted. |
+| Third-party DOM-free library spot-check (RxJS 7.8.2) | Implemented & verified (tested) | `pnpm bundle:third-party` bundles the unmodified, lockfile-pinned RxJS 7.8.2 into `dist/aot/rxjs-bundle.js`; ignored test `third_party_rxjs_runs_unchanged_in_quickjs` loads it into the embedded QuickJS runtime and asserts `of(1,2,3).pipe(map(x => x*2)).subscribe(...)` yields `[2,4,6]` with `complete` and no error. This proves one third-party, non-Angular, DOM-free package executes unchanged on the native JS path. It is a **spot-check, not general compatibility**: DOM-heavy UI libraries, NgRx, Transloco, AG Grid, etc. were not installed or run, and no third-party app was ingested end-to-end. |
 | AG Grid sorting / filtering / editing / pinning | Not implemented | Grid POC is read-only (`showcases/ecosystem-grid`). |
 | ECharts zoom / animation / full option schema | Not implemented | Native Canvas charts POC only. |
 | Rich text editing (Tiptap/CKEditor) | Native equivalent built | `showcases/ecosystem-richtext` — native Spannable editor; not unchanged Tiptap compatibility; no HTML import/export, no redo. |

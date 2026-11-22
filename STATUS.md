@@ -86,7 +86,7 @@ elevation (error 740). Git's copy does not. Workaround:
 ```powershell
 $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
 cargo build --workspace
-cargo test --workspace   # 135 tests pass, 9 ignored; includes host-engine and desktop (11)
+cargo test --workspace   # 135 tests pass, 10 ignored; includes host-engine and desktop (11)
 ```
 
 ## Verification summary
@@ -99,11 +99,12 @@ cargo test --workspace   # 135 tests pass, 9 ignored; includes host-engine and d
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified |
 | iOS shell | ⚠️ code complete, Mac build pending |
-| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; single event path; 9 ignored acceptance tests pass (Angular bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n) once `dist/aot` bundles exist; on-device shell loading still pending (`docs/EVENT-BRIDGE.md`) |
+| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; single event path; 9 ignored Angular acceptance tests pass (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n) once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; on-device shell loading still pending (`docs/EVENT-BRIDGE.md`) |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |
 | Template-driven `ngModel` in QuickJS | ✅ verified by ignored acceptance test `angular_template_driven_forms_round_trip_in_quickjs`: AOT `FormsAppComponent` uses `FormsModule`/`ngModel` on `<input>`; JS model changes emit native `SetProperty`/text mutations, and a Rust-dispatched native `input` event updates the model. `<input>` now maps to the `na-text-input` primitive; `navigator.userAgent` shim added for Angular's DefaultValueAccessor. |
 | AOT i18n markers in QuickJS | ✅ verified by ignored acceptance test `angular_aot_i18n_translated_text_in_native_tree`: `tsconfig.aot.i18n.json` compiles `<na-text i18n>Hello {{ name }}!</na-text>` to `$localize` + `ɵɵi18n`/`ɵɵi18nExp`; a registered translation renders `Assalam-o-Alaikum AngNative!` in the native tree. Root causes: `$localize` placeholder self-substitution loop and missing `Node` DOM constants. |
 | Angular Animations engine in QuickJS | ✅ verified by ignored acceptance test `angular_animation_engine_interpolates_native_styles`: `pnpm compile:aot:animations && pnpm bundle:framework` builds the AOT `fade` trigger; the real `AnimationEngine` over `AngNativeRendererFactory2` emits a native `SetStyle opacity: 0.5` midpoint between lifecycle `start,done`, ending at native `opacity: 1`. Native player uses three deterministic samples (`0 / 0.5 / 1`) via flat numeric-id registries — real-time easing fidelity is **not verified**. Root causes: null root renderer host, string `nodeType`, missing `element.style` mirror, orphan-element check, and zero-keyframe `animate('100ms')`. |
+| Third-party library spot-check (RxJS 7.8.2) | ✅ verified in embedded QuickJS (native JS path) | `pnpm bundle:third-party` + ignored test `third_party_rxjs_runs_unchanged_in_quickjs`: unmodified RxJS `of(1,2,3).pipe(map(x => x*2))` yields `[2,4,6]` with `complete`, no error. Single DOM-free library only — no DOM-heavy UI library or third-party app was run unchanged; see `docs/COMPATIBILITY.md` §2b. |
 | Android cross-thread bridge safety | ⚠️ host/C ABI verified, device NOT verified | Fixed the release `panic = "abort"` defect: C ABI entry points reject wrong-thread calls with a sentinel before any `assert_owner_thread()` panic can occur (`test_c_abi_dispatch_from_non_owner_thread_returns_sentinel_without_panicking` + `test_thread_affinity` pass). No wrong-thread JNI call has been executed on device (no `androidTest` sources, no background-thread trigger in Kotlin, no UI-thread marshalling in JNI callbacks). Details in `docs/EVENT-BRIDGE.md`. |
 | Production AOT (`pnpm run compile:aot`, `angnative build`) | ✅ real Angular `ngc` (not shadowed 0.1.0 binary), Ivy definitions verified in `dist/aot/`, esbuild bundle produced |
 

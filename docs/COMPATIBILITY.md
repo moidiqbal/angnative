@@ -45,6 +45,22 @@ comparison. They are **not** native AngNative performance demos; each README say
 | Calendar | FullCalendar | ✅ FullCalendar | ❌ needs native calendar | ✅ |
 | Microfrontends | Native Federation | architecture-dependent | ❌ not applicable to native path | ✅ |
 
+## 2b. Verified third-party spot-check (2026-11-22)
+
+One real third-party package was actually bundled and executed on the **native
+JS path** (embedded QuickJS inside `angnative-runtime-bridge`), not just assessed:
+
+| Library | Version | How verified | Result |
+|---|---|---|---|
+| RxJS | 7.8.2 (already pinned in `pnpm-lock.yaml`) | `pnpm bundle:third-party` → `dist/aot/rxjs-bundle.js`; ignored Rust test `third_party_rxjs_runs_unchanged_in_quickjs` | `of(1,2,3).pipe(map(x => x*2)).subscribe(...)` produced `[2,4,6]`, `complete` fired, no error |
+
+This confirms the "pure TS / DOM-free libraries work" row for RxJS specifically.
+It is a **spot-check, not a compatibility guarantee**: no DOM-heavy UI library
+(Material, PrimeNG, NG-ZORRO, Taiga, Spartan), NgRx, Transloco, AG Grid, ECharts,
+Tiptap or FullCalendar was installed or executed, and no unmodified third-party
+*app* was ingested end-to-end. The web-adapter claims in the tables above remain
+design/reasoning claims except where a test is named.
+
 ## 3. What we recommend to the community
 
 - **Native apps:** use `@angnative/common` primitives + `@angnative/core` renderer.

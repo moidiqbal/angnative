@@ -161,8 +161,9 @@ for opt-in use only.
 
 | Check | Result |
 |---|---|
-| `cargo test --workspace` | 135 passed, 9 ignored (acceptance tests) |
-| `cargo test -p angnative-runtime-bridge -- --ignored` | 9 acceptance tests passed |
+| `cargo test --workspace` | 135 passed, 10 ignored (9 Angular acceptance + 1 third-party spot-check) |
+| `cargo test -p angnative-runtime-bridge -- --ignored` | 9 Angular acceptance tests + 1 third-party RxJS spot-check passed |
+| Third-party library (native JS path) | RxJS 7.8.2 bundled unmodified via `pnpm bundle:third-party`; `third_party_rxjs_runs_unchanged_in_quickjs` asserts `of(1,2,3).pipe(map(x => x*2))` → `[2,4,6]`, `complete`, no error. **One DOM-free library only**; DOM-heavy UI libraries and third-party apps were not run. |
 | `pnpm test` | 221 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
 | Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
@@ -171,13 +172,13 @@ for opt-in use only.
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
 | CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
 
-The nine acceptance tests require regenerated `dist/aot/*` bundles, which are
+The ten ignored tests require regenerated `dist/aot/*` bundles, which are
 gitignored. Reproduce locally with:
 `pnpm --filter @angnative/core build && pnpm --filter @angnative/testing build &&
 pnpm --filter @angnative/platform build` then
 `pnpm compile:aot && pnpm compile:aot:router && pnpm compile:aot:forms &&
 pnpm compile:aot:i18n && pnpm compile:aot:animations && pnpm bundle:quickjs &&
-pnpm bundle:forms && pnpm bundle:framework`, then
+pnpm bundle:forms && pnpm bundle:framework && pnpm bundle:third-party`, then
 `cargo test -p angnative-runtime-bridge -- --ignored`. Workspace packages
 (`@angnative/contract`, `core`, `platform`) must be rebuilt first — a stale
 `packages/platform/dist` was a real past source of incorrect behavior.

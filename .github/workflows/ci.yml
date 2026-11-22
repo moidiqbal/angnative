@@ -95,6 +95,7 @@ jobs:
           pnpm run bundle:quickjs
           pnpm run bundle:forms
           pnpm run bundle:framework
+          pnpm run bundle:third-party
 
       - name: Run Angular-in-QuickJS acceptance tests
         run: cargo test -p angnative-runtime-bridge -- --ignored

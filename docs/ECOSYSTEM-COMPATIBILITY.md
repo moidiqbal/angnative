@@ -1,10 +1,16 @@
 # Ecosystem Compatibility — Phase 2 Categories
 
-**Status: 2026-11-21.** Assessment of the 11 Phase 2 ecosystem categories from
-the mission brief. This is a **reasoned, evidence-backed assessment**, not a
-record of executed integration tests: no third-party library listed below was
-installed, built, or run as part of this task. Where a status looks optimistic,
-the caveat underneath explains exactly what is and is not proven.
+**Status: 2026-11-21; spot-check addendum 2026-11-22.** Assessment of the 11
+Phase 2 ecosystem categories from the mission brief. This is a **reasoned,
+evidence-backed assessment**, not a record of executed integration tests. Where
+a status looks optimistic, the caveat underneath explains exactly what is and
+is not proven.
+
+**2026-11-22 addendum:** one library from category 7 (RxJS 7.8.2) was
+subsequently bundled unmodified and executed inside the embedded QuickJS
+runtime on the native path — see `docs/COMPATIBILITY.md` §2b and the ignored
+test `third_party_rxjs_runs_unchanged_in_quickjs`. No other library in the
+matrix below was installed, built, or run.
 
 ## Evidence and caveats (read first)
 
@@ -36,7 +42,7 @@ the caveat underneath explains exactly what is and is not proven.
 | 4 | Charts (ECharts / ng2-charts / AG Charts) | **Native reimplementation required** | DOM/canvas renderers; [COMPATIBILITY.md](COMPATIBILITY.md) marks ngx-echarts ❌ native and lists `na-chart` (GPU-backed) on the wishlist. Web adapter expected to work; not tested here. |
 | 5 | Animation (GSAP / Angular animations / Motion One) | **Native reimplementation required** | GSAP is DOM-only per [COMPATIBILITY.md](COMPATIBILITY.md); Angular animations also depend on DOM-style element mutation. Use native animators on the native path. GSAP works on the web adapter. Motion One not tested. |
 | 6 | i18n (Transloco / ngx-translate) | **Compatible with configuration** | Pure TS, no DOM; [COMPATIBILITY.md](COMPATIBILITY.md) marks Transloco ✅. Web adapter runs it. The JS runtime now exists (QuickJS), but this library has not been run natively; so the ✅ for native is a design expectation, not a demonstrated run. ngx-translate not separately tested. |
-| 7 | API / async data (RxJS / TanStack Query) | **Compatible with configuration** | RxJS observables are renderer-agnostic and already underpin Angular core; [COMPATIBILITY.md](COMPATIBILITY.md) marks the pair ✅. TanStack Query is not installed in this repo and was not tested. Native path needs the JS runtime. |
+| 7 | API / async data (RxJS / TanStack Query) | **Compatible with configuration** (RxJS now spot-check verified on the native path) | RxJS observables are renderer-agnostic and already underpin Angular core. RxJS 7.8.2 was bundled unmodified and run in QuickJS (`third_party_rxjs_runs_unchanged_in_quickjs`), producing `[2,4,6]` via `of`/`map`/`subscribe` with `complete` and no error. TanStack Query is not installed in this repo and was not tested. |
 | 8 | Component primitives (Angular CDK / Angular Aria) | **Compatible with configuration** | [COMPATIBILITY.md](COMPATIBILITY.md): CDK behaviours need native equivalents; web adapter works. Angular Aria was not separately tested. |
 | 9 | Rich text (Tiptap / CKEditor) | **Native reimplementation required** | Tiptap is contenteditable/DOM-only. A native equivalent is built and verified in `showcases/ecosystem-richtext` (Android `EditText` + real Spannable spans, WebViews=0). It is NOT unchanged Tiptap compatibility. Web adapter works. CKEditor not tested. |
 | 10 | Calendar (FullCalendar) | **Native reimplementation required** | DOM-based. A native equivalent is built and verified in `showcases/ecosystem-calendar` (Android Canvas month grid, WebViews=0). NOT unchanged FullCalendar compatibility. Web adapter works. |

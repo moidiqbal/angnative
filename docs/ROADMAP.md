@@ -22,6 +22,7 @@
 - [x] Install/launch the APK on an Android 34 x86_64 emulator and verify the click round trip visually: the demo renders from Rust `PlatformOp`s and "Click Me!" updates the Rust-hosted output node to "Hello World!" (screenshots in `docs/assets/android-demo*.png`).
 - [x] Native event bridge scaffolding: FFI `set_event_callback` / `add|remove|dispatch_event` with tests, plus QuickJS-side `na.addEventListener` / `na.removeEventListener` / `dispatch_event` API (`docs/EVENT-BRIDGE.md`).
 - [x] Full Angular listener round trip **in the embedded runtime**: `angnative-runtime-bridge` + real AOT bundle in QuickJS, 9 ignored acceptance tests pass (`docs/CODE-REVIEW-2026-11-22.md`).
+- [x] Third-party spot-check: unmodified RxJS 7.8.2 bundled via `pnpm bundle:third-party` and executed in QuickJS (`third_party_rxjs_runs_unchanged_in_quickjs`). One DOM-free library only — DOM-heavy UI libraries and unmodified third-party apps remain unverified (`docs/COMPATIBILITY.md` §2b).
 - [ ] Load that bundle in a **shipping native shell on-device** and tap a real widget — still outstanding; shells remain imperative.
 - [x] Enforce size budgets with `check-rust-size.mjs` and R8/Proguard optimizations.
 

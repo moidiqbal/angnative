@@ -4,6 +4,8 @@
 **Scope:** every showcase APK actually built and verified in this repository.
 **Rule applied:** no compatibility claim without execution evidence; native reimplementations are never labelled "unchanged library compatibility".
 
+> **2026-11-22 addendum (native JS path, not an APK):** RxJS 7.8.2 was bundled unmodified (`pnpm bundle:third-party`) and executed inside the embedded QuickJS runtime. The ignored test `third_party_rxjs_runs_unchanged_in_quickjs` asserts `of(1,2,3).pipe(map(x => x*2))` → `[2,4,6]` with `complete` and no error. This is a single DOM-free library spot-check; the APK verdicts and "claims explicitly NOT made" below still apply to third-party **UI** libraries, none of which was installed or run. The stale line 59 statement about no embedded JS runtime is superseded by `docs/EVENT-BRIDGE.md`.
+
 ## Environment (exact)
 
 | Item | Version / value |
@@ -18,7 +20,7 @@
 | Android NDK | 27.2.12479018 |
 | Android SDK | API 34 / 36, build-tools 34.0.0 / 37.0.0 |
 | Emulator | `sdk_gphone64_x86_64`, API 34, 1080×2400 @ 420 dpi, AVD `AngNative34` |
-| Test suites | `pnpm test` 220 passed; `cargo test --workspace` 134 passed (with Git `patch.exe` on PATH); 8 ignored Angular-in-QuickJS acceptance tests pass separately |
+| Test suites (current, 2026-11-22) | `pnpm test` 221 passed; `cargo test --workspace` 135 passed with 10 ignored (with Git `patch.exe` on PATH); 9 Angular acceptance + 1 third-party RxJS spot-check pass separately |
 
 ## Phase 1 — UI library showcases
 
@@ -56,5 +58,5 @@
 - No WebView/Capacitor/embedded browser exists in any showcase (verified via `dumpsys meminfo` `WebViews: 0` and source scans).
 - No frame-pacing, CPU, warm-start, physical-device or WebView-comparison benchmark has been run.
 - iOS was not built or tested (no macOS/Xcode in this environment).
-- Native shells have no embedded JS runtime executing an Angular bundle; see `docs/EVENT-BRIDGE.md`.
+- No shipping native shell keeps an embedded QuickJS runtime and Angular listener alive for a real tap. `EcosystemCoreActivity` did load the AOT bundle on-device (20 native nodes, `rc=0`) but destroys the bridge immediately; see `docs/EVENT-BRIDGE.md`.
 

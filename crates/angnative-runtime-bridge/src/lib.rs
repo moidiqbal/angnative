@@ -1206,4 +1206,74 @@ mod tests {
 
         unsafe { angnative_runtime_bridge_destroy(handle) };
     }
+
+    /// Third-party spot-check: RxJS 7.8.2 is a real, DOM-free npm package
+    /// already pinned in this repo's lockfile. Loading its unmodified bundle
+    /// into the embedded runtime proves a non-Angular third-party library can
+    /// execute on the native path. Requires: `pnpm bundle:third-party`.
+    #[test]
+    #[ignore = "requires generated dist/aot/rxjs-bundle.js"]
+    fn third_party_rxjs_runs_unchanged_in_quickjs() {
+        let handle = std::thread::Builder::new()
+            .name("rxjs-spotcheck-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_third_party_rxjs_spotcheck)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_third_party_rxjs_spotcheck() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/rxjs-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm bundle:third-party` first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge
+            .load_script(&source)
+            .expect("unmodified RxJS bundle must load in QuickJS");
+
+        bridge
+            .load_script(
+                r#"
+                globalThis.__rxjsValues = [];
+                globalThis.__rxjsComplete = false;
+                globalThis.__rxjsError = null;
+                try {
+                  __thirdPartyRxjs.of(1, 2, 3).pipe(
+                    __thirdPartyRxjsOperators.map(function (x) { return x * 2; })
+                  ).subscribe({
+                    next: function (v) { __rxjsValues.push(v); },
+                    error: function (e) { globalThis.__rxjsError = String(e); },
+                    complete: function () { globalThis.__rxjsComplete = true; }
+                  });
+                } catch (e) {
+                  globalThis.__rxjsError = String(e && (e.stack || e.message) || e);
+                }
+                0;
+                "#,
+            )
+            .expect("RxJS pipeline must run without throwing");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("JSON.stringify(__rxjsValues)")
+                .unwrap(),
+            JsValue::String("[2,4,6]".to_string()),
+            "RxJS of/map/subscribe must produce 2,4,6"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("__rxjsComplete").unwrap(),
+            JsValue::Boolean(true),
+            "RxJS subscription must complete"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("__rxjsError").unwrap(),
+            JsValue::Null,
+            "RxJS pipeline must not error"
+        );
+    }
 }
