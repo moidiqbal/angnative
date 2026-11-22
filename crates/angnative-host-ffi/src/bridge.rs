@@ -345,18 +345,22 @@ impl Host {
         let Ok(c_event) = CString::new(event_name) else { return 0 };
         let Ok(c_payload) = CString::new(payload) else { return 0 };
 
-        // Canonical path: JS runtime dispatch (thread-local, installed by RuntimeBridge).
+        // Canonical path: JS runtime dispatch (thread-local, installed by
+        // RuntimeBridge). F2 fix: the legacy fallback is chosen by *whether a
+        // JS dispatcher is installed*, NOT by its return count. A listener
+        // error makes the callback return 0; treating that as "no handler"
+        // would fire the legacy callback too and double-deliver the event.
         let js_invoked = JS_RUNTIME_DISPATCH.with(|dispatch| {
             match dispatch.borrow().as_ref() {
-                Some(f) => f(node_id, c_event.as_ptr(), c_payload.as_ptr()),
-                None => 0,
+                Some(f) => Some(f(node_id, c_event.as_ptr(), c_payload.as_ptr())),
+                None => None,
             }
         });
-        if js_invoked > 0 {
-            return js_invoked;
+        if let Some(invoked) = js_invoked {
+            return invoked;
         }
 
-        // Legacy FFI callback path (kept for shells that register one directly).
+        // Legacy FFI callback path (only when no JS dispatcher is installed).
         let Some(cb) = self.event_callback else { return 0 };
         let ids = self
             .event_listeners

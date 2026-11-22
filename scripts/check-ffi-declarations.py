@@ -22,7 +22,13 @@ SWIFT = ROOT / "platforms/ios/Sources/AngNativeHost/SwiftFFI.swift"
 HEADER = ROOT / "crates/angnative-host-ffi/include/angnative_host_ffi.h"
 
 # C exports intentionally kept after Kotlin switched to the runtime bridge.
-LEGACY_CPP_ONLY = {"nativeHostCreate", "nativeHostDestroy"}
+LEGACY_CPP_ONLY = {
+    "nativeHostCreate",
+    "nativeHostDestroy",
+    # C++ implementation kept for legacy shells; no longer declared by the
+    # 10 unified showcase bridges (they use nativeRuntimeBridgeDispatchEvent).
+    "nativeHostDispatchEvent",
+}
 
 
 def kotlin_methods(text: str) -> dict[str, int]:

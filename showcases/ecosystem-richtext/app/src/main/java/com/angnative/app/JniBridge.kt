@@ -49,7 +49,6 @@ class JniBridge(private val context: Context) {
   external fun nativeHostLastError(handle: Long): String?
   external fun nativeHostNodeCount(handle: Long): Int
   external fun nativeHostSnapshot(handle: Long): String?
-  external fun nativeHostDispatchEvent(handle: Long, nodeId: Long, eventName: String, payloadJson: String?): Int
   
   // Runtime bridge methods (unified host + QuickJS runtime)
   external fun nativeRuntimeBridgeCreate(): Long
@@ -381,3 +380,4 @@ data class NodeSnapshot(
   val styles: MutableMap<String, String> = mutableMapOf(),
   val properties: MutableMap<String, String> = mutableMapOf()
 )
+

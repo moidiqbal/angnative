@@ -21,6 +21,12 @@ use std::ffi::{c_char, CStr};
 use std::thread::{self, ThreadId};
 use std::thread_local;
 
+/// Sentinel returned by event dispatch when a panic was caught. 0 means
+/// "no listener invoked"; this distinguishes a real miss from a failure.
+pub const DISPATCH_PANIC: u32 = u32::MAX;
+/// 0 = success, 1 = script error / invalid input, 2 = panic caught.
+pub const LOAD_SCRIPT_PANIC: i32 = 2;
+
 thread_local! {
     static CURRENT_BRIDGE_RUNTIME: RefCell<Option<*mut AngNativeRuntime<QuickJsEngine>>> =
         RefCell::new(None);
@@ -168,7 +174,7 @@ extern "C" fn js_runtime_dispatch_callback(
             }
         })
     }));
-    result.unwrap_or(0)
+    result.unwrap_or(DISPATCH_PANIC)
 }
 
 #[repr(C)]
@@ -213,7 +219,7 @@ pub unsafe extern "C" fn angnative_runtime_bridge_dispatch_event(
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         bridge.dispatch_event(node_id, name, payload).unwrap_or(0)
     }));
-    result.unwrap_or(0)
+    result.unwrap_or(DISPATCH_PANIC)
 }
 
 /// Load a raw JS source string into the runtime. Returns 0 on success,
@@ -236,7 +242,8 @@ pub unsafe extern "C" fn angnative_runtime_bridge_load_script(
     }));
     match result {
         Ok(true) => 0,
-        _ => 1,
+        Ok(false) => 1,
+        Err(_) => LOAD_SCRIPT_PANIC,
     }
 }
 

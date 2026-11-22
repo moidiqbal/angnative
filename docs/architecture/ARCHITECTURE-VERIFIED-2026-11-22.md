@@ -156,10 +156,12 @@ for opt-in use only.
 | `cargo test --workspace` | 124 passed |
 | `cargo test -p angnative-runtime-bridge -- --ignored` | 6 acceptance tests passed |
 | `pnpm test` | 208 passed |
+| Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
+| Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
 | `python scripts/check-ffi-declarations.py` | 12 JNI methods, 9 Swift bindings, 20 header declarations |
 | All 10 Android `assembleDebug` | SUCCESS observed during development; no CI Android job and no retained build log |
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
-| CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; it does **not** build Android |
+| CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
 
 The six acceptance tests require regenerated `dist/aot/*` bundles, which are
 gitignored. Reproduce locally with:

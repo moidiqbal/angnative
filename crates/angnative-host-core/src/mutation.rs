@@ -18,6 +18,8 @@ pub enum MutationError {
     UnknownNodeType(String),
     #[error("No native element with id {0}")]
     NodeNotFound(NodeId),
+    #[error("Element with id {0} is already registered")]
+    DuplicateId(NodeId),
     #[error("Element {child_id} is not a child of element {parent_id}")]
     NotACheckedChild { child_id: NodeId, parent_id: NodeId },
     #[error("Unsupported protocol version {0}, expected {1}")]
@@ -90,10 +92,7 @@ impl MutationEngine {
 
     /// Look up a single node snapshot. Returns None if the node was removed.
     pub fn get_node(&self, id: NodeId) -> Option<NodeSnapshot> {
-        if !self.registry.has(id) {
-            return None;
-        }
-        let el = self.registry.get(id);
+        let el = self.registry.get(id).ok()?;
         Some(NodeSnapshot {
             id: el.id,
             tag: el.node_type.canonical_tag().to_string(),
@@ -139,7 +138,7 @@ impl MutationEngine {
                     }
                 };
                 let el = ViewNode::new(id, nt);
-                self.registry.register_with_id(el);
+                self.registry.register_with_id(el)?;
                 Ok("CreateNode".to_string())
             }
             Command::RemoveNode { id } => {
@@ -152,20 +151,20 @@ impl MutationEngine {
                 index,
             } => {
                 // Extract child's current parent before taking mutable borrows.
-                let child_old_parent = self.registry.get(child_id).parent_id;
+                let child_old_parent = self.registry.get(child_id)?.parent_id;
 
                 // Detach from previous parent if re-parenting (T5 fix #1).
                 if let Some(old_parent_id) = child_old_parent {
                     if old_parent_id != parent_id {
-                        let old_parent = self.registry.get_mut(old_parent_id);
+                        let old_parent = self.registry.get_mut(old_parent_id)?;
                         old_parent.remove_child_id(child_id);
                     }
                 }
 
                 // Now mutate parent and child.
-                let child = self.registry.get_mut(child_id);
+                let child = self.registry.get_mut(child_id)?;
                 child.parent_id = Some(parent_id);
-                let parent = self.registry.get_mut(parent_id);
+                let parent = self.registry.get_mut(parent_id)?;
                 parent.insert_child_at(index, child_id);
 
                 Ok("InsertChild".to_string())
@@ -175,7 +174,7 @@ impl MutationEngine {
                 child_id,
             } => {
                 // T5 fix #2: verify child belongs to parent before removing.
-                let child_parent = self.registry.get(child_id).parent_id;
+                let child_parent = self.registry.get(child_id)?.parent_id;
                 if child_parent != Some(parent_id) {
                     return Err(MutationError::NotACheckedChild {
                         child_id,
@@ -183,15 +182,15 @@ impl MutationEngine {
                     });
                 }
 
-                let child = self.registry.get_mut(child_id);
+                let child = self.registry.get_mut(child_id)?;
                 child.parent_id = None;
-                let parent = self.registry.get_mut(parent_id);
+                let parent = self.registry.get_mut(parent_id)?;
                 parent.remove_child_id(child_id);
 
                 Ok("RemoveChild".to_string())
             }
             Command::SetProperty { id, key, value } => {
-                let el = self.registry.get_mut(id);
+                let el = self.registry.get_mut(id)?;
                 // T5 fix #7: null value removes the property.
                 if value.is_null() {
                     el.remove_property(&key);
@@ -201,7 +200,7 @@ impl MutationEngine {
                 Ok("SetProperty".to_string())
             }
             Command::SetStyle { id, key, value } => {
-                let el = self.registry.get_mut(id);
+                let el = self.registry.get_mut(id)?;
                 // T5 fix #4: unknown style keys are validated by the style
                 // table before reaching the engine; here we store the value.
                 let value = if matches!(
@@ -226,7 +225,7 @@ impl MutationEngine {
                 Ok("SetStyle".to_string())
             }
             Command::SetTextContent { id, text } => {
-                let el = self.registry.get_mut(id);
+                let el = self.registry.get_mut(id)?;
                 // T5 fix #3: text payloads are kept (not a no-op).
                 el.set_text_content(text);
                 Ok("SetTextContent".to_string())

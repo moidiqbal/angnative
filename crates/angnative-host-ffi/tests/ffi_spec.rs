@@ -479,6 +479,91 @@ fn op_kind_str(op: &PlatformOp) -> &'static str {
     }
 }
 
+/// F6: the shared conformance fixture from packages/testing/fixtures is run
+/// through the *new* pipeline (Host::process_batch_json, the same entry point
+/// na_dispatchBatch uses). The TS suite runs the same fixture, so a divergence
+/// between fake backend and real host is caught by one shared keystone.
+#[test]
+fn angular_bootstrap_fixture_drives_real_host_pipeline() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../packages/testing/fixtures/angular-bootstrap-native.json"
+    );
+    let fixture: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let batch_json = serde_json::json!({
+        "protocolVersion": angnative_host_core::command::PROTOCOL_VERSION,
+        "frameId": 0,
+        "timestampMs": 0,
+        "commands": fixture["commands"],
+    })
+    .to_string();
+
+    let handle = unsafe { ffi::angnative_host_create() };
+    assert!(!handle.is_null());
+    let ops = unsafe {
+        ffi::angnative_host_process_batch(handle, cstr(&batch_json).as_ptr(), std::ptr::null_mut())
+    };
+    assert!(!ops.is_null(), "batch must be accepted by the real host");
+    unsafe { free_cstr(ops) };
+
+    let snapshot = unsafe { ffi::angnative_host_snapshot(handle) };
+    assert!(!snapshot.is_null());
+    let snapshot = unsafe { CStr::from_ptr(snapshot) }.to_str().unwrap().to_string();
+    let parsed: Value = serde_json::from_str(&snapshot).unwrap();
+    let nodes = parsed["nodes"].as_array().unwrap();
+    assert_eq!(nodes.len(), 3, "fixture must create exactly three native nodes");
+    assert!(snapshot.contains("HOME ROUTE"), "text must reach the host tree");
+    unsafe { ffi::angnative_host_destroy(handle) };
+}
+
+/// F2 regression: a JS dispatcher that returns 0 (e.g. its listener threw)
+/// must NOT cause the legacy FFI callback to fire as well — that would
+/// double-deliver the event.
+#[test]
+fn js_dispatch_returning_zero_does_not_trigger_legacy_fallback() {
+    use std::sync::atomic::AtomicU32;
+
+    static LEGACY_CALLS: AtomicU32 = AtomicU32::new(0);
+
+    extern "C" fn js_cb(
+        _node_id: u64,
+        _event_name: *const c_char,
+        _payload_json: *const c_char,
+    ) -> u32 {
+        0 // listener error / no invocation — still the canonical path
+    }
+
+    extern "C" fn legacy_cb(_listener_id: u64, _payload: *const c_char, _user_data: *mut c_void) {
+        LEGACY_CALLS.fetch_add(1, Ordering::SeqCst);
+    }
+
+    let handle = unsafe { ffi::angnative_host_create() };
+    assert!(!handle.is_null());
+    set_js_runtime_dispatch_for_thread(js_cb);
+    unsafe {
+        ffi::angnative_host_set_event_callback(handle, Some(legacy_cb), std::ptr::null_mut());
+        ffi::angnative_host_add_event_listener(handle, 7, cstr("press").as_ptr(), 1);
+    }
+
+    let count = unsafe {
+        ffi::angnative_host_dispatch_event(
+            handle,
+            7,
+            cstr("press").as_ptr(),
+            cstr("{}").as_ptr(),
+        )
+    };
+    assert_eq!(count, 0, "JS path reported zero invocations");
+    assert_eq!(
+        LEGACY_CALLS.load(Ordering::SeqCst),
+        0,
+        "legacy fallback must not fire when a JS dispatcher is installed"
+    );
+
+    clear_js_runtime_dispatch_for_thread();
+    unsafe { ffi::angnative_host_destroy(handle) };
+}
+
 #[test]
 fn js_runtime_dispatch_callback_is_invoked() {
     use std::sync::atomic::{AtomicU32, Ordering};

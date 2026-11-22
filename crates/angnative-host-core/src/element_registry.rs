@@ -5,6 +5,7 @@
  * allocates unique node IDs, registers/lookup/remove nodes, and detaches removed
  * nodes from their parents.
  */
+use crate::mutation::MutationError;
 use crate::node::{NodeId, ViewNode};
 use std::collections::HashMap;
 
@@ -31,39 +32,42 @@ impl ElementRegistry {
     }
 
     /// Register a newly created element with an allocated id.
-    pub fn register(&mut self, element: ViewNode) -> NodeId {
+    pub fn register(&mut self, element: ViewNode) -> Result<NodeId, MutationError> {
         let id = element.id;
         if self.elements.contains_key(&id) {
-            panic!("Element with id {id} already registered");
+            return Err(MutationError::DuplicateId(id));
         }
         self.elements.insert(id, element);
-        id
+        Ok(id)
     }
 
     /// Register an element with an explicit id (used when decoding command
     /// batches that carry their own ids, mirroring the TS fake backend).
-    pub fn register_with_id(&mut self, element: ViewNode) {
+    /// Duplicate ids are a typed error, never a panic — a bad batch from JS
+    /// must not abort the host process.
+    pub fn register_with_id(&mut self, element: ViewNode) -> Result<(), MutationError> {
         let id = element.id;
         if self.elements.contains_key(&id) {
-            panic!("Element with id {id} already registered");
+            return Err(MutationError::DuplicateId(id));
         }
         if id >= self.next_id {
             self.next_id = id + 1;
         }
         self.elements.insert(id, element);
+        Ok(())
     }
 
-    /// Look up an element by id. Panics if missing (loud failure, spec §5.3).
-    pub fn get(&self, id: NodeId) -> &ViewNode {
+    /// Look up an element by id. Missing ids are a typed error (spec §5.3).
+    pub fn get(&self, id: NodeId) -> Result<&ViewNode, MutationError> {
         self.elements
             .get(&id)
-            .unwrap_or_else(|| panic!("No native element with id {id}"))
+            .ok_or(MutationError::NodeNotFound(id))
     }
 
-    pub fn get_mut(&mut self, id: NodeId) -> &mut ViewNode {
+    pub fn get_mut(&mut self, id: NodeId) -> Result<&mut ViewNode, MutationError> {
         self.elements
             .get_mut(&id)
-            .unwrap_or_else(|| panic!("No native element with id {id}"))
+            .ok_or(MutationError::NodeNotFound(id))
     }
 
     pub fn has(&self, id: NodeId) -> bool {

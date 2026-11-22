@@ -51,6 +51,28 @@ fn remove_node(id: NodeId) -> Command {
     Command::RemoveNode { id }
 }
 
+/// F3/F4 regression: a bad batch with a duplicate node id must return a typed
+/// error instead of panicking and aborting the host process.
+#[test]
+fn duplicate_node_id_returns_error_without_panicking() {
+    let mut engine = MutationEngine::new();
+    engine.run_command(create_node(1, "View")).unwrap();
+    let result = engine.run_command(create_node(1, "View"));
+    assert!(result.is_err(), "duplicate id must be a typed error");
+    let msg = result.unwrap_err().to_string();
+    assert!(msg.contains("already registered"), "unexpected error: {msg}");
+    assert_eq!(engine.size(), 1, "bad command must not corrupt the tree");
+}
+
+/// Missing-node references in a batch must also error, not panic.
+#[test]
+fn missing_node_reference_returns_error_without_panicking() {
+    let mut engine = MutationEngine::new();
+    let result = engine.run_command(set_text(99, "orphan"));
+    assert!(result.is_err(), "missing node must be a typed error");
+    assert!(result.unwrap_err().to_string().contains("No native element"));
+}
+
 #[test]
 fn create_append_and_remove_produces_expected_tree() {
     let mut engine = MutationEngine::new();

@@ -11,7 +11,7 @@ android {
   ndkVersion = "27.2.12479018"
 
   defaultConfig {
-    applicationId = "com.angnative.app"
+    applicationId = "com.angnative.demo.material"
     minSdk = 24
     targetSdk = 34
     versionCode = 1
@@ -64,3 +64,4 @@ dependencies {
   implementation("com.google.android.material:material:1.11.0")
   implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 }
+

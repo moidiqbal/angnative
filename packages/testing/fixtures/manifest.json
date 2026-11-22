@@ -7,5 +7,6 @@
   "error-cases",
   "capability-degradation",
   "reparent",
-  "multiple-listeners-per-event"
+  "multiple-listeners-per-event",
+  "angular-bootstrap-native"
 ]
