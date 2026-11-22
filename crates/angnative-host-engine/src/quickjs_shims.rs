@@ -61,6 +61,30 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             return { href: href, pathname: pathname, search: search, hash: hash };
         }
 
+        // Standard URL shim for Angular router / serializer.
+        // Required by Angular's isProtocolRelative check; without URL, every
+        // route serializer throws and falls back to '/'.
+        function URL(url, base) {
+            var full = String(url);
+            if (base && full.indexOf('://') < 0 && full.indexOf('//') !== 0) {
+                var baseStr = String(base);
+                if (full.charAt(0) === '/') {
+                    var m = baseStr.match(/^([a-zA-Z]+:\/\/[^\/]+)/);
+                    full = (m ? m[1] : baseStr) + full;
+                } else {
+                    full = baseStr.replace(/\/?$/, '/') + full;
+                }
+            }
+            var m = full.match(/^([a-zA-Z]+:\/\/[^\/?#]+)?(\/[^?#]*)?(\?[^#]*)?(#.*)?$/);
+            this.origin = (m && m[1]) || '';
+            this.pathname = (m && m[2]) || '/';
+            this.search = (m && m[3]) || '';
+            this.hash = (m && m[4]) || '';
+            this.href = full;
+        }
+        URL.prototype.toString = function () { return this.href; };
+        globalThis.URL = URL;
+
         var _domLocation = Object.create(null);
         function _domSyncLocation() {
             var p = _angParseUrl(_histStack[_histIndex].url);
@@ -631,6 +655,84 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             this.detail = options?.detail ?? null;
         }
         CustomEvent.prototype = Object.create(Event.prototype);
+
+        // Flat, cycle-free AbortSignal and AbortController.
+        // Listeners are stored in a root map keyed by numeric signal ID, never on
+        // the signal instance itself, preventing cyclic GC stack overflows in rquickjs.
+        var _abortSignalNextId = 1;
+        var _abortListeners = new Map();
+
+        function AbortSignal() {
+            this._id = _abortSignalNextId++;
+            this.aborted = false;
+            this.reason = undefined;
+            this.onabort = null;
+        }
+        AbortSignal.prototype.addEventListener = function(type, handler) {
+            if (type !== 'abort' || typeof handler !== 'function') return;
+            var list = _abortListeners.get(this._id);
+            if (!list) {
+                list = [];
+                _abortListeners.set(this._id, list);
+            }
+            if (list.indexOf(handler) < 0) list.push(handler);
+        };
+        AbortSignal.prototype.removeEventListener = function(type, handler) {
+            if (type !== 'abort') return;
+            var list = _abortListeners.get(this._id);
+            if (!list) return;
+            var idx = list.indexOf(handler);
+            if (idx >= 0) list.splice(idx, 1);
+            if (list.length === 0) _abortListeners.delete(this._id);
+        };
+        AbortSignal.prototype.dispatchEvent = function(event) {
+            if (event.type !== 'abort') return true;
+            if (typeof this.onabort === 'function') {
+                try { this.onabort(event); } catch (e) {}
+            }
+            var list = _abortListeners.get(this._id);
+            if (list) {
+                var copy = list.slice();
+                for (var i = 0; i < copy.length; i++) {
+                    try { copy[i](event); } catch (e) {}
+                }
+            }
+            return true;
+        };
+        AbortSignal.prototype.throwIfAborted = function() {
+            if (this.aborted) throw this.reason;
+        };
+        AbortSignal.abort = function(reason) {
+            var s = new AbortSignal();
+            s.aborted = true;
+            s.reason = reason !== undefined ? reason : new Error('This operation was aborted');
+            return s;
+        };
+        AbortSignal.timeout = function(delay) {
+            var s = new AbortSignal();
+            setTimeout(function() {
+                if (s.aborted) return;
+                s.aborted = true;
+                s.reason = new Error('TimeoutError');
+                s.dispatchEvent(new Event('abort'));
+                _abortListeners.delete(s._id);
+            }, delay);
+            return s;
+        };
+
+        function AbortController() {
+            this.signal = new AbortSignal();
+        }
+        AbortController.prototype.abort = function(reason) {
+            if (this.signal.aborted) return;
+            this.signal.aborted = true;
+            this.signal.reason = reason !== undefined ? reason : new Error('This operation was aborted');
+            this.signal.dispatchEvent(new Event('abort'));
+            _abortListeners.delete(this.signal._id);
+        };
+
+        globalThis.AbortSignal = AbortSignal;
+        globalThis.AbortController = AbortController;
     "#)?;
 
     // localStorage/sessionStorage stubs
@@ -667,6 +769,9 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
             EventTarget: EventTarget,
             Event: Event,
             CustomEvent: CustomEvent,
+            AbortController: AbortController,
+            AbortSignal: AbortSignal,
+            URL: URL,
             document: document,
             queueMicrotask: queueMicrotask,
             location: _domLocation,
@@ -924,6 +1029,32 @@ mod tests {
         assert_eq!(
             engine.eval("_greeting").unwrap(),
             crate::engine::JsValue::String("Assalam-o-Alaikum AngNative!".to_string())
+        );
+    }
+
+    #[test]
+    fn test_abort_controller_cycle_free() {
+        let mut engine = installed();
+        let res = engine.eval(r#"
+            (function () {
+                var ctrl = new AbortController();
+                var sig = ctrl.signal;
+                var abortedFired = 0;
+                var handler = function (e) {
+                    abortedFired++;
+                };
+                sig.addEventListener('abort', handler);
+                var initial = sig.aborted;
+                ctrl.abort('test reason');
+                var after = sig.aborted;
+                var reason = sig.reason;
+                sig.removeEventListener('abort', handler);
+                return [initial, after, abortedFired, reason].join(',');
+            })()
+        "#).unwrap();
+        assert_eq!(
+            res,
+            crate::engine::JsValue::String("false,true,1,test reason".to_string())
         );
     }
 

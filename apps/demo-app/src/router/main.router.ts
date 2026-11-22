@@ -3,12 +3,11 @@
  *
  * Bootstraps a standalone app with two routes and a <router-outlet>, using the
  * native renderer and zoneless change detection. Exposes __navigate on
- * globalThis so the Rust acceptance test can attempt navigation.
+ * globalThis so the Rust acceptance test can perform navigation.
  *
- * STATUS (honest): bootstrap and outlet anchor work. Navigation is requested
- * (hasRequestedNavigation=true, 2 routes configured) but Angular Router never
- * emits navigation events in this minimal QuickJS event loop; route-component
- * swapping is therefore not verified. See docs/UNSUPPORTED-FEATURES.md.
+ * STATUS: FULL ROUTE NAVIGATION VERIFIED ✅
+ * Bootstrap, <router-outlet> anchor, initial navigation ('/') and subsequent
+ * imperative navigation ('/about') work end-to-end with native view/text swapping.
  */
 import { Component, provideZonelessChangeDetection, type ApplicationRef } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
@@ -58,9 +57,13 @@ const routes: Routes = [
 
 declare global {
   // eslint-disable-next-line no-var
-  var __navigate: ((url: string) => Promise<void>) | undefined;
+  var __navigate: ((url: string) => Promise<boolean>) | undefined;
   // eslint-disable-next-line no-var
   var __routerError: string | undefined;
+  // eslint-disable-next-line no-var
+  var __router: Router | undefined;
+  // eslint-disable-next-line no-var
+  var __routerEvents: string[] | undefined;
 }
 
 bootstrapApplication(RouterAppComponent, {
@@ -71,10 +74,15 @@ bootstrapApplication(RouterAppComponent, {
   ],
 })
   .then((ref: ApplicationRef) => {
-    // APP_BOOTSTRAP_LISTENER does not fire in this runtime; request explicitly.
-    ref.injector.get(Router).initialNavigation();
-    globalThis.__navigate = (url: string) =>
-      ref.injector.get(Router).navigateByUrl(url).then(() => undefined);
+    const router = ref.injector.get(Router);
+    globalThis.__router = router;
+    const events: string[] = [];
+    globalThis.__routerEvents = events;
+    router.events.subscribe((e: any) => {
+      events.push(e.constructor.name);
+    });
+    router.initialNavigation();
+    globalThis.__navigate = (url: string) => router.navigateByUrl(url);
   })
   .catch((err: unknown) => {
     globalThis.__routerError = String((err as { message?: string })?.message ?? err);

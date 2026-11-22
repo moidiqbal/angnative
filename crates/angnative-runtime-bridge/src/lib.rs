@@ -634,6 +634,17 @@ mod tests {
     #[test]
     #[ignore = "requires generated dist/aot/router-app-bundle.js"]
     fn angular_router_bootstraps_with_outlet() {
+        let handle = std::thread::Builder::new()
+            .name("router-test-thread".into())
+            .stack_size(32 * 1024 * 1024) // 32 MB stack
+            .spawn(|| {
+                run_angular_router_bootstraps_with_outlet();
+            })
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_angular_router_bootstraps_with_outlet() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../dist/aot/router-app-bundle.js"
@@ -653,25 +664,43 @@ mod tests {
             bridge.runtime_mut().eval("typeof __navigate").unwrap(),
             JsValue::String("function".to_string())
         );
-        // The root component and <router-outlet> anchor must be built in the
-        // native tree. (A Custom node with an empty text anchor is emitted.)
-        let batches = bridge
+
+        // The root component, <router-outlet> anchor, and initial route (HOME ROUTE)
+        // must be built in the native tree.
+        let initial_batches = bridge
             .runtime_mut()
             .eval("JSON.stringify(__angnativeBatches)")
             .unwrap();
-        match batches {
-            JsValue::String(s) => assert!(
-                s.contains("CreateNode") && s.contains("InsertChild"),
-                "router outlet must produce native nodes; got {s}"
-            ),
+        match initial_batches {
+            JsValue::String(s) => {
+                assert!(
+                    s.contains("CreateNode") && s.contains("InsertChild"),
+                    "router outlet must produce native nodes; got {s}"
+                );
+                assert!(
+                    s.contains("HOME ROUTE"),
+                    "initial navigation must render HOME ROUTE; got {s}"
+                );
+            }
             other => panic!("unexpected batch JSON: {other:?}"),
         }
 
-        // Navigation is callable and must not throw synchronously.
+        // Perform imperative route navigation to /about.
         bridge
-            .load_script("try { __navigate('/about'); } catch (e) { globalThis.__navThrow = String(e && e.message); }")
+            .load_script(r#"
+                try {
+                    globalThis.__navDone = false;
+                    __navigate('/about').then(
+                        function(val) { globalThis.__navDone = true; globalThis.__navResult = 'ok:' + val; },
+                        function(err) { globalThis.__navDone = true; globalThis.__navResult = 'err:' + (err && err.message || err); }
+                    );
+                } catch (e) {
+                    globalThis.__navThrow = String(e && e.message || e);
+                }
+            "#)
             .expect("navigation must be dispatchable");
         bridge.runtime_mut().drain_microtasks().unwrap();
+
         assert_eq!(
             bridge
                 .runtime_mut()
@@ -680,11 +709,36 @@ mod tests {
             JsValue::String("none".to_string()),
             "navigateByUrl must not throw synchronously"
         );
+        assert_eq!(
+            bridge.runtime_mut().eval("globalThis.__navResult").unwrap(),
+            JsValue::String("ok:true".to_string()),
+            "navigation to /about must succeed"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("location.pathname").unwrap(),
+            JsValue::String("/about".to_string()),
+            "location pathname must be /about"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("globalThis.__router.url").unwrap(),
+            JsValue::String("/about".to_string()),
+            "router URL must be /about"
+        );
 
-        // NOTE (honest): the navigation promise remains pending — Angular's
-        // RouterInitializer waits on ApplicationRef stability, which this
-        // minimal QuickJS event loop does not fully provide. Route-component
-        // swapping is therefore NOT asserted here. See docs.
+        // Verify that ABOUT ROUTE component was rendered in the native tree.
+        let final_batches = bridge
+            .runtime_mut()
+            .eval("JSON.stringify(__angnativeBatches)")
+            .unwrap();
+        match final_batches {
+            JsValue::String(s) => {
+                assert!(
+                    s.contains("ABOUT ROUTE"),
+                    "navigation to /about must render ABOUT ROUTE into native tree; got {s}"
+                );
+            }
+            other => panic!("unexpected final batch JSON: {other:?}"),
+        }
     }
 
     #[test]

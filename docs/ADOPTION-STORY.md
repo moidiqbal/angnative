@@ -42,11 +42,11 @@ QuickJS and mutate a native view tree, on an Android emulator.
    `apps/demo-app`. The demo must ingest an unmodified third-party Angular app
    (or a checked-out sample like a Angular Material dashboard) without editing
    its components.
-2. **Full Angular surface on native — BLOCKED / separate epics.** Routing is
-   explicitly **blocked (F7)** on a real QuickJS event-loop/stability bridge;
+2. **Full Angular surface on native.** Routing is verified in QuickJS (F7 resolved
+   with cycle-free AbortController, URL shim, and Renderer2 parent fix);
    template-driven forms, HttpClient via DI, the real animation engine and i18n
-   markers are likewise unverified. Showcase UIs remain imperative native
-   reimplementations. Do not present routing as supported.
+   markers remain unverified. Showcase UIs remain imperative native
+   reimplementations.
 3. **One-command CLI flow.** `angnative build` bundles, but `angnative run/test/
    inspect` are placeholders; there is no "ship to device" command.
 4. **iOS.** Swift bindings still wrap the legacy host; nothing claims iOS
@@ -90,8 +90,9 @@ Do **not** market "any Angular app runs natively". The defensible statement is:
 
 > AngNative demonstrates that an Angular AOT component tree can execute inside
 > an embedded QuickJS engine and drive a native view tree with no WebView.
-> We are closing the remaining gaps (routing, forms, HTTP, animations, iOS)
-> before claiming general framework compatibility.
+> Routing is now verified in QuickJS. Remaining gaps (template-driven forms,
+> DI-based HTTP, the real animation engine, iOS) are still being closed before
+> claiming general framework compatibility.
 
 This is the adoption story to finish — it is currently a roadmap item, not a
 shipped product claim.

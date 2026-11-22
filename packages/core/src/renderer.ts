@@ -331,14 +331,22 @@ export class AngNativeRenderer implements Renderer2 {
   }
 
   removeChild(parent: any, oldChild: any): void {
-    const parentEl = this.asElement(parent);
     const childEl = this.asElement(oldChild);
-
-    if (childEl.parentId !== parentEl.id) {
-      throw new Error(
-        `Element ${childEl.id} is not a child of element ${parentEl.id}`,
-      );
+    if (!childEl || childEl.parentId === null) {
+      return;
     }
+
+    let parentEl = (parent === null || parent === undefined)
+      ? null
+      : this.asElement(parent);
+
+    if (!parentEl || parentEl.id === 0 || parentEl.id !== childEl.parentId) {
+      // Angular Router / ViewContainerRef often passes null or an outlet anchor
+      // as the parent when deactivating component views. Resolve the real parent.
+      parentEl = this.registry.get(childEl.parentId);
+    }
+
+    if (!parentEl) return;
 
     childEl.parentId = null;
     parentEl.removeChildId(childEl.id);

@@ -73,7 +73,7 @@ Still open (honest):
   `platforms/android` still use the legacy host + imperative batches. iOS has no
   runtime-bridge bindings. Until a shell loads the bundle and a tap reaches Angular,
   the framework-level claim is "verified in the embedded runtime," not "runs natively."
-- **Full router navigation, animation-engine integration, DI-based `HttpClient.get()`,
+- **Animation-engine integration, DI-based `HttpClient.get()`,
   template-driven `ngModel`, and AOT i18n markers** remain unverified (see
   `UNSUPPORTED-FEATURES.md`).
 - The web adapter already has a complete DOM-based click path.

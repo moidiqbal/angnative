@@ -14,9 +14,9 @@ On this machine all toolchains are installed and every item below was actually e
 | AOT compile | ✅ PASS | `pnpm run compile:aot` → "AOT compilation complete (Ivy definitions verified)"; `dist/aot/app.component.js` contains `ɵɵdefineComponent` |
 | CLI production build | ✅ PASS | `node packages/cli/dist/cli.js build` → real ngc + esbuild → `dist/aot/bundle.js` |
 | Rust build | ✅ PASS | `cargo build --workspace` → Finished, 0 errors |
-| Rust tests | ✅ PASS | `cargo test --workspace` → **124 passed, 0 failed** (6 acceptance tests ignored by default) |
+| Rust tests | ✅ PASS | `cargo test --workspace` → **129 passed, 0 failed** (6 acceptance tests ignored by default) |
 | Angular-in-QuickJS acceptance tests | ✅ PASS | `cargo test -p angnative-runtime-bridge -- --ignored` → **6 passed** (real AOT bundle boots, native click reaches Angular listener; forms, router, animations, http bundles load) |
-| JS/TS unit tests | ✅ PASS | `pnpm test` → **208 passed** (16 files) |
+| JS/TS unit tests | ✅ PASS | `pnpm test` → **219 passed** (16 files) |
 | Desktop app | ✅ PASS | `cargo test --manifest-path crates/angnative-desktop/Cargo.toml` → 11 passed; window "AngNative Desktop" previously launched and click-tested |
 | Android APK | ✅ PASS | **10 APKs** built under `dist/device-testing/` (19.2–19.3 MB each) |
 | Android device run | ✅ PASS | all 10 installed/launched on **OnePlus Open (CPH2551, Android 16)**; `WebViews: 0` on every app; gfxinfo: grid 170 frames / 1.76% jank / 6 ms p50; valid screenshots in `docs/benchmarks/physical/`) |
@@ -40,3 +40,4 @@ cargo test --workspace
 pnpm test
 node scripts/check-size-budget.mjs
 ```
+

@@ -153,9 +153,9 @@ for opt-in use only.
 
 | Check | Result |
 |---|---|
-| `cargo test --workspace` | 124 passed |
+| `cargo test --workspace` | 129 passed |
 | `cargo test -p angnative-runtime-bridge -- --ignored` | 6 acceptance tests passed |
-| `pnpm test` | 208 passed |
+| `pnpm test` | 219 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
 | Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
 | `python scripts/check-ffi-declarations.py` | 12 JNI methods, 9 Swift bindings, 20 header declarations |
@@ -179,20 +179,18 @@ but is relevant when reasoning about event handling.
 
 ## 8. Known, honest gaps (NOT claims)
 
-1. **Full Router navigation — BLOCKED (separate epic, F7)**: the AOT router app
-   bootstraps and emits an outlet anchor. During development diagnostics the
-   navigation promise remained pending and no route-component swap was observed;
-   those diagnostics were not retained as a repo artifact, so the claim is
-   limited to "not verified". Deep-dive finding: Angular's
-   `NavigationTransitions.setupNavigations` constructs `AbortController`, which
-   this runtime did not provide — the pipeline throws inside an RxJS operator
-   and its error handler swallows it, so no `NavigationStart` is ever emitted.
-   Adding a naive `AbortController` shim makes the pipeline advance but the
-   controller/signal callbacks create a cyclic object graph that overflows
-   rquickjs GC, so the shim was reverted. **Blocked on** a cycle-free
-   `AbortController`/`AbortSignal` implementation plus the fuller event-loop /
-   stability integration (`ApplicationRef.whenStable`, RxJS scheduler, zoneless
-   `PendingTasks`). Do not treat route-based navigation as supported.
+1. **Full Router navigation — RESOLVED (F7)**: the AOT router app bootstraps,
+   emits the outlet anchor, performs initial navigation (`/` -> `HOME ROUTE`),
+   and executes imperative navigation (`navigateByUrl('/about')` -> `ABOUT ROUTE`).
+   Root causes identified and fixed:
+   - Added a cycle-free `AbortController`/`AbortSignal` shim using a flat, ID-keyed
+     listener map (preventing rquickjs recursive GC stack overflow).
+   - Added a standard `URL` shim so Angular's `isProtocolRelative` check in
+     `DefaultUrlSerializer` does not fail and coerce all paths to `/`.
+   - Fixed `Renderer2.removeChild` to resolve `actualParent` from `childEl.parentId`
+     when Angular passes null/synthetic-root during outlet component deactivation.
+   - Verified end-to-end via `angular_router_bootstraps_with_outlet` asserting
+     both initial and destination route batches in QuickJS.
 2. **Thread identity on native click callbacks**: load and node inspection ran
    on the UI thread; a dedicated cross-thread dispatch test on-device is not
    done. A cross-thread call panics by design (caught by the C shim → 0).
@@ -226,9 +224,11 @@ applied:
   (unified static library staged, but Kotlin still uses legacy host JNI).
 - §6/§7 on-device numbers now reference the retained screenshot artifact; the
   material emulator observation is marked as not retained in-repo.
-- §7 notes that no CI Android job exists and that bundles are gitignored.
-- §8 router gap is limited to "not verified" without unrecorded specifics.
+- §7 now notes the `android-e2e` CI job and gitignored bundles.
+- F7 router gap was subsequently **RESOLVED** (cycle-free AbortController, URL
+  shim, renderer parent lookup); the acceptance test now asserts route swapping.
 
 Residual caveat: build and on-device observations that were not retained as
 repo artifacts are explicitly labelled as such. Treat this document as a
 design map plus verified test evidence, not as an independent audit certificate.
+

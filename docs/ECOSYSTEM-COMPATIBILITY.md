@@ -30,12 +30,12 @@ the caveat underneath explains exactly what is and is not proven.
 
 | # | Category | Status | Why |
 |---|---|---|---|
-| 1 | State management (NgRx, SignalStore, NGXS, Elf) | **Compatible with configuration** | Signals/stores/observables are renderer-agnostic and DOM-free; [COMPATIBILITY.md](COMPATIBILITY.md) marks NgRx SignalStore ✅. Runs unchanged on the web adapter. Native shell execution is blocked on the missing JS runtime. NGXS and Elf were not individually tested. |
+| 1 | State management (NgRx, SignalStore, NGXS, Elf) | **Compatible with configuration** | Signals/stores/observables are renderer-agnostic and DOM-free; [COMPATIBILITY.md](COMPATIBILITY.md) marks NgRx SignalStore ✅. Runs unchanged on the web adapter. The JS runtime now exists (QuickJS); these libraries are not yet individually verified in a native shell. NGXS and Elf were not individually tested. |
 | 2 | Data grid (AG Grid) | **Native reimplementation required** | AG Grid is DOM- and virtualization-heavy; [COMPATIBILITY.md](COMPATIBILITY.md) lists `na-data-grid` as a planned native replacement. Web adapter works. |
 | 3 | Dynamic forms (Formly / Reactive Forms) | **Compatible with configuration** | Reactive Forms is pure TS / renderer-agnostic and works on the web adapter. Formly needs native field-type mappings for the native path (not implemented). Native shell execution still needs the JS runtime. |
 | 4 | Charts (ECharts / ng2-charts / AG Charts) | **Native reimplementation required** | DOM/canvas renderers; [COMPATIBILITY.md](COMPATIBILITY.md) marks ngx-echarts ❌ native and lists `na-chart` (GPU-backed) on the wishlist. Web adapter expected to work; not tested here. |
 | 5 | Animation (GSAP / Angular animations / Motion One) | **Native reimplementation required** | GSAP is DOM-only per [COMPATIBILITY.md](COMPATIBILITY.md); Angular animations also depend on DOM-style element mutation. Use native animators on the native path. GSAP works on the web adapter. Motion One not tested. |
-| 6 | i18n (Transloco / ngx-translate) | **Compatible with configuration** | Pure TS, no DOM; [COMPATIBILITY.md](COMPATIBILITY.md) marks Transloco ✅. Web adapter runs it. Native shell execution is still blocked on the missing JS runtime, so the ✅ for native is a design expectation, not a demonstrated run. ngx-translate not separately tested. |
+| 6 | i18n (Transloco / ngx-translate) | **Compatible with configuration** | Pure TS, no DOM; [COMPATIBILITY.md](COMPATIBILITY.md) marks Transloco ✅. Web adapter runs it. The JS runtime now exists (QuickJS), but this library has not been run natively; so the ✅ for native is a design expectation, not a demonstrated run. ngx-translate not separately tested. |
 | 7 | API / async data (RxJS / TanStack Query) | **Compatible with configuration** | RxJS observables are renderer-agnostic and already underpin Angular core; [COMPATIBILITY.md](COMPATIBILITY.md) marks the pair ✅. TanStack Query is not installed in this repo and was not tested. Native path needs the JS runtime. |
 | 8 | Component primitives (Angular CDK / Angular Aria) | **Compatible with configuration** | [COMPATIBILITY.md](COMPATIBILITY.md): CDK behaviours need native equivalents; web adapter works. Angular Aria was not separately tested. |
 | 9 | Rich text (Tiptap / CKEditor) | **Native reimplementation required** | Tiptap is contenteditable/DOM-only. A native equivalent is built and verified in `showcases/ecosystem-richtext` (Android `EditText` + real Spannable spans, WebViews=0). It is NOT unchanged Tiptap compatibility. Web adapter works. CKEditor not tested. |
@@ -61,3 +61,4 @@ Toolchain facts behind this assessment are validated by
 Re-run that script after any dependency change; re-assess this matrix after the
 native runtime lands, since several statuses are expected to improve at that
 point.
+

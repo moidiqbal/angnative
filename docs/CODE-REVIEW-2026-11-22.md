@@ -9,8 +9,8 @@
 
 | Check | Original result | Current result |
 |---|---|---|
-| `pnpm test` | ✅ 208 passed | ✅ 208 passed |
-| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors | ✅ **124 passed, 0 failed** (6 ignored acceptance tests pass separately) |
+| `pnpm test` | ✅ 219 passed | ✅ 219 passed |
+| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors | ✅ **129 passed, 0 failed** (6 ignored acceptance tests pass separately) |
 | `cargo check --workspace` | ❌ same 7 errors | ✅ clean (no warnings) |
 | Committed baseline (`fc8b6a2` + earlier) | ✅ was green (108 Rust tests) | ✅ still green |
 | Current working tree | 🔴 broken; do not commit as-is | 🟢 green; fixes applied |
@@ -153,10 +153,10 @@ All *actionable* gaps from the original list were closed:
 
 ### Verification evidence
 
-- `cargo test --workspace`: **124 passed, 0 failed** (6 acceptance tests ignored by default)
+- `cargo test --workspace`: **129 passed, 0 failed** (6 acceptance tests ignored by default)
 - `cargo test -p angnative-runtime-bridge -- --ignored`: **6 passed** (`dist/aot` bundles present)
 - `cargo check --workspace`: clean, no warnings
-- `pnpm test`: **208 passed**
+- `pnpm test`: **219 passed**
 - `python scripts/check-ffi-declarations.py`: OK (11 JNI methods, 9 Swift bindings, 19 header declarations)
 - `pwsh -File scripts/build-android-native.ps1`: unified staticlib built and staged for arm64-v8a, armeabi-v7a, x86_64
 - `showcases/ecosystem-core/gradlew assembleDebug`: **BUILD SUCCESSFUL** (all 3 ABIs)
@@ -174,7 +174,8 @@ All *actionable* gaps from the original list were closed:
   - **On-device smoke test (emulator `AngNative34`, API 34)**: showcase APK installed and launched; logcat shows `AngNative runtime bridge created`, `View factory registered for host`, UI renders without crash. The showcase's ecosystem-core activity uses imperative Kotlin views, so the click round trip is verified in-process (Rust/QuickJS acceptance test), not by tapping this activity's UI.
   - **Phase 1 of Angular feature compatibility is done**: `@angular/forms` installed as a dev dependency, `pnpm bundle:forms` produces a self-contained forms bundle, and `angular_forms_work_in_quickjs` verifies `FormControl` / `FormGroup` / `Validators` values and validity inside QuickJS. `$localize` i18n shim (tagged templates + `loadTranslations`) is verified by `test_localize_i18n_translations`.
   - **Phase 2/3 (platform surface)**: real `@angular/router`, `@angular/animations` and `@angular/common/http` bundles are produced by `pnpm bundle:framework` and load in QuickJS. Browser shims added: `history`/`location`/`popstate` (routing), no-op `Element.animate()` driver (animations), and a host-wirable `fetch` (HttpClient). Five `--ignored` acceptance tests pass in total (bootstrap, forms, router, animations, http platform).
-  - **Router deep-dive**: a real AOT router app (`apps/demo-app/src/router/main.router.ts`) now bootstraps in QuickJS with `<router-outlet>` and the native renderer, after adding a synthetic root element (id 0) so Angular's null-parent calls no longer throw. `angular_router_bootstraps_with_outlet` verifies the native anchor nodes and that `navigateByUrl` is callable. **Honest blocker**: the navigation promise stays pending because `RouterInitializer` waits on `ApplicationRef` stability, which this minimal event loop does not fully provide — route-component swapping is not asserted.
+  - **Router — RESOLVED (F7)**: a real AOT router app (`apps/demo-app/src/router/main.router.ts`) bootstraps in QuickJS and navigates. Four root causes were fixed: (1) cycle-free `AbortController`/`AbortSignal` using a flat numeric-ID listener registry, (2) a real `URL` shim so Angular's serializer resolves `/about` instead of falling back to `/`, (3) `Renderer2.removeChild` now resolves the real parent from `child.parentId` when Angular passes null/synthetic root, (4) the synthetic root element (id 0) for null-parent calls. `angular_router_bootstraps_with_outlet` now asserts bootstrap, initial `HOME ROUTE`, imperative `navigateByUrl('/about')` → `ABOUT ROUTE`, location update and `NavigationEnd` lifecycle. It passes.
   - Still open (honest): full route-component swapping, Angular animation-engine integration, and DI-based `HttpClient.get()` (FetchBackend needs platform providers a bare EnvironmentInjector lacks — NG0201) are **not verified**. Template-driven `ngModel` bindings and AOT i18n markers in real app templates are also unverified. The 10 showcase UIs remain largely imperative reimplementations. This is not a claim of total Angular parity.
 - **iOS/Mac cannot be built here** (Windows host, no Xcode). Swift bindings and the C header are statically cross-checked, and `scripts/build-ios-native.sh` is kept aligned, but no `swift build` or device verification was performed. Nothing here claims iOS verification.
 - **No on-device runtime verification of Android** — the APK builds and links, but no emulator/device smoke test of the click → JS → Angular round trip was run.
+
