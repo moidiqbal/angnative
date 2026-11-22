@@ -167,11 +167,15 @@ class EcosystemCoreActivity : AppCompatActivity() {
         setContentView(scroll)
         renderState()
 
-        // Prove the AngNative Rust JNI bridge is alive in this showcase.
+        // Boot the real Angular AOT bundle inside the Rust-owned QuickJS
+        // runtime. Renderer flushes now reach Host::process_batch_json, so a
+        // non-zero node count here proves the full native pipeline is closed.
         try {
             val bridge = JniBridge(this)
             bridge.initHost()
-            statusLabel.text = "${t("rust")}: ${bridge.nodeCount()} (JNI bridge active)"
+            val bundle = assets.open("angnative-bundle.js").bufferedReader().use { it.readText() }
+            val rc = bridge.loadScript(bundle)
+            statusLabel.text = "Angular in Rust: nodes=${bridge.nodeCount()} (load rc=$rc)"
             bridge.destroyHost()
         } catch (e: Exception) {
             statusLabel.text = "Rust host unavailable: ${e.message}"
