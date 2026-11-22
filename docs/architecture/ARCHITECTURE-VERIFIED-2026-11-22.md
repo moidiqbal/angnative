@@ -150,7 +150,7 @@ fires per event and a new native batch follows.
 | Shell | Bridge | Bundle load | Verified |
 |---|---|---|---|
 | ecosystem-core | unified | **yes** (flagship) | on-device: `nodes=20 rc=0 plusNode=18` (screenshot retained: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png`); bridge stays alive, main-thread ViewFactory callbacks and real tap verified on emulator + OnePlus |
-| other 9 showcases | unified | asset present, opt-in API; **not auto-loaded** | all 10 `assembleDebug` observed during development (no CI Android job); material launched on emulator and logged `runtime bridge created`, 8 nodes, layout response, no crash (log excerpt not retained as a repo artifact) |
+| other 9 showcases | unified | asset present, opt-in API; **not auto-loaded** | all 10 `assembleDebug` observed during development; no CI job builds these 9 (CI `android-e2e` covers `ecosystem-core` only); material launched on emulator and logged `runtime bridge created`, 8 nodes, layout response, no crash (log excerpt not retained as a repo artifact) |
 | platforms/android | unified static library staged; Kotlin JNI still calls legacy `nativeHostCreate` | legacy imperative UI | `assembleDebug` OK |
 | iOS | legacy host Swift bindings | none | build not possible here (no macOS/Xcode) |
 
@@ -177,7 +177,7 @@ for opt-in use only.
 | Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
 | `python scripts/check-ffi-declarations.py` | 11 JNI methods, 14 Swift bindings (5 runtime bridge), 20 header declarations; iOS unified staticlib wiring OK |
 | iOS static verification | `SwiftFFI.swift` binds `angnative_runtime_bridge_{create,destroy,dispatch_event,load_script,get_host}` with `UInt64`/`UInt32` signatures; `Package.swift` links `angnative_runtime_bridge`; `build-ios-native.sh` builds/stages that archive. No Swift compile, `swift test`, Simulator or device run on this host. |
-| All 10 Android `assembleDebug` | SUCCESS observed during development; no CI Android job and no retained build log |
+| All 10 Android `assembleDebug` | SUCCESS observed during development; CI has an `android-e2e` job (APK build + node-count + tap assertions); no build log artifact retained |
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
 | Wrong-thread JNI instrumentation (API 34 emulator + physical OnePlus Open) | `connectedDebugAndroidTest`: 2 tests, 0 failures on `emulator-5554` (Android 14, x86_64) and on `b6640c8f` (`CPH2551`, Android 16, arm64-v8a); sentinels `-1` / `2` / NULL, bridge survives. Evidence: `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md`, `docs/evidence/ANDROID-THREAD-AFFINITY-ONEPLUS.md`, and retained HTML reports. |
 | UI-thread ViewFactory marshalling (emulator + OnePlus) | Full `connectedDebugAndroidTest` suite: 4 tests, 0 failures on both devices. `ViewFactoryMainThreadTest.kt` records `Looper.myLooper()` inside each `NativeViewSink` callback from worker-thread native entries; all recorded loopers were `Looper.getMainLooper()`. Evidence: `docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md` and retained HTML reports. |

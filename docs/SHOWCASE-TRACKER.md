@@ -69,10 +69,10 @@ JS runtime); no APK claimed.
 - Frame pacing measured on emulator: `docs/benchmarks/frame-pacing.json` (gfxinfo jank/p50/p95 for grid, charts, richtext, calendar). Physical-device multi-sample and CPU still pending.
 
 ## Phase 3 — Reusable packages
-⬜ `@angnative/ui-core`, adapter packages, native-grid/charts/animation/richtext — incremental only.
+✅ `@angnative/native-ui-core` is a real tested Android library (line 63); adapter packages and remaining native widgets stay incremental-only — no empty placeholders.
 
 ## Phases 4-7
-⬜ Compatibility matrix, APK build/verify, benchmarks, repository deliverables — pending.
+✅ Compatibility matrix, APK build/verify, initial benchmarks and repository deliverables are in place; only physical multi-sample/CPU benchmarking remains pending.
 
 ## Evidence rules
 - No APK reported as verified unless installed + launched on emulator.

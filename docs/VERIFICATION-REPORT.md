@@ -24,11 +24,14 @@ On this machine all toolchains are installed and every item below was actually e
 | iOS app | ⚠️ NOT TESTED | Swift config + runtime-bridge bindings exist under `platforms/ios/`; `check-ffi-declarations.py` statically verifies 14 Swift bindings and unified staticlib wiring, but no macOS/Xcode here — `swift build`, `swift test`, Simulator and device runs intentionally skipped |
 
 ## Bottom line
-Everything except iOS/macOS is implemented, built, tested and pushed to `master`
-(latest commit `fc3370c`). The iOS shell is code-complete but requires a Mac for
-`./scripts/build-ios-native.sh simulator` and simulator verification. The embedded
-Angular runtime is verified in-process; loading the bundle in a shipping native
-shell on-device remains the integration milestone (see `CODE-REVIEW-2026-11-22.md`).
+All correctness blockers outside iOS/macOS are closed and pushed to `master`.
+The flagship `ecosystem-core` shell loads a real AOT bundle and a native tap
+reaches a live Angular listener, verified on emulator and OnePlus
+(`docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`). The other 9 showcases remain
+imperative native-reimplementation concept demos by design (ADR 0003); remaining
+items are explicit deferred features, not hidden gaps. The iOS shell is
+code-complete but requires a Mac for `./scripts/build-ios-native.sh simulator`
+and simulator verification — no iOS runtime claim is made here.
 
 ## Reproduce
 ```powershell
