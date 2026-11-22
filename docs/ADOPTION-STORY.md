@@ -47,8 +47,11 @@ QuickJS and mutate a native view tree, on an Android emulator.
    `HttpClient.get()` is verified by `angular_http_platform_loads_in_quickjs`, and
    template-driven `ngModel` is verified by
    `angular_template_driven_forms_round_trip_in_quickjs`, and AOT i18n markers are
-   verified by `angular_aot_i18n_translated_text_in_native_tree`. The real
-   animation engine remains unverified. Showcase UIs remain imperative native
+   verified by `angular_aot_i18n_translated_text_in_native_tree`, and the real
+   animation engine now runs over the native renderer with deterministic
+   three-sample interpolation, verified by
+   `angular_animation_engine_interpolates_native_styles` (real-time easing
+   fidelity is still unverified). Showcase UIs remain imperative native
    reimplementations.
 3. **One-command CLI flow.** `angnative build` bundles, but `angnative run/test/
    inspect` are placeholders; there is no "ship to device" command.
@@ -76,7 +79,7 @@ angnative run --platform android
 #   - app bootstraps (verifiable today)
 #   - native view tree mirrors the Angular template (verifiable today)
 #   - taps update the UI through Angular handlers (verifiable today)
-#   - navigation between routes works (NOT verified today)
+#   - navigation between routes works (verifiable today)
 ```
 
 **Acceptance criteria for calling this demo "real":**
@@ -93,9 +96,10 @@ Do **not** market "any Angular app runs natively". The defensible statement is:
 
 > AngNative demonstrates that an Angular AOT component tree can execute inside
 > an embedded QuickJS engine and drive a native view tree with no WebView.
-> Routing, DI-based HTTP, template-driven forms and AOT i18n are now verified in
-> QuickJS. Remaining gaps (the real animation engine, on-device shell loading,
-> iOS) are still being closed before claiming general framework compatibility.
+> Routing, DI-based HTTP, template-driven forms, AOT i18n and the real animation
+> engine (deterministic samples only) are now verified in QuickJS. Remaining
+> gaps (real-time easing fidelity, on-device shell loading, iOS) are still being
+> closed before claiming general framework compatibility.
 
 This is the adoption story to finish — it is currently a roadmap item, not a
 shipped product claim.
