@@ -42,7 +42,7 @@ Full evidence: [`docs/VERIFICATION-REPORT.md`](docs/VERIFICATION-REPORT.md) · [
 | Android shell (10 APKs) | ✅ | built, installed and launched on emulator **and OnePlus Open (Android 16)**; `WebViews: 0` on every app |
 | Desktop shell (winit + wgpu) | ✅ | 11 tests; window opens; interactive button; shader fix |
 | Web adapter (`@angnative/web`) | ✅ | DOM backend + Playwright verified render/click |
-| iOS shell | 🟡 code complete | Swift 6 package + UIKit bridge; **Mac/Xcode build not run** |
+| iOS shell | 🟡 bindings statically verified | Swift 6 package + UIKit + runtime bridge bindings; **Mac/Xcode build/test not run** |
 | Size budget gate | ✅ | `GATE EXIT=0`, 203 B gzip / 60 KB |
 
 ### Performance (real hardware, OnePlus Open, Android 16)
@@ -168,7 +168,7 @@ cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeH
 [![Sponsor](https://img.shields.io/badge/Sponsor-Open%20Collective-3385FF?style=for-the-badge&logo=opencollective&logoColor=white)](https://opencollective.com/angnative)
 · Details & transparency: [`docs/SPONSORS.md`](docs/SPONSORS.md)
 
-The iOS shell is **code-complete** (Swift 6 SwiftPM package, C-ABI bridge with `UInt64` node ids, 8 UIKit view-factory callbacks, demo + tests) but we do not have a Mac/Xcode in the current development environment, so no simulator run has happened.
+The iOS shell is **code-complete** (Swift 6 SwiftPM package, legacy-host + runtime-bridge C ABI bindings with `UInt64` node ids, 8 UIKit view-factory callbacks, demo + tests). `python scripts/check-ffi-declarations.py` statically verifies the bindings and unified staticlib wiring, but we do not have a Mac/Xcode in the current development environment, so no Swift compile or simulator run has happened.
 
 We are looking for:
 - **A Mac with Xcode** (even a macOS CI runner or a short loan/test session) to run [`scripts/build-ios-native.sh`](scripts/build-ios-native.sh), `swift test`, and the Simulator demo.

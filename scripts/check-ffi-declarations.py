@@ -6,8 +6,11 @@ No SDK/Xcode/device required. Checks:
   1. Kotlin `external fun nativeX(...)` <-> C++ `Java_..._nativeX` (name + arity)
   2. C++ `angnative_*(...)` calls <-> declarations in angnative_host_ffi.h
   3. Swift `@_silgen_name("angnative_*")` <-> declarations in angnative_host_ffi.h
+  4. Swift runtime-bridge bindings: required symbols, key signature types, and
+     iOS build wiring (unified staticlib, not the legacy host-only archive)
 
-This is STATIC verification only; it does not replace Android/iOS builds.
+This is STATIC verification only; it does not replace Android/iOS builds or
+prove that `swift build` / Simulator tests pass on macOS.
 
 Usage: python scripts/check-ffi-declarations.py
 """
@@ -20,6 +23,46 @@ KT = ROOT / "showcases/ecosystem-core/app/src/main/java/com/angnative/app/JniBri
 CPP = ROOT / "showcases/ecosystem-core/app/src/main/cpp/jni_bridge.cpp"
 SWIFT = ROOT / "platforms/ios/Sources/AngNativeHost/SwiftFFI.swift"
 HEADER = ROOT / "crates/angnative-host-ffi/include/angnative_host_ffi.h"
+IOS_PACKAGE = ROOT / "platforms/ios/Package.swift"
+IOS_BUILD_SCRIPT = ROOT / "scripts/build-ios-native.sh"
+
+# The unified runtime bridge is implemented in angnative-runtime-bridge, but
+# its C ABI is declared in the shared host-ffi header. Every iOS binding below
+# must exist in both places with the exact ABI types used by the Swift wrapper.
+REQUIRED_RUNTIME_BRIDGE_SYMBOLS = {
+    "angnative_runtime_bridge_create",
+    "angnative_runtime_bridge_destroy",
+    "angnative_runtime_bridge_dispatch_event",
+    "angnative_runtime_bridge_load_script",
+    "angnative_runtime_bridge_get_host",
+}
+
+SWIFT_SIGNATURE_PATTERNS = {
+    "angnative_runtime_bridge_create": (
+        r"func\s+angnative_runtime_bridge_create\s*\(\s*\)\s*->\s*"
+        r"AngNativeRuntimeBridgeHandle\?"
+    ),
+    "angnative_runtime_bridge_destroy": (
+        r"func\s+angnative_runtime_bridge_destroy\s*\(\s*_\s+handle:\s*"
+        r"AngNativeRuntimeBridgeHandle\?\s*\)"
+    ),
+    "angnative_runtime_bridge_dispatch_event": (
+        r"func\s+angnative_runtime_bridge_dispatch_event\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\?\s*,\s*"
+        r"_\s+nodeId:\s*UInt64\s*,\s*"
+        r"_\s+eventName:\s*UnsafePointer<CChar>\?\s*,\s*"
+        r"_\s+payloadJson:\s*UnsafePointer<CChar>\?\s*\)\s*->\s*UInt32"
+    ),
+    "angnative_runtime_bridge_load_script": (
+        r"func\s+angnative_runtime_bridge_load_script\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\?\s*,\s*"
+        r"_\s+source:\s*UnsafePointer<CChar>\?\s*\)\s*->\s*Int32"
+    ),
+    "angnative_runtime_bridge_get_host": (
+        r"func\s+angnative_runtime_bridge_get_host\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\?\s*\)\s*->\s*AngNativeHost\?"
+    ),
+}
 
 # C exports intentionally kept after Kotlin switched to the runtime bridge.
 LEGACY_CPP_ONLY = {
@@ -72,7 +115,10 @@ def main() -> int:
     jni = cpp_jni_methods(CPP.read_text(encoding="utf-8"))
     cpp_text = CPP.read_text(encoding="utf-8")
     header = header_declarations(HEADER.read_text(encoding="utf-8"))
-    swift = swift_symbols(SWIFT.read_text(encoding="utf-8"))
+    swift_text = SWIFT.read_text(encoding="utf-8")
+    swift = swift_symbols(swift_text)
+    package_text = IOS_PACKAGE.read_text(encoding="utf-8")
+    ios_build_text = IOS_BUILD_SCRIPT.read_text(encoding="utf-8")
     errors = []
 
     # 1. Kotlin <-> C++ JNI
@@ -95,6 +141,24 @@ def main() -> int:
     for name in sorted(swift - header):
         errors.append(f"Swift binds undeclared C ABI symbol: {name}")
 
+    # 4. iOS must bind and link the unified runtime bridge, not just the
+    #    legacy host. These are static checks only (no macOS/Xcode required).
+    for name in sorted(REQUIRED_RUNTIME_BRIDGE_SYMBOLS - swift):
+        errors.append(f"Swift runtime bridge binding missing: {name}")
+    for name in sorted(REQUIRED_RUNTIME_BRIDGE_SYMBOLS - header):
+        errors.append(f"C header runtime bridge declaration missing: {name}")
+    for name, pattern in sorted(SWIFT_SIGNATURE_PATTERNS.items()):
+        if not re.search(pattern, swift_text, re.S):
+            errors.append(f"Swift runtime bridge signature mismatch: {name}")
+    if '.linkedLibrary("angnative_runtime_bridge")' not in package_text:
+        errors.append("Package.swift must link angnative_runtime_bridge staticlib")
+    if '.linkedLibrary("angnative_host_ffi")' in package_text:
+        errors.append("Package.swift still links the legacy host-only staticlib")
+    if "--package angnative-runtime-bridge" not in ios_build_text:
+        errors.append("build-ios-native.sh must build angnative-runtime-bridge")
+    if "libangnative_runtime_bridge.a" not in ios_build_text:
+        errors.append("build-ios-native.sh must stage libangnative_runtime_bridge.a")
+
     if errors:
         print("FFI declaration check FAILED:")
         for error in errors:
@@ -103,7 +167,9 @@ def main() -> int:
 
     print(
         f"FFI declaration check OK: {len(kt)} JNI methods, "
-        f"{len(swift)} Swift bindings, {len(header)} header declarations"
+        f"{len(swift)} Swift bindings "
+        f"({len(REQUIRED_RUNTIME_BRIDGE_SYMBOLS)} runtime bridge), "
+        f"{len(header)} header declarations; iOS unified staticlib wiring OK"
     )
     return 0
 

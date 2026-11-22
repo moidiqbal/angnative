@@ -41,13 +41,20 @@ Automation: `scripts/verify-web.py` + `scripts/serve-web.mjs` (`pnpm start`)
 
 Implementation: Swift 6 SwiftPM package, UInt64 C-ABI signatures, `free_string`
 on every Rust string, 8 UIKit view-factory callbacks, layout + click → Rust batch,
-unit tests. `scripts/build-ios-native.sh` now builds the Rust static lib for the
-correct simulator/device triple and runs `swift build` with the linker path.
+unit tests. `SwiftFFI.swift` now also binds the five unified runtime-bridge C ABI
+functions and exposes `NativeRuntimeBridge` (main-thread owner, borrowed host,
+bundle load, event dispatch). `Package.swift` and `build-ios-native.sh` link the
+unified `libangnative_runtime_bridge.a`, which bundles host-ffi, host-engine and
+QuickJS; the old host-only archive is not linked.
+`python scripts/check-ffi-declarations.py` statically verifies the 14 Swift
+bindings, their runtime-bridge signatures and the build wiring.
 
-**Honest status:** no Mac here → `swift build` / Simulator run NOT performed.
-First action on the Mac: `./scripts/build-ios-native.sh simulator` then
+**Honest status:** no Mac here → Swift compile, `swift test`, Simulator/device
+run and the runtime-bridge smoke test are **NOT performed**. First action on the
+Mac: `python scripts/check-ffi-declarations.py`, then
+`./scripts/build-ios-native.sh simulator` and
 `cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost`.
-See `docs/IOS-BUILD.md` for the full checklist.
+See `docs/IOS-BUILD.md` for the full runtime-bridge smoke checklist.
 
 ---
 
@@ -98,7 +105,7 @@ cargo test --workspace   # 135 tests pass, 10 ignored; includes host-engine and 
 | Android JNI + emulator run | ✅ verified |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified |
-| iOS shell | ⚠️ code complete, Mac build pending |
+| iOS shell | ⚠️ Swift runtime-bridge bindings + unified staticlib wiring statically verified; Swift compile / Simulator / device run NOT verified (no Mac/Xcode here). Runbook in `docs/IOS-BUILD.md`. |
 | Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; single event path; 9 ignored Angular acceptance tests pass (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n) once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; on-device shell loading still pending (`docs/EVENT-BRIDGE.md`) |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |
 | Template-driven `ngModel` in QuickJS | ✅ verified by ignored acceptance test `angular_template_driven_forms_round_trip_in_quickjs`: AOT `FormsAppComponent` uses `FormsModule`/`ngModel` on `<input>`; JS model changes emit native `SetProperty`/text mutations, and a Rust-dispatched native `input` event updates the model. `<input>` now maps to the `na-text-input` primitive; `navigator.userAgent` shim added for Angular's DefaultValueAccessor. |

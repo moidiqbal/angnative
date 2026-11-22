@@ -34,6 +34,9 @@ local.properties
 *.xcarchive
 *.dSYM/
 .swiftpm/
+# Staged by scripts/build-ios-native.sh (do not commit native build outputs)
+platforms/ios/Sources/AngNativeHost/*.a
+platforms/ios/Sources/AngNativeHost/include/
 
 # Generated test fixtures
 packages/testing/fixtures/out/

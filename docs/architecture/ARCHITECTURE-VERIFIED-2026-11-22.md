@@ -167,7 +167,8 @@ for opt-in use only.
 | `pnpm test` | 221 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
 | Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
-| `python scripts/check-ffi-declarations.py` | 11 JNI methods, 9 Swift bindings, 20 header declarations |
+| `python scripts/check-ffi-declarations.py` | 11 JNI methods, 14 Swift bindings (5 runtime bridge), 20 header declarations; iOS unified staticlib wiring OK |
+| iOS static verification | `SwiftFFI.swift` binds `angnative_runtime_bridge_{create,destroy,dispatch_event,load_script,get_host}` with `UInt64`/`UInt32` signatures; `Package.swift` links `angnative_runtime_bridge`; `build-ios-native.sh` builds/stages that archive. No Swift compile, `swift test`, Simulator or device run on this host. |
 | All 10 Android `assembleDebug` | SUCCESS observed during development; no CI Android job and no retained build log |
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
 | CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
@@ -271,8 +272,15 @@ but is relevant when reasoning about event handling.
    `quickjs.rs` is depth-limited because returning a cyclic RxJS `Subscription`
    previously overflowed rquickjs; the test returns a primitive and a new unit
    test `quickjs_engine_cyclic_value_does_not_overflow` covers truncation.
-5. **iOS parity**: Swift bindings still wrap the legacy host; nothing here
-   claims iOS execution.
+5. **iOS parity — bindings statically verified, execution NOT verified**:
+   `SwiftFFI.swift` now wraps the legacy host **and** the five unified runtime
+   bridge C ABI functions through `NativeRuntimeBridge`; `Package.swift` and
+   `build-ios-native.sh` link `libangnative_runtime_bridge.a` (which bundles
+   host-ffi + QuickJS). `check-ffi-declarations.py` verifies symbol presence,
+   key signature types and build wiring on Windows. No Mac/Xcode is available,
+   so Swift compile, `swift test`, Simulator/device runs and the runtime-bridge
+   smoke checklist in `docs/IOS-BUILD.md` have not been executed. Nothing here
+   claims iOS execution or UIKit Angular parity.
 6. **AOT i18n markers — RESOLVED**: the AOT fixture
    `apps/demo-app/src/i18n/main.i18n.ts` uses `<na-text i18n>Hello {{ name }}!</na-text>`.
    `tsconfig.aot.i18n.json` emits `$localize`, `ɵɵi18n`, `ɵɵi18nExp` and

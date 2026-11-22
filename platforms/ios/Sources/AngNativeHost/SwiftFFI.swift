@@ -127,3 +127,135 @@ public enum HostError: Error, LocalizedError {
         }
     }
 }
+
+// MARK: - Unified runtime bridge (Host + QuickJS + Angular runtime)
+//
+// These symbols are implemented by `angnative-runtime-bridge`, not by
+// `angnative-host-ffi`. Its staticlib already bundles the host FFI symbols, so
+// iOS links only `libangnative_runtime_bridge.a` (see Package.swift and
+// scripts/build-ios-native.sh).
+//
+// The bridge is thread-affine: create it, call it, and destroy it on the same
+// (normally main/UI) thread. `destroy()` from another thread is a no-op in the
+// C ABI rather than a panic; call it on the owner thread before releasing the
+// Swift wrapper.
+
+public typealias AngNativeRuntimeBridgeHandle = OpaquePointer
+
+@_silgen_name("angnative_runtime_bridge_create")
+public func angnative_runtime_bridge_create() -> AngNativeRuntimeBridgeHandle?
+
+@_silgen_name("angnative_runtime_bridge_destroy")
+public func angnative_runtime_bridge_destroy(_ handle: AngNativeRuntimeBridgeHandle?)
+
+@_silgen_name("angnative_runtime_bridge_dispatch_event")
+public func angnative_runtime_bridge_dispatch_event(
+    _ handle: AngNativeRuntimeBridgeHandle?,
+    _ nodeId: UInt64,
+    _ eventName: UnsafePointer<CChar>?,
+    _ payloadJson: UnsafePointer<CChar>?
+) -> UInt32
+
+@_silgen_name("angnative_runtime_bridge_load_script")
+public func angnative_runtime_bridge_load_script(
+    _ handle: AngNativeRuntimeBridgeHandle?,
+    _ source: UnsafePointer<CChar>?
+) -> Int32
+
+@_silgen_name("angnative_runtime_bridge_get_host")
+public func angnative_runtime_bridge_get_host(
+    _ handle: AngNativeRuntimeBridgeHandle?
+) -> AngNativeHost?
+
+/// Result of dispatching a native event into the single JS event pipeline.
+public struct RuntimeBridgeDispatchResult {
+    public let listenersInvoked: UInt32
+
+    /// `DISPATCH_PANIC` (`UInt32.max`) means the C ABI rejected a wrong-thread
+    /// call before QuickJS ran; it is never a real listener count.
+    public var rejectedForWrongThread: Bool { listenersInvoked == UInt32.max }
+}
+
+public final class NativeRuntimeBridge {
+    public let handle: AngNativeRuntimeBridgeHandle
+    private var isDestroyed = false
+
+    /// Create the bridge on the thread that will use it (normally the main
+    /// thread). Do not create a second bridge in the same process.
+    public init() throws {
+        guard let h = angnative_runtime_bridge_create() else {
+            throw RuntimeBridgeError.createFailed
+        }
+        self.handle = h
+    }
+
+    deinit { destroy() }
+
+    /// Borrow the Host owned by the bridge for view-factory registration and
+    /// node inspection. Never wrap this in `NativeHost` or call
+    /// `angnative_host_destroy` on it — the bridge owns the Host.
+    public func hostHandle() throws -> AngNativeHost {
+        guard let h = angnative_runtime_bridge_get_host(handle) else {
+            throw RuntimeBridgeError.hostUnavailable
+        }
+        return h
+    }
+
+    /// Load a self-contained JS bundle (e.g. a generated Angular AOT bundle).
+    /// Returns 0 on success, 1 on script error, 2 when called off the owner
+    /// thread.
+    @discardableResult
+    public func loadScript(_ source: String) throws -> Int32 {
+        let rc = source.withCString { angnative_runtime_bridge_load_script(handle, $0) }
+        guard rc == 0 else {
+            throw rc == 2 ? RuntimeBridgeError.wrongThread : RuntimeBridgeError.scriptFailed(rc)
+        }
+        return rc
+    }
+
+    /// Dispatch a native event (for example a UIKit button press) into the
+    /// Angular listener through the single JS event path.
+    @discardableResult
+    public func dispatchEvent(
+        nodeId: UInt64,
+        eventName: String,
+        payloadJson: String? = nil
+    ) -> RuntimeBridgeDispatchResult {
+        eventName.withCString { name in
+            if let payloadJson = payloadJson {
+                return RuntimeBridgeDispatchResult(
+                    listenersInvoked: payloadJson.withCString {
+                        angnative_runtime_bridge_dispatch_event(handle, nodeId, name, $0)
+                    }
+                )
+            }
+            return RuntimeBridgeDispatchResult(
+                listenersInvoked: angnative_runtime_bridge_dispatch_event(handle, nodeId, name, nil)
+            )
+        }
+    }
+
+    /// Must be called on the creating thread. Calling from another thread is a
+    /// safe no-op in the C ABI but leaks the bridge, so do not rely on it.
+    public func destroy() {
+        guard !isDestroyed else { return }
+        angnative_runtime_bridge_destroy(handle)
+        isDestroyed = true
+    }
+}
+
+public enum RuntimeBridgeError: Error, LocalizedError {
+    case createFailed
+    case hostUnavailable
+    case wrongThread
+    case scriptFailed(Int32)
+
+    public var errorDescription: String? {
+        switch self {
+        case .createFailed: return "Failed to create AngNative runtime bridge"
+        case .hostUnavailable: return "Runtime bridge returned a NULL host handle"
+        case .wrongThread: return "Runtime bridge called from a non-owner thread"
+        case .scriptFailed(let rc): return "Loading the JS bundle failed (rc=\(rc))"
+        }
+    }
+}

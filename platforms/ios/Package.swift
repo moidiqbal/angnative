@@ -14,14 +14,15 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
-        // Swift wrapper around the Rust host C ABI. The native library is
-        // supplied at build time via the XCFramework produced by
-        // scripts/build-ios-native.sh (see docs/IOS-BUILD.md).
+        // Swift wrapper around the Rust C ABI. Link the unified runtime-bridge
+        // staticlib: it bundles angnative-host-ffi, host-engine and QuickJS,
+        // and exports both the legacy host symbols and runtime bridge symbols.
+        // scripts/build-ios-native.sh stages it (see docs/IOS-BUILD.md).
         .target(
             name: "AngNativeHost",
             path: "Sources/AngNativeHost",
             linkerSettings: [
-                .linkedLibrary("angnative_host_ffi")
+                .linkedLibrary("angnative_runtime_bridge")
             ]
         ),
         // UIKit view factory + demo view controller.

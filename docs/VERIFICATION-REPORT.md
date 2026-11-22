@@ -21,7 +21,7 @@ On this machine all toolchains are installed and every item below was actually e
 | Android APK | ✅ PASS | **10 APKs** built under `dist/device-testing/` (19.2–19.3 MB each) |
 | Android device run | ✅ PASS | all 10 installed/launched on **OnePlus Open (CPH2551, Android 16)**; `WebViews: 0` on every app; gfxinfo: grid 170 frames / 1.76% jank / 6 ms p50; valid screenshots in `docs/benchmarks/physical/`) |
 | Size budget check | ✅ PASS | `node scripts/check-size-budget.mjs` → `GATE EXIT=0`, 203 B gzip / 60 KB budget |
-| iOS app | ⚠️ NOT TESTED | 6 Swift/config files exist under `platforms/ios/`; no macOS/Xcode here — build intentionally skipped |
+| iOS app | ⚠️ NOT TESTED | Swift config + runtime-bridge bindings exist under `platforms/ios/`; `check-ffi-declarations.py` statically verifies 14 Swift bindings and unified staticlib wiring, but no macOS/Xcode here — `swift build`, `swift test`, Simulator and device runs intentionally skipped |
 
 ## Bottom line
 Everything except iOS/macOS is implemented, built, tested and pushed to `master`

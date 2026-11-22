@@ -33,7 +33,8 @@
 - [x] C ABI bridge in Swift (`SwiftFFI.swift`, UInt64 node ids, all returned strings freed).
 - [x] UIKit view factory: all 8 `PlatformOp` callbacks → `UIView`/`UILabel`/`UIButton`/etc.
 - [x] Demo command batch, Taffy layout application, and button press → Rust batch.
-- [x] `scripts/build-ios-native.sh` builds the correct iOS Rust target and stages the static library for `swift build`.
+- [x] `scripts/build-ios-native.sh` builds the correct iOS Rust target and stages the unified `libangnative_runtime_bridge.a` for `swift build`.
+- [x] Swift runtime-bridge bindings + Mac runbook: `SwiftFFI.swift` binds the 5 `angnative_runtime_bridge_*` functions, `Package.swift` links the unified staticlib, and `check-ffi-declarations.py` verifies symbols/signatures/wiring statically. Swift compile and Simulator run still pending on a Mac (`docs/IOS-BUILD.md`).
 - [ ] Run `./scripts/build-ios-native.sh simulator` and `swift test` on a Mac; verify UI and click in Simulator (no Mac in this environment).
 - [ ] iOS touch/scroll coordinator refinements based on device feedback.
 

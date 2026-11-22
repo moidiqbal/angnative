@@ -9,9 +9,11 @@
 #   ./scripts/build-ios-native.sh [simulator|device]
 #
 # What it does:
-#   1. Builds angnative-host-ffi as a static lib for the selected iOS target.
+#   1. Builds angnative-runtime-bridge as a static lib for the selected iOS
+#      target. This archive bundles host-ffi, host-engine and QuickJS and
+#      exports both legacy host and unified runtime-bridge C ABI symbols.
 #   2. Copies the .a + C header into the SwiftPM package.
-#   3. Runs `swift build` (simulator) or `swift build -c release -Xswiftc -target ...` (device).
+#   3. Runs `swift build` (simulator) or `swift build -c release` (device).
 #   4. Prints the exact commands to launch the demo in Simulator / on a device.
 
 set -euo pipefail
@@ -51,9 +53,9 @@ if ! rustup target list --installed | grep -q "^${IOS_TARGET}$"; then
   rustup target add "${IOS_TARGET}"
 fi
 
-cargo build --release --target "${IOS_TARGET}" --package angnative-host-ffi
+cargo build --release --target "${IOS_TARGET}" --package angnative-runtime-bridge
 
-RUST_LIB="${REPO_ROOT}/target/${IOS_TARGET}/release/libangnative_host_ffi.a"
+RUST_LIB="${REPO_ROOT}/target/${IOS_TARGET}/release/libangnative_runtime_bridge.a"
 if [[ ! -f "${RUST_LIB}" ]]; then
   echo "ERROR: Rust static library not found: ${RUST_LIB}"
   exit 1
@@ -61,7 +63,9 @@ fi
 
 # 2. Stage library + header into the SwiftPM package
 mkdir -p "${HOST_LIB_DIR}"
-cp "${RUST_LIB}" "${HOST_LIB_DIR}/libangnative_host_ffi.a"
+cp "${RUST_LIB}" "${HOST_LIB_DIR}/libangnative_runtime_bridge.a"
+# Avoid accidentally linking a stale host-only archive left by older builds.
+rm -f "${HOST_LIB_DIR}/libangnative_host_ffi.a"
 mkdir -p "${HOST_LIB_DIR}/include"
 cp "${REPO_ROOT}/crates/angnative-host-ffi/include/angnative_host_ffi.h" \
    "${HOST_LIB_DIR}/include/angnative_host_ffi.h"
