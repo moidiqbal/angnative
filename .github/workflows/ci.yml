@@ -190,6 +190,18 @@ jobs:
           grep -oE 'Angular in Rust: nodes=[0-9]+ \(load rc=0\)' /tmp/window.xml
           echo "Angular-in-QuickJS on-device assertion passed"
 
+      - name: Assert a real tap reaches the Angular listener
+        run: |
+          coords=$(python3 scripts/android-tap-coords.py /tmp/window.xml)
+          adb logcat -c
+          adb shell input tap $coords
+          sleep 3
+          adb logcat -d -s AngNative:I | grep -E 'Angular tap node=[0-9]+ -> [1-9]'
+          adb shell uiautomator dump /sdcard/after.xml > /dev/null
+          adb pull /sdcard/after.xml /tmp/after.xml
+          grep -q 'Count: 1' /tmp/after.xml
+          echo "Angular real-tap -> native UI update assertion passed"
+
   size:
     needs: test
     runs-on: ubuntu-latest

@@ -33,6 +33,7 @@ class NativeViewFactory(
 ) {
   private val views = mutableMapOf<Long, View>()
   private val rootIds = mutableSetOf<Long>()
+  private val childParents = mutableMapOf<Long, Long>()
   private val density = context.resources.displayMetrics.density
 
   /** Mark a node as a root: it will be attached directly to [rootContainer]. */
@@ -54,6 +55,11 @@ class NativeViewFactory(
     val view = createViewForType(nodeId, viewType)
     view.layoutParams = frameParams()
     views[nodeId] = view
+    // Angular registers (click) listeners on component host nodes, which may
+    // be ancestors of the tappable text view. Make every node clickable so a
+    // real tap can be dispatched up the ancestor chain.
+    view.isClickable = true
+    view.setOnClickListener { onPress(nodeId) }
     if (nodeId in rootIds && view.parent == null) {
       rootContainer.addView(view, frameParams())
     }
@@ -144,13 +150,24 @@ class NativeViewFactory(
     }
   }
 
+  /** Node id of the first Button whose text matches (used by E2E tap proofs). */
+  fun findButtonIdByText(text: String): Long? =
+    views.entries.firstOrNull { (_, v) -> v is TextView && v.text.toString() == text }?.key
+
+  /** Current text of a native TextView node (used by E2E assertions). */
+  fun textOf(nodeId: Long): String? = (views[nodeId] as? TextView)?.text?.toString()
+
   fun clear() {
     views.clear()
     rootIds.clear()
+    childParents.clear()
     rootContainer.removeAllViews()
   }
 
+  fun parentOf(nodeId: Long): Long? = childParents[nodeId]
+
   private fun attachChild(parentId: Long, childId: Long, index: Int) {
+    childParents[childId] = parentId
     val parent = views[parentId] as? ViewGroup ?: return
     val child = views[childId] ?: return
     (child.parent as? ViewGroup)?.removeView(child)

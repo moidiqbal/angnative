@@ -58,5 +58,5 @@
 - No WebView/Capacitor/embedded browser exists in any showcase (verified via `dumpsys meminfo` `WebViews: 0` and source scans).
 - No frame-pacing, CPU, warm-start, physical-device or WebView-comparison benchmark has been run.
 - iOS was not built or tested (no macOS/Xcode in this environment).
-- No shipping native shell keeps an embedded QuickJS runtime and Angular listener alive for a real tap. `EcosystemCoreActivity` did load the AOT bundle on-device (20 native nodes, `rc=0`) but destroys the bridge immediately; see `docs/EVENT-BRIDGE.md`.
+- RESOLVED: `EcosystemCoreActivity` now keeps the bridge alive, installs a `NativeViewFactory`, boots the AOT bundle and attaches Angular's native views. A real tap on the Angular "+" dispatches `click` to the registered listener (node 17) and updates the UI from `Count: 0` to `Count: 1`. Evidence: `docs/assets/angular-real-tap-count1.png`. The other 9 shells remain imperative concept demos.
 

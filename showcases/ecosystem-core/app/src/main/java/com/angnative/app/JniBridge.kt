@@ -235,10 +235,16 @@ class JniBridge(private val context: Context) {
    * native click → runtime bridge → JS runtime → na_onEvent → Angular listener.
    */
   fun onNativePress(nodeId: Long) {
-    if (!isInitialized) return
-    val payload = """{"source":"native","nodeId":$nodeId}"""
-    val invoked = nativeRuntimeBridgeDispatchEvent(runtimeBridgeHandle, nodeId, "press", payload)
-    Log.i(TAG, "onNativePress($nodeId) dispatched to runtime bridge, listeners invoked: $invoked")
+    dispatchNativeEvent(nodeId, "press")
+  }
+
+  /** Dispatch any native event name (Angular templates use "click"). */
+  fun dispatchNativeEvent(nodeId: Long, eventName: String): Int {
+    if (!isInitialized) return 0
+    val payload = """{"source":"native","nodeId":$nodeId,"event":"$eventName"}"""
+    val invoked = nativeRuntimeBridgeDispatchEvent(runtimeBridgeHandle, nodeId, eventName, payload)
+    Log.i(TAG, "dispatchNativeEvent($nodeId, $eventName) -> listeners invoked: $invoked")
+    return invoked
   }
 
   /* =======================================================================

@@ -42,6 +42,10 @@ class EcosystemCoreActivity : AppCompatActivity() {
     private lateinit var emailError: TextView
     private lateinit var submitResult: TextView
 
+    // Angular-driven native UI (booted from the real AOT bundle in QuickJS).
+    private var angularBridge: JniBridge? = null
+    private var angularFactory: NativeViewFactory? = null
+
     private val strings = mapOf(
         "en" to mapOf(
             "badge" to "ANGNATIVE • ECOSYSTEM CORE (NATIVE REIMPLEMENTATION)",
@@ -50,6 +54,7 @@ class EcosystemCoreActivity : AppCompatActivity() {
             "locale" to "INTERNATIONALIZATION (Transloco concept)",
             "forms" to "DYNAMIC FORMS (Formly / Reactive Forms concept)",
             "animation" to "ANIMATION (GSAP concept)",
+            "angularLive" to "ANGULAR-DRIVEN NATIVE UI (LIVE AOT BUNDLE)",
             "name" to "Name (required, min 3 chars)",
             "email" to "Email (valid format)",
             "submit" to "Validate & Submit",
@@ -164,21 +169,70 @@ class EcosystemCoreActivity : AppCompatActivity() {
             ObjectAnimator.ofFloat(animBox, "rotation", 0f, 360f).apply { duration = 600; start() }
         })
 
+        // ---- Angular-driven native UI (REAL AOT bundle in QuickJS) ----
+        root.addView(sectionHeader("angularLive"))
+        val angularContainer = FrameLayout(this).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        root.addView(angularContainer)
+
         setContentView(scroll)
         renderState()
+        bootAngularNativeUi(angularContainer)
+    }
 
-        // Boot the real Angular AOT bundle inside the Rust-owned QuickJS
-        // runtime. Renderer flushes now reach Host::process_batch_json, so a
-        // non-zero node count here proves the full native pipeline is closed.
+    /**
+     * Boots the real Angular AOT bundle in the Rust-owned QuickJS runtime and
+     * materializes its command batches as real Android views. A tap on the
+     * Angular "+" button dispatches a "click" event back into QuickJS; the
+     * Angular handler updates a signal, emits a new native batch, and the
+     * TextView text changes — proving the full round trip in a shipping shell.
+     */
+    private fun bootAngularNativeUi(container: FrameLayout) {
         try {
             val bridge = JniBridge(this)
             bridge.initHost()
+            var factory: NativeViewFactory? = null
+            factory = NativeViewFactory(this, container) { nodeId ->
+                // Angular's (click) may live on an ancestor host node, so walk
+                // up to the root and dispatch for each node in the chain.
+                var current: Long? = nodeId
+                var hops = 0
+                while (current != null && current != 0L && hops < 32) {
+                    val invoked = bridge.dispatchNativeEvent(current, "click")
+                    android.util.Log.i("AngNative", "Angular tap node=$current -> $invoked listener(s)")
+                    if (invoked > 0) break
+                    current = factory?.parentOf(current)
+                    hops++
+                }
+            }
+            bridge.viewFactory = factory
+            angularBridge = bridge
+            angularFactory = factory
+            // Angular's root component is node 1; attach it to the container.
+            factory.setRootNode(1L)
+
             val bundle = assets.open("angnative-bundle.js").bufferedReader().use { it.readText() }
             val rc = bridge.loadScript(bundle)
-            statusLabel.text = "Angular in Rust: nodes=${bridge.nodeCount()} (load rc=$rc)"
-            bridge.destroyHost()
+
+            // Layout is produced by the Rust host, not guessed here.
+            val w = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+            val h = 600f
+            bridge.runLayout(w, h)?.let { factory.applyLayoutResult(it) }
+
+            val plusId = factory.findButtonIdByText("+")
+            statusLabel.text = "Angular in Rust: nodes=${bridge.nodeCount()} rc=$rc plusNode=$plusId"
+
+            // Expose ids/text for E2E (uiautomator) assertions.
+            container.tag = "angular-native-ui"
+            plusId?.let { container.setTag(0x7F000001, it) }
         } catch (e: Exception) {
             statusLabel.text = "Rust host unavailable: ${e.message}"
+            android.util.Log.e("AngNative", "Angular boot failed", e)
         }
     }
 
