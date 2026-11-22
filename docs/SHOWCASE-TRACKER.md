@@ -66,7 +66,7 @@ JS runtime); no APK claimed.
 ## Phase 5/6 — build/verify/performance
 - All 8 showcase APKs staged under `dist/showcases/<name>/` with source.zip + compatibility-report.md; installed/launched on emulator API 34; `WebViews=0`.
 - Initial cold-start/memory numbers in `docs/BENCHMARKS.md` + `docs/benchmarks/*.json` (1 sample, emulator, honest caveats).
-- Frame pacing measured on emulator: `docs/benchmarks/frame-pacing.json` (gfxinfo jank/p50/p95 for grid, charts, richtext, calendar). Physical-device multi-sample and CPU still pending.
+- Frame pacing measured on emulator: `docs/benchmarks/frame-pacing.json` (single burst) and `docs/benchmarks/emulator-multisample.json` (3 bursts per app). Physical-device multi-sample, sustained CPU and warm-start still pending.
 
 ## Phase 3 — Reusable packages
 ✅ `@angnative/native-ui-core` is a real tested Android library (line 63); adapter packages and remaining native widgets stay incremental-only — no empty placeholders.

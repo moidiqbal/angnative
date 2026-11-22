@@ -329,7 +329,7 @@
 | **Gate D** | Android E2E round-trip verified (flagship `ecosystem-core`) | ✅ Passed with scope limitation |
 | **Gate E** | All tests pass | ✅ Passed (135 Rust / 10 ignored runtime / 221 JS; FFI check OK) |
 | **Gate F** | Engine abstraction complete | ⬜ Pending |
-| **Gate G** | Benchmarks complete | ⬜ Pending |
+| **Gate G** | Benchmarks complete | ✅ Partial (emulator multi-sample retained; physical multi-sample/CPU/warm-start pending) |
 
 ---
 

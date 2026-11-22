@@ -32,14 +32,23 @@ Raw JSON: `docs/benchmarks/*.json`.
   **Caveat:** software-rasterized emulator, one burst per app, low frame counts for
   richtext/calendar. These are NOT production performance figures.
 
-### Physical-device run (OnePlus Open, Android 16) — DONE
+### Emulator multi-sample (2026-11-23) — DONE
+`docs/benchmarks/emulator-multisample.json` +
+`docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md`: 3 swipe bursts per app with
+`gfxinfo` framestats and instantaneous `top` CPU samples. Averages: grid 127.3
+frames / 48.96% jank / 42.7 ms p50 / 93 ms p95; charts 7 frames, richtext 1 frame,
+calendar 8 frames — those low counts make percentiles unstable. CPU samples are
+frequently `0.0` and are not sustained utilization.
+
+### Physical-device run (OnePlus Open, Android 16) — single burst DONE
 `docs/benchmarks/physical/README.md` + `results.json`: all 10 APKs installed/launched,
 WebViews=0 on every app. Real-GPU headline: **ecosystem-grid 170 frames, 1.76% jank,
 6 ms p50 / 20 ms p95** vs emulator 16.13% / 20 ms. Clean screenshots for all 10 apps are kept in `docs/benchmarks/physical/*.png`
 (status bar + navbar cropped, strict foreground guard so notification shades are
-never captured). Multi-sample averaging is still pending.
-- CPU utilization during scroll
-- Warm start, multi-sample averages, physical device
+never captured). Physical multi-sample, CPU and warm-start are still pending:
+`b6640c8f` was not connected on 2026-11-23, so no new physical claim is made.
+- Sustained CPU utilization during scroll (physical)
+- Warm start and multi-sample averages on the physical device
 - WebView comparison builds (deliberately not built for native showcases)
 
 Do not present these numbers as a NativeScript/Flutter comparison — no equivalent builds exist in this repo.

@@ -1,0 +1,256 @@
+{
+  "measured_at": "2026-11-23T00:46:24.1561779+05:00",
+  "device": "sdk_gphone64_x86_64 / Android 14",
+  "method": "dumpsys gfxinfo framestats + top CPU sampled during each 6-swipe burst; 3 bursts per app, foreground app confirmed by launch",
+  "note": "Emulator SwiftShader software rendering. Multi-sample averages reduce single-burst noise but are NOT physical-device GPU figures. CPU values are instantaneous top samples taken during the burst and are often 0.0; they are not sustained CPU utilization.",
+  "results": [
+    {
+      "name": "ecosystem-grid",
+      "package": "com.angnative.demo.ecosystem.grid",
+      "samples": [
+        {
+          "sample": 1,
+          "frames": 134,
+          "janky_percent": 44.78,
+          "p50_ms": 38.0,
+          "p95_ms": 81.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            38.4
+          ],
+          "cpu_percent_avg": 7.68,
+          "cpu_percent_max": 38.4
+        },
+        {
+          "sample": 2,
+          "frames": 129,
+          "janky_percent": 44.96,
+          "p50_ms": 42.0,
+          "p95_ms": 89.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        },
+        {
+          "sample": 3,
+          "frames": 119,
+          "janky_percent": 57.14,
+          "p50_ms": 48.0,
+          "p95_ms": 109.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            53.8,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 10.76,
+          "cpu_percent_max": 53.8
+        }
+      ],
+      "avg_frames": 127.3,
+      "avg_janky_pct": 48.96,
+      "avg_p50_ms": 42.7,
+      "avg_p95_ms": 93.0,
+      "avg_cpu_pct": 6.15,
+      "max_cpu_pct": 53.8
+    },
+    {
+      "name": "ecosystem-charts",
+      "package": "com.angnative.demo.ecosystem.charts",
+      "samples": [
+        {
+          "sample": 1,
+          "frames": 7,
+          "janky_percent": 100.0,
+          "p50_ms": 31.0,
+          "p95_ms": 1250.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        },
+        {
+          "sample": 2,
+          "frames": 7,
+          "janky_percent": 100.0,
+          "p50_ms": 31.0,
+          "p95_ms": 1100.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        },
+        {
+          "sample": 3,
+          "frames": 7,
+          "janky_percent": 100.0,
+          "p50_ms": 36.0,
+          "p95_ms": 1100.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        }
+      ],
+      "avg_frames": 7.0,
+      "avg_janky_pct": 100.0,
+      "avg_p50_ms": 32.7,
+      "avg_p95_ms": 1150.0,
+      "avg_cpu_pct": 0.0,
+      "max_cpu_pct": 0.0
+    },
+    {
+      "name": "ecosystem-richtext",
+      "package": "com.angnative.demo.ecosystem.richtext",
+      "samples": [
+        {
+          "sample": 1,
+          "frames": 1,
+          "janky_percent": 100.0,
+          "p50_ms": 1100.0,
+          "p95_ms": 1100.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        },
+        {
+          "sample": 2,
+          "frames": 1,
+          "janky_percent": 100.0,
+          "p50_ms": 1100.0,
+          "p95_ms": 1100.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        },
+        {
+          "sample": 3,
+          "frames": 1,
+          "janky_percent": 100.0,
+          "p50_ms": 1350.0,
+          "p95_ms": 1350.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        }
+      ],
+      "avg_frames": 1.0,
+      "avg_janky_pct": 100.0,
+      "avg_p50_ms": 1183.3,
+      "avg_p95_ms": 1183.3,
+      "avg_cpu_pct": 0.0,
+      "max_cpu_pct": 0.0
+    },
+    {
+      "name": "ecosystem-calendar",
+      "package": "com.angnative.demo.ecosystem.calendar",
+      "samples": [
+        {
+          "sample": 1,
+          "frames": 9,
+          "janky_percent": 88.89,
+          "p50_ms": 89.0,
+          "p95_ms": 1100.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        },
+        {
+          "sample": 2,
+          "frames": 7,
+          "janky_percent": 85.71,
+          "p50_ms": 105.0,
+          "p95_ms": 1000.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.0,
+          "cpu_percent_max": 0.0
+        },
+        {
+          "sample": 3,
+          "frames": 8,
+          "janky_percent": 75.0,
+          "p50_ms": 69.0,
+          "p95_ms": 1100.0,
+          "cpu_samples": [
+            0.0,
+            0.0,
+            0.0,
+            3.8,
+            0.0,
+            0.0
+          ],
+          "cpu_percent_avg": 0.63,
+          "cpu_percent_max": 3.8
+        }
+      ],
+      "avg_frames": 8.0,
+      "avg_janky_pct": 83.2,
+      "avg_p50_ms": 87.7,
+      "avg_p95_ms": 1066.7,
+      "avg_cpu_pct": 0.21,
+      "max_cpu_pct": 3.8
+    }
+  ]
+}
