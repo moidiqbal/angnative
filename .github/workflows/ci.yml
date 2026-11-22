@@ -54,6 +54,54 @@ jobs:
       - name: Run Rust tests (workspace)
         run: cargo test --workspace
 
+  # Headline feature protection: the Angular-in-QuickJS acceptance tests are
+  # #[ignore] by default because dist/ is gitignored. Generate the bundles and
+  # run them explicitly so a regression in the runtime -> native pipeline or
+  # the FFI surface cannot land silently.
+  angular-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-11-14
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Compile Angular AOT (main + router app)
+        run: |
+          pnpm run compile:aot
+          pnpm run compile:aot:router
+
+      - name: Build self-contained QuickJS bundles
+        run: |
+          pnpm run bundle:quickjs
+          pnpm run bundle:forms
+          pnpm run bundle:framework
+
+      - name: Run Angular-in-QuickJS acceptance tests
+        run: cargo test -p angnative-runtime-bridge -- --ignored
+
+      - name: Check FFI declarations (JNI / Swift / C header)
+        run: python3 scripts/check-ffi-declarations.py
+
   size:
     needs: test
     runs-on: ubuntu-latest
