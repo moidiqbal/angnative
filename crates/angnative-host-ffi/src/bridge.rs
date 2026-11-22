@@ -20,21 +20,36 @@ use std::thread_local;
 /// UTF-8 JSON string owned by the host for the duration of the call.
 pub type EventCallback = unsafe extern "C" fn(u64, *const c_char, *mut c_void);
 
-// Thread-local JS dispatch callback (installed by RuntimeBridge).
+/// Canonical JS dispatch callback. `owner` is the bridge instance that
+/// installed it; routing is keyed by owner so two bridges on one thread cannot
+/// deliver each other's events (P1-1).
+pub type JsRuntimeDispatch =
+    extern "C" fn(u64, *const c_char, *const c_char, usize) -> u32;
+
+/// Owner used by legacy shells/tests that install a dispatcher without a
+/// `RuntimeBridge`. A real bridge always uses a unique non-zero owner.
+pub const LEGACY_DISPATCH_OWNER: usize = 0;
+
+// Per-bridge JS dispatch callbacks installed on this thread by RuntimeBridge.
 thread_local! {
-    static JS_RUNTIME_DISPATCH: RefCell<Option<extern "C" fn(u64, *const c_char, *const c_char) -> u32>> = RefCell::new(None);
+    static JS_RUNTIME_DISPATCH: RefCell<HashMap<usize, JsRuntimeDispatch>> =
+        RefCell::new(HashMap::new());
 }
 
-/// Set the JS runtime dispatch function for the current thread.
-/// Called by RuntimeBridge::new() to register its dispatch function.
-pub fn set_js_runtime_dispatch_for_thread(f: extern "C" fn(u64, *const c_char, *const c_char) -> u32) {
-    JS_RUNTIME_DISPATCH.with(|dispatch| *dispatch.borrow_mut() = Some(f));
+/// Set the JS runtime dispatch function for one bridge on the current thread.
+/// Called by RuntimeBridge::with_engine() to register its dispatch function.
+pub fn set_js_runtime_dispatch_for_thread(owner: usize, f: JsRuntimeDispatch) {
+    JS_RUNTIME_DISPATCH.with(|dispatch| {
+        dispatch.borrow_mut().insert(owner, f);
+    });
 }
 
-/// Clear the JS runtime dispatch function for the current thread.
-/// Called by RuntimeBridge::destroy() or when bridge is dropped.
-pub fn clear_js_runtime_dispatch_for_thread() {
-    JS_RUNTIME_DISPATCH.with(|dispatch| *dispatch.borrow_mut() = None);
+/// Clear only this bridge's JS runtime dispatch function on the current
+/// thread. Other bridges on the same thread keep their callbacks.
+pub fn clear_js_runtime_dispatch_for_thread(owner: usize) {
+    JS_RUNTIME_DISPATCH.with(|dispatch| {
+        dispatch.borrow_mut().remove(&owner);
+    });
 }
 
 use angnative_host_core::command::CommandBatch;
@@ -262,6 +277,9 @@ pub struct Host {
     event_callback: Option<EventCallback>,
     event_user_data: *mut c_void,
     event_listeners: HashMap<(u64, String), Vec<u64>>,
+    /// Which bridge's JS dispatch callback serves this Host. Defaults to the
+    /// legacy owner so shells without a bridge keep their existing path.
+    js_dispatch_owner: usize,
 }
 
 impl Host {
@@ -276,7 +294,15 @@ impl Host {
             event_callback: None,
             event_user_data: std::ptr::null_mut(),
             event_listeners: HashMap::new(),
+            js_dispatch_owner: LEGACY_DISPATCH_OWNER,
         }
+    }
+
+    /// Associate this Host with the bridge that owns its canonical JS dispatch
+    /// callback. Called by `RuntimeBridge::with_engine()`.
+    pub fn set_js_dispatch_owner(&mut self, owner: usize) {
+        assert_ne!(owner, LEGACY_DISPATCH_OWNER, "bridge owner must be non-zero");
+        self.js_dispatch_owner = owner;
     }
 
     pub fn set_last_error(&mut self, msg: impl Into<String>) {
@@ -345,19 +371,17 @@ impl Host {
         let Ok(c_event) = CString::new(event_name) else { return 0 };
         let Ok(c_payload) = CString::new(payload) else { return 0 };
 
-        // Canonical path: JS runtime dispatch (thread-local, installed by
-        // RuntimeBridge). F2 fix: the legacy fallback is chosen by *whether a
-        // JS dispatcher is installed*, NOT by its return count. A listener
-        // error makes the callback return 0; treating that as "no handler"
-        // would fire the legacy callback too and double-deliver the event.
-        let js_invoked = JS_RUNTIME_DISPATCH.with(|dispatch| {
-            match dispatch.borrow().as_ref() {
-                Some(f) => Some(f(node_id, c_event.as_ptr(), c_payload.as_ptr())),
-                None => None,
-            }
+        // Canonical path: this Host's bridge-owned JS runtime dispatch.
+        // F2 fix: the legacy fallback is chosen by *whether this owner's JS
+        // dispatcher is installed*, NOT by its return count. A listener error
+        // makes the callback return 0; treating that as "no handler" would fire
+        // the legacy callback too and double-deliver the event.
+        let owner = self.js_dispatch_owner;
+        let js_dispatch = JS_RUNTIME_DISPATCH.with(|dispatch| {
+            dispatch.borrow().get(&owner).copied()
         });
-        if let Some(invoked) = js_invoked {
-            return invoked;
+        if let Some(f) = js_dispatch {
+            return f(node_id, c_event.as_ptr(), c_payload.as_ptr(), owner);
         }
 
         // Legacy FFI callback path (only when no JS dispatcher is installed).
@@ -388,24 +412,32 @@ impl Host {
         angnative_host_core::command::validate_version(batch.protocol_version)
             .map_err(|e| format!("Protocol error: {e}"))?;
 
-        // Apply the batch to the retained shadow tree so node_count/snapshot
-        // (used by platform shells) reflect the current state.
-        self.engine
+        // Stage-then-commit (P2-3): mutate clones first. A failed command or
+        // failed native op application must not leave a partially updated
+        // shadow tree or stale op buffer behind.
+        let mut staged_engine = self.engine.clone();
+        let mut staged_emitter = self.emitter.clone();
+
+        staged_engine
             .run_batch(batch.clone())
             .map_err(|e| format!("MutationEngine error: {e}"))?;
 
-        // Emit platform ops through the OpEmitter.
-        let ops = self
-            .emitter
+        let ops = staged_emitter
             .process_batch(&batch)
             .map_err(|e| format!("OpEmitter error: {e}"))?;
 
-        // Apply ops to the registered view factory, if any.
+        // Apply ops to the registered view factory, if any. Native views are
+        // not clonable, so factory failure still commits nothing on the Rust
+        // side; shells must treat a failed batch as not applied.
         if let Some(factory) = &self.view_factory {
             factory
                 .apply_ops(&ops)
                 .map_err(|e| format!("ViewFactory error: {e}"))?;
         }
+
+        // Commit both staged states only after every stage succeeded.
+        self.engine = staged_engine;
+        self.emitter = staged_emitter;
 
         // Serialize ops back to JSON for the platform shell.
         serde_json::to_string(&ops).map_err(|e| format!("Ops serialization: {e}"))

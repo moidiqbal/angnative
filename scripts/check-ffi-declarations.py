@@ -10,7 +10,10 @@ No SDK/Xcode/device required. Checks:
      iOS build wiring (unified staticlib, not the legacy host-only archive)
 
 This is STATIC verification only; it does not replace Android/iOS builds or
-prove that `swift build` / Simulator tests pass on macOS.
+prove that `swift build` / Simulator tests pass on macOS. The Kotlin/JNI side
+covers the flagship `ecosystem-core` shell only; other shells call Rust host
+APIs directly and are outside this checker's scope. Signature checks compare
+names/arity for Kotlin and exact patterns for the Swift runtime bridge.
 
 Usage: python scripts/check-ffi-declarations.py
 """

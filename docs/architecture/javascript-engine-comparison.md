@@ -1,6 +1,15 @@
 # JavaScript Engine Runtime Research
 
-## Executive Summary
+> **UPDATE 2026-11-23:** This document originally recommended V8/deno_core as
+> the primary engine, pending "Phase G" benchmarks that were never run. That
+> recommendation is **superseded**. The finalized decision is in
+> [ADR-javascript-runtime-selection.md](ADR-javascript-runtime-selection.md):
+> **retain the QuickJS family, upgrade the engine, minify/bytecode the bundles**.
+> Rationale: 4–10× smaller binary, no iOS JIT penalty, and Angular compatibility
+> is already proven via shims on emulator and a physical device. The V8 section
+> below is retained as historical research, not as a current recommendation.
+
+## Executive Summary (original research)
 
 This document presents research findings on JavaScript engine options for AngNative's embedded Angular execution runtime. The research was conducted to inform the architectural decision for the primary execution engine.
 
@@ -8,7 +17,10 @@ This document presents research findings on JavaScript engine options for AngNat
 
 ### 1. QuickJS-NG (Current: rquickjs)
 
-**Version**: QuickJS-NG 2024-01-13 via rquickjs 0.5.x
+**Version correction (2026-11-23):** rquickjs 0.5.1 actually vendors QuickJS with
+`VERSION = 2021-03-27` — the original Bellard QuickJS, NOT QuickJS-NG 2024.
+QuickJS-ng's current release is v0.18.0 (1 Nov 2026), which contains years of
+memory-safety and performance fixes. See the ADR for the upgrade decision.
 
 **Capabilities Verified**:
 - ES2023 support (partial)
@@ -218,9 +230,9 @@ Signals work without Zone.js:
 
 ---
 
-## Recommendation
+## Recommendation (HISTORICAL — superseded, see ADR)
 
-### Primary: **V8 via deno_core** 
+### Primary (old proposal, NOT adopted): **V8 via deno_core** 
 
 **Rationale**:
 1. **Angular runs natively** - Angular's primary target is V8/Chrome
@@ -250,9 +262,13 @@ Evaluate only if:
 
 ---
 
-## Conclusion
+## Conclusion (HISTORICAL)
 
-**Recommend V8 via deno_core as primary engine** with QuickJS-NG retained as fallback. The architectural decision should be documented in ADR after Phase G benchmarks.
+The original conclusion — "Recommend V8 via deno_core, decide after Phase G" —
+was never enacted: no V8 PoC or Phase G benchmarks were produced. The final,
+evidence-backed decision is recorded in
+[ADR-javascript-runtime-selection.md](ADR-javascript-runtime-selection.md):
+**QuickJS retained, engine upgraded, bundles minified/bytecoded.**
 
 **Next Steps**:
 1. Phase C: Complete Angular AOT + QuickJS-NG proof-of-concept

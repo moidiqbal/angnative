@@ -323,6 +323,44 @@ fn process_batch_invalid_json_returns_error() {
 }
 
 #[test]
+fn failed_batch_leaves_shadow_tree_unchanged() {
+    let handle = ffi::angnative_host_create();
+    assert!(!handle.is_null());
+
+    // First command would succeed; the second must abort the whole batch.
+    let batch_json = serde_json::to_string(&batch(vec![
+        Command::CreateNode {
+            id: 1,
+            node_type: "View".to_string(),
+        },
+        Command::RemoveNode { id: 99 },
+    ]))
+    .unwrap();
+
+    let mut out_len: u32 = 0;
+    let result_ptr = unsafe {
+        ffi::angnative_host_process_batch(handle, cstr(&batch_json).as_ptr(), &mut out_len)
+    };
+    assert!(!result_ptr.is_null());
+    let result = unsafe { CStr::from_ptr(result_ptr) }
+        .to_str()
+        .unwrap()
+        .to_owned();
+    unsafe { free_cstr(result_ptr) };
+    assert!(
+        result.contains("MutationEngine error") || result.contains("OpEmitter error"),
+        "expected staged batch failure, got {result}"
+    );
+    assert_eq!(
+        unsafe { ffi::angnative_host_node_count(handle) },
+        0,
+        "a failed batch must not leave a partially applied shadow tree"
+    );
+
+    unsafe { ffi::angnative_host_destroy(handle) };
+}
+
+#[test]
 fn process_batch_null_handle_returns_error() {
     let mut out_len: u32 = 0;
     let result_ptr = unsafe {
@@ -529,6 +567,7 @@ fn js_dispatch_returning_zero_does_not_trigger_legacy_fallback() {
         _node_id: u64,
         _event_name: *const c_char,
         _payload_json: *const c_char,
+        _owner: usize,
     ) -> u32 {
         0 // listener error / no invocation — still the canonical path
     }
@@ -539,7 +578,7 @@ fn js_dispatch_returning_zero_does_not_trigger_legacy_fallback() {
 
     let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
-    set_js_runtime_dispatch_for_thread(js_cb);
+    set_js_runtime_dispatch_for_thread(0, js_cb);
     unsafe {
         ffi::angnative_host_set_event_callback(handle, Some(legacy_cb), std::ptr::null_mut());
         ffi::angnative_host_add_event_listener(handle, 7, cstr("press").as_ptr(), 1);
@@ -560,7 +599,7 @@ fn js_dispatch_returning_zero_does_not_trigger_legacy_fallback() {
         "legacy fallback must not fire when a JS dispatcher is installed"
     );
 
-    clear_js_runtime_dispatch_for_thread();
+    clear_js_runtime_dispatch_for_thread(0);
     unsafe { ffi::angnative_host_destroy(handle) };
 }
 
@@ -575,6 +614,7 @@ fn js_runtime_dispatch_callback_is_invoked() {
         node_id: u64,
         _event_name: *const c_char,
         _payload_json: *const c_char,
+        _owner: usize,
     ) -> u32 {
         JS_DISPATCH_INVOKED.fetch_add(1, Ordering::SeqCst);
         JS_DISPATCH_NODE_ID.store(node_id, Ordering::SeqCst);
@@ -585,7 +625,7 @@ fn js_runtime_dispatch_callback_is_invoked() {
     assert!(!handle.is_null());
     
     // Register the JS runtime dispatch callback via thread-local
-    set_js_runtime_dispatch_for_thread(js_runtime_dispatch_callback);
+    set_js_runtime_dispatch_for_thread(0, js_runtime_dispatch_callback);
     
     // Dispatch an event - should call both FFI callback (none registered) and JS dispatch
     let count = unsafe {
@@ -603,7 +643,7 @@ fn js_runtime_dispatch_callback_is_invoked() {
     assert_eq!(JS_DISPATCH_NODE_ID.load(Ordering::SeqCst), 42);
     
     // Cleanup thread-local
-    clear_js_runtime_dispatch_for_thread();
+    clear_js_runtime_dispatch_for_thread(0);
     
     unsafe { ffi::angnative_host_destroy(handle) };
 }

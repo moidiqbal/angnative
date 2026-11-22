@@ -1,7 +1,11 @@
 # JS engine bake-off — design
 
 **Date:** 2026-11-23
-**Status:** Validated with user; ready for implementation
+**Status:** Closed 2026-11-23 — QuickJS-NG retained by explicit decision;
+Hermes/V8 implementation and the planned bake-off were not pursued. See
+`docs/architecture/ADR-javascript-runtime-selection.md` for the accepted decision
+and the measured 23,312,447-byte release APK (above the 20 MB target). This
+document is retained as the pre-decision design, not as pending work.
 **Scope:** Engine selection for the flagship AngNative Angular runtime. Rust host,
 renderer, JNI/FFI, Taffy layout and the AOT bundle stay unchanged.
 

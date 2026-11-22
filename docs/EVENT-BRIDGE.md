@@ -2,8 +2,8 @@
 
 **Status (2026-11-23):** Implemented and verified in-process and on-device.
 `angnative-runtime-bridge` owns Host + QuickJS + `AngNativeRuntime`, a real Angular AOT
-bundle boots, and native events reach live Angular listeners (10 ignored tests pass —
-9 Angular acceptance tests plus 1 RxJS spot-check — via
+bundle boots, and native events reach live Angular listeners (15 ignored tests pass —
+11 Angular acceptance tests, 3 stress/memory checks and 1 RxJS spot-check — via
 `cargo test -p angnative-runtime-bridge -- --ignored`). The cross-thread C ABI fix,
 UI-thread marshalling of Rust→Kotlin ViewFactory callbacks, and a real native tap →
 live Angular listener are verified on the Android 14 emulator and on the physical

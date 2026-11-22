@@ -43,6 +43,7 @@ pub enum OpEmitterError {
 }
 
 /// The OpEmitter. Owns a ViewTree and converts commands + layout into ops.
+#[derive(Clone)]
 pub struct OpEmitter {
     tree: ViewTree,
     /// Accumulated ops for the current commit.

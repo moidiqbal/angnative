@@ -119,6 +119,12 @@ impl RuntimeController {
     }
 
     pub fn state(&self) -> LifecycleState {
-        *self.state.lock().expect("state lock poisoned")
+        // Recover a poisoned state lock instead of `expect`, which aborts in
+        // Android release builds (`panic = "abort"`). The stored state is a
+        // plain Copy value, so reading it after a panic is safe (P3).
+        *self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }

@@ -21,10 +21,10 @@ use angnative_host_ffi::bridge::{
     clear_js_runtime_dispatch_for_thread, set_js_runtime_dispatch_for_thread, Host,
 };
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread::{self, ThreadId};
 use std::thread_local;
 use std::time::Instant;
@@ -48,13 +48,21 @@ struct JsErrorState {
 }
 
 thread_local! {
-    /// Type-erased runtime dispatch: keeps the thread-local callback engine-neutral.
-    static CURRENT_BRIDGE_RUNTIME: RefCell<Option<*mut dyn RuntimeEventDispatch>> =
-        RefCell::new(None);
-    /// Stable pointer to the bridge-owned Host for `na_dispatchBatch`.
-    static CURRENT_BRIDGE_HOST: RefCell<Option<*mut Host>> = RefCell::new(None);
-    static JS_ERROR_STATE: RefCell<JsErrorState> = RefCell::new(JsErrorState::default());
+    /// Type-erased runtime dispatch, keyed by bridge owner (P1-1). Keeping one
+    /// entry per live bridge prevents a second bridge from repointing the
+    /// first bridge's event/batch callbacks on the same thread.
+    static CURRENT_BRIDGE_RUNTIME: RefCell<HashMap<usize, *mut dyn RuntimeEventDispatch>> =
+        RefCell::new(HashMap::new());
+    /// Stable pointer to each bridge-owned Host for `na_dispatchBatch`.
+    static CURRENT_BRIDGE_HOST: RefCell<HashMap<usize, *mut Host>> =
+        RefCell::new(HashMap::new());
+    /// Per-bridge native error callback state.
+    static JS_ERROR_STATE: RefCell<HashMap<usize, JsErrorState>> =
+        RefCell::new(HashMap::new());
 }
+
+/// Unique, process-local identity for a live bridge. Never crosses FFI.
+static NEXT_BRIDGE_OWNER: AtomicU64 = AtomicU64::new(1);
 
 /// Engine-neutral view of an AngNativeRuntime used by the canonical JS callback.
 pub trait RuntimeEventDispatch {
@@ -85,6 +93,8 @@ pub struct RuntimeBridge<E: JsEngine = QuickJsEngine> {
     // struct is moved (for example into a Box by the handle registry).
     runtime: Box<AngNativeRuntime<E>>,
     host: Box<Host>,
+    /// Key for every owner-scoped thread-local slot and callback.
+    owner_id: usize,
     owner_thread: ThreadId,
     controller: RuntimeController,
     metrics: RuntimeMetrics,
@@ -118,7 +128,9 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
     pub fn with_engine(engine: E) -> Result<Self, AngNativeError> {
         let engine_name = engine.engine_name();
         let heap_bytes = engine.memory_usage();
-        let host = Box::new(Host::new());
+        let owner_id = NEXT_BRIDGE_OWNER.fetch_add(1, AtomicOrdering::SeqCst) as usize;
+        let mut host = Box::new(Host::new());
+        host.set_js_dispatch_owner(owner_id);
         let mut runtime = Box::new(AngNativeRuntime::new(engine, RuntimeConfig::default()));
         runtime.install_api()?;
 
@@ -130,6 +142,7 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
         let mut bridge = Self {
             runtime,
             host,
+            owner_id,
             owner_thread,
             controller,
             metrics: RuntimeMetrics::new(engine_name, heap_bytes),
@@ -140,36 +153,52 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
 
         bridge.install_thread_locals();
         bridge.register_bridge_functions()?;
-        set_js_runtime_dispatch_for_thread(js_runtime_dispatch_callback);
+        set_js_runtime_dispatch_for_thread(bridge.owner_id, js_runtime_dispatch_callback);
         Ok(bridge)
     }
 
     fn install_thread_locals(&mut self) {
         let dispatch: *mut dyn RuntimeEventDispatch = &mut *self.runtime;
-        CURRENT_BRIDGE_RUNTIME.with(|rt| *rt.borrow_mut() = Some(dispatch));
-        CURRENT_BRIDGE_HOST.with(|h| *h.borrow_mut() = Some(&mut *self.host as *mut Host));
+        let host: *mut Host = &mut *self.host;
+        let owner = self.owner_id;
+        CURRENT_BRIDGE_RUNTIME.with(|rt| {
+            let previous = rt.borrow_mut().insert(owner, dispatch);
+            assert!(previous.is_none(), "bridge owner {owner} already installed");
+        });
+        CURRENT_BRIDGE_HOST.with(|h| {
+            let previous = h.borrow_mut().insert(owner, host);
+            assert!(previous.is_none(), "bridge owner {owner} already installed");
+        });
+        JS_ERROR_STATE.with(|state| {
+            let previous = state.borrow_mut().insert(owner, JsErrorState::default());
+            assert!(previous.is_none(), "bridge owner {owner} already installed");
+        });
     }
 
     fn register_bridge_functions(&mut self) -> Result<(), AngNativeError> {
-        // Angular renderer batches flow into the Host's MutationEngine/OpEmitter.
-        self.runtime.engine().register_function("na_dispatchBatch", |args| {
+        let owner = self.owner_id;
+
+        // Angular renderer batches flow into this bridge's Host only.
+        self.runtime.engine().register_function("na_dispatchBatch", move |args| {
             let Some(JsValue::String(json)) = args.first() else {
                 return Ok(JsValue::Null);
             };
-            CURRENT_BRIDGE_HOST.with(|h| {
-                let Some(ptr) = *h.borrow() else {
-                    return Ok(JsValue::Null);
-                };
-                let host = unsafe { &mut *ptr };
-                match host.process_batch_json(json.as_str()) {
-                    Ok(ops) => Ok(JsValue::String(ops)),
-                    Err(e) => Err(EngineError::CallError(e)),
-                }
-            })
+            // Copy the pointer and drop the RefCell borrow before touching the
+            // Host; a batch can synchronously call back into JS (P2-4).
+            let host = CURRENT_BRIDGE_HOST.with(|h| h.borrow().get(&owner).copied());
+            let Some(host) = host else {
+                return Ok(JsValue::Null);
+            };
+            let host = unsafe { &mut *host };
+            match host.process_batch_json(json.as_str()) {
+                Ok(ops) => Ok(JsValue::String(ops)),
+                Err(e) => Err(EngineError::CallError(e)),
+            }
         });
 
-        // Angular ErrorHandler provider calls this global (P1-09).
-        self.runtime.engine().register_function("na_reportError", |args| {
+        // Angular ErrorHandler provider calls this global (P1-09). Record only;
+        // the single notification point is `drain_js_reported_error` (P2-1).
+        self.runtime.engine().register_function("na_reportError", move |args| {
             let message = match args.first() {
                 Some(JsValue::String(s)) => s.clone(),
                 Some(other) => format!("{other:?}"),
@@ -180,12 +209,8 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
                 _ => None,
             };
             JS_ERROR_STATE.with(|state| {
-                let mut state = state.borrow_mut();
-                state.last = Some((message.clone(), stack.clone()));
-                if let Some((callback, user_data)) = state.callback {
-                    let message_c = CString::new(message).unwrap_or_default();
-                    let stack_c = CString::new(stack.unwrap_or_default()).unwrap_or_default();
-                    unsafe { callback(message_c.as_ptr(), stack_c.as_ptr(), user_data) };
+                if let Some(state) = state.borrow_mut().get_mut(&owner) {
+                    state.last = Some((message, stack));
                 }
             });
             Ok(JsValue::Null)
@@ -267,7 +292,12 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
     ) {
         self.error_callback = callback;
         self.error_user_data = user_data;
-        JS_ERROR_STATE.with(|state| state.borrow_mut().callback = callback.map(|cb| (cb, user_data)));
+        let owner = self.owner_id;
+        JS_ERROR_STATE.with(|state| {
+            if let Some(state) = state.borrow_mut().get_mut(&owner) {
+                state.callback = callback.map(|cb| (cb, user_data));
+            }
+        });
     }
 
     fn invoke_error_callback(&self, info: &RuntimeErrorInfo) {
@@ -286,7 +316,13 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
     }
 
     fn drain_js_reported_error(&mut self) {
-        let reported = JS_ERROR_STATE.with(|state| state.borrow_mut().last.take());
+        let owner = self.owner_id;
+        let reported = JS_ERROR_STATE.with(|state| {
+            state
+                .borrow_mut()
+                .get_mut(&owner)
+                .and_then(|state| state.last.take())
+        });
         if let Some((message, stack)) = reported {
             let error = AngNativeError::ScriptError(message);
             self.report_error("angular_error_handler", &error, stack);
@@ -377,10 +413,19 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
 
 impl<E: JsEngine> Drop for RuntimeBridge<E> {
     fn drop(&mut self) {
-        CURRENT_BRIDGE_RUNTIME.with(|rt| *rt.borrow_mut() = None);
-        CURRENT_BRIDGE_HOST.with(|h| *h.borrow_mut() = None);
-        JS_ERROR_STATE.with(|state| state.borrow_mut().callback = None);
-        clear_js_runtime_dispatch_for_thread();
+        let owner = self.owner_id;
+        // Remove only this bridge's slots: another live bridge on the same
+        // thread must keep working when this one is destroyed (P1-1).
+        CURRENT_BRIDGE_RUNTIME.with(|rt| {
+            rt.borrow_mut().remove(&owner);
+        });
+        CURRENT_BRIDGE_HOST.with(|h| {
+            h.borrow_mut().remove(&owner);
+        });
+        JS_ERROR_STATE.with(|state| {
+            state.borrow_mut().remove(&owner);
+        });
+        clear_js_runtime_dispatch_for_thread(owner);
     }
 }
 
@@ -389,6 +434,7 @@ extern "C" fn js_runtime_dispatch_callback(
     node_id: u64,
     event_name: *const c_char,
     payload_json: *const c_char,
+    owner: usize,
 ) -> u32 {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if event_name.is_null() { return 0; }
@@ -404,19 +450,19 @@ extern "C" fn js_runtime_dispatch_callback(
                 Err(_) => return 0,
             }
         };
-        CURRENT_BRIDGE_RUNTIME.with(|rt| {
-            let borrow = rt.borrow();
-            match borrow.as_ref() {
-                Some(ptr) => {
-                    let runtime = unsafe { &mut **ptr };
-                    match runtime.dispatch_event_erased(node_id, event_name_str, payload_str) {
-                        Ok(invoked) => invoked,
-                        Err(_) => 0,
-                    }
+        // Copy the pointer and release the borrow before the foreign-facing
+        // dispatch call (P2-4); route strictly to the originating bridge.
+        let ptr = CURRENT_BRIDGE_RUNTIME.with(|rt| rt.borrow().get(&owner).copied());
+        match ptr {
+            Some(ptr) => {
+                let runtime = unsafe { &mut *ptr };
+                match runtime.dispatch_event_erased(node_id, event_name_str, payload_str) {
+                    Ok(invoked) => invoked,
+                    Err(_) => 0,
                 }
-                None => 0,
             }
-        })
+            None => 0,
+        }
     }));
     result.unwrap_or(DISPATCH_PANIC)
 }
@@ -450,12 +496,17 @@ fn bridge_registry() -> &'static BridgeRegistry {
     })
 }
 
-fn lookup_entry(handle: u64) -> Result<BridgeEntry, AngNativeError> {
-    let registry = bridge_registry();
-    let entries = registry
+/// Recover the registry even after a panic poisoned it. Dropping a poisoned
+/// lock otherwise leaks both the BridgeRecord and its registry entry (P3).
+fn lock_entries() -> MutexGuard<'static, HashMap<u64, BridgeEntry>> {
+    bridge_registry()
         .entries
         .lock()
-        .map_err(|_| AngNativeError::Internal("bridge registry lock poisoned".to_string()))?;
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn lookup_entry(handle: u64) -> Result<BridgeEntry, AngNativeError> {
+    let entries = lock_entries();
     entries
         .get(&handle)
         .copied()
@@ -463,10 +514,35 @@ fn lookup_entry(handle: u64) -> Result<BridgeEntry, AngNativeError> {
         .ok_or_else(|| AngNativeError::InvalidHandle(format!("handle {handle} is invalid or stale")))
 }
 
+thread_local! {
+    /// Handles already borrowed via `&mut` on this thread. A native callback
+    /// that re-enters the C ABI with the same handle must not create a second
+    /// `&mut RuntimeBridge` (P2-4).
+    static ACTIVE_BRIDGE_HANDLES: RefCell<HashSet<u64>> = RefCell::new(HashSet::new());
+}
+
+struct ActiveBridgeGuard(u64);
+
+impl Drop for ActiveBridgeGuard {
+    fn drop(&mut self) {
+        ACTIVE_BRIDGE_HANDLES.with(|active| {
+            active.borrow_mut().remove(&self.0);
+        });
+    }
+}
+
 fn with_bridge<T>(
     handle: u64,
     f: impl FnOnce(&mut RuntimeBridge) -> T,
 ) -> Result<T, AngNativeError> {
+    let entered = ACTIVE_BRIDGE_HANDLES.with(|active| active.borrow_mut().insert(handle));
+    if !entered {
+        return Err(AngNativeError::Lifecycle(format!(
+            "re-entrant access to bridge handle {handle} rejected"
+        )));
+    }
+    let _guard = ActiveBridgeGuard(handle);
+
     let entry = lookup_entry(handle)?;
     if entry.owner_thread != thread::current().id() {
         return Err(AngNativeError::Lifecycle(
@@ -513,16 +589,16 @@ fn c_string(value: &str) -> CString {
 pub extern "C" fn angnative_runtime_bridge_create() -> u64 {
     let result = std::panic::catch_unwind(|| {
         let bridge = RuntimeBridge::new().ok()?;
-        let registry = bridge_registry();
-        let generation = registry.next_generation.fetch_add(1, AtomicOrdering::SeqCst);
+        let generation = bridge_registry()
+            .next_generation
+            .fetch_add(1, AtomicOrdering::SeqCst);
         let record = Box::into_raw(Box::new(BridgeRecord { bridge: Box::new(bridge) }));
         let entry = BridgeEntry {
             generation,
             owner_thread: thread::current().id(),
             record: record as usize,
         };
-        let mut entries = registry.entries.lock().ok()?;
-        entries.insert(generation, entry);
+        lock_entries().insert(generation, entry);
         Some(generation)
     });
     result.unwrap_or(Some(0)).unwrap_or(0)
@@ -541,11 +617,16 @@ pub unsafe extern "C" fn angnative_runtime_bridge_destroy(handle: u64) {
         note_wrong_thread_rejection();
         return;
     }
+    // Destroying while this handle is borrowed would free the bridge that is
+    // still on the stack (P2-4).
+    let entered = ACTIVE_BRIDGE_HANDLES.with(|active| active.borrow_mut().insert(handle));
+    if !entered {
+        return;
+    }
+    let _guard = ActiveBridgeGuard(handle);
     let _ = std::panic::catch_unwind(|| {
         let record = Box::from_raw(entry.record as *mut BridgeRecord);
-        if let Ok(mut entries) = bridge_registry().entries.lock() {
-            entries.remove(&handle);
-        }
+        lock_entries().remove(&handle);
         drop(record);
     });
 }
@@ -1835,7 +1916,11 @@ mod tests {
         unsafe { angnative_runtime_bridge_free_string(raw) };
         assert!(json.contains("boom from Angular"), "last error JSON: {json}");
         assert!(json.contains("angular_error_handler"), "last error JSON: {json}");
-        assert!(ERROR_CALLBACK_HITS.load(AtomicOrdering::SeqCst) >= 1);
+        assert_eq!(
+            ERROR_CALLBACK_HITS.load(AtomicOrdering::SeqCst),
+            1,
+            "na_reportError must notify the native callback exactly once"
+        );
 
         let raw = unsafe { angnative_runtime_bridge_metrics_json(handle) };
         assert!(!raw.is_null());
@@ -1844,6 +1929,82 @@ mod tests {
         assert!(json.contains("\"script_load_count\":1"), "metrics JSON: {json}");
         assert!(json.contains("\"reported_error_count\":1"), "metrics JSON: {json}");
         assert!(json.contains("QuickJS"), "metrics JSON: {json}");
+
+        unsafe { angnative_runtime_bridge_destroy(handle) };
+    }
+
+    /// P1-1 regression: two live bridges on one thread must route each Host's
+    /// event to its own runtime, and destroying one must not disable the other.
+    #[test]
+    fn two_bridges_on_one_thread_do_not_cross_route() {
+        let mut a = create_runtime_bridge().unwrap();
+        let mut b = create_runtime_bridge().unwrap();
+
+        for bridge in [&mut a, &mut b] {
+            bridge
+                .load_script(
+                    "globalThis.hits = 0; \
+                     globalThis.__angnativeDispatchListener = function () { hits += 1; }; \
+                     na_addEventListener(1, 'click', 7); 0;",
+                )
+                .unwrap();
+        }
+
+        let host_a = a.host() as *const Host as *mut Host;
+        let host_b = b.host() as *const Host as *mut Host;
+
+        assert_eq!(unsafe { (*host_a).dispatch_event(1, "click", "{}") }, 1);
+        assert_eq!(a.runtime_mut().eval("hits").unwrap(), JsValue::Number(1.0));
+        assert_eq!(b.runtime_mut().eval("hits").unwrap(), JsValue::Number(0.0));
+
+        assert_eq!(unsafe { (*host_b).dispatch_event(1, "click", "{}") }, 1);
+        assert_eq!(a.runtime_mut().eval("hits").unwrap(), JsValue::Number(1.0));
+        assert_eq!(b.runtime_mut().eval("hits").unwrap(), JsValue::Number(1.0));
+
+        drop(b);
+        assert_eq!(unsafe { (*host_a).dispatch_event(1, "click", "{}") }, 1);
+        assert_eq!(a.runtime_mut().eval("hits").unwrap(), JsValue::Number(2.0));
+    }
+
+    /// P2-4 regression: a native callback invoked from inside `with_bridge`
+    /// must not obtain a second `&mut RuntimeBridge` for the same handle.
+    #[test]
+    fn native_callback_cannot_reenter_the_same_bridge_handle() {
+        use std::sync::atomic::AtomicI32;
+
+        static HANDLE: AtomicU64 = AtomicU64::new(0);
+        static REENTERED_STATE: AtomicI32 = AtomicI32::new(99);
+
+        extern "C" fn reenter(
+            _message: *const c_char,
+            _stack: *const c_char,
+            _user_data: *mut c_void,
+        ) {
+            let handle = HANDLE.load(AtomicOrdering::SeqCst);
+            REENTERED_STATE.store(
+                angnative_runtime_bridge_lifecycle_state(handle),
+                AtomicOrdering::SeqCst,
+            );
+        }
+
+        let handle = angnative_runtime_bridge_create();
+        assert_ne!(handle, 0);
+        HANDLE.store(handle, AtomicOrdering::SeqCst);
+        unsafe {
+            angnative_runtime_bridge_set_error_callback(handle, Some(reenter), std::ptr::null_mut())
+        };
+
+        let script = CString::new("na_reportError('reentrant probe', ''); 0;").unwrap();
+        assert_eq!(
+            unsafe { angnative_runtime_bridge_load_script(handle, script.as_ptr()) },
+            0
+        );
+        assert_eq!(
+            REENTERED_STATE.load(AtomicOrdering::SeqCst),
+            -1,
+            "re-entrant FFI access must be rejected instead of aliasing &mut"
+        );
+        assert_eq!(angnative_runtime_bridge_lifecycle_state(handle), 3);
 
         unsafe { angnative_runtime_bridge_destroy(handle) };
     }

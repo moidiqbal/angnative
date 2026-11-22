@@ -75,7 +75,7 @@ This round fixes both for the flagship without changing the JNI/FFI schema.
    the existing required ignored-suite command.
 3. **Android instrumentation:** boot the real bundle, assert layout JSON has
    `nodes` and the four controls' `FrameLayout.LayoutParams` are disjoint.
-   Added but **not verified locally** — no emulator/device is available.
+   Verified locally on physical OnePlus `b6640c8f` — see the post-delivery section and `docs/evidence/ANGULAR-COUNTER-ONEPLUS.md`.
 
 `docs/evidence/ANGULAR-COUNTER-LAYOUT.md` retains the host test command and the
 four rects, labelled as host-level layout proof, not an on-device screenshot.
@@ -86,8 +86,9 @@ four rects, labelled as host-level layout proof, not an on-device screenshot.
   demo-only.
 - Style `px` is applied as raw device px while layout frames are scaled by
   density; this can leave small offsets but is not the overlap cause. Deferred.
-- No device screenshot/video can be produced in this environment. Physical
-  OnePlus `b6640c8f` stays **not verified**.
+- Screenshot and UI XML are retained after the post-delivery OnePlus run; no
+  video was captured. Physical OnePlus `b6640c8f` is **verified locally**
+  (8/8 instrumentation tests), not on GitHub Actions.
 - The retained CI finding is configuration/intent only: `android-e2e` was
   skipped in all 26 runs where it existed. No claim that CI protects this fix.
 

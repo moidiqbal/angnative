@@ -1,169 +1,119 @@
 # Architecture Decision Record: JavaScript Runtime Selection
 
-## Status: Pending (Awaiting Phase G Benchmarks)
+## Status: **ACCEPTED — 2026-11-23** (supersedes "Pending Phase G benchmarks")
+
+Phase C (Angular on QuickJS) is complete and verified on emulator and a physical
+device. Phase G never produced an apples-to-apples V8 benchmark, so that
+open-ended wait has been closed with the evidence now available. This ADR records
+the actual decision, not a provisional preference.
 
 ## Context
 
-AngNative requires an embedded JavaScript engine to execute Angular applications natively. The engine must:
+AngNative requires an embedded JavaScript engine to execute Angular applications
+natively, with **zero WebView**. Requirements:
 1. Execute Angular 22+ AOT-compiled code
-2. Support Angular's zoneless change detection
-3. Interface with Rust host via FFI
-4. Run on Android (ARM64), iOS (ARM64), and Desktop (x64)
-5. Meet binary size and startup performance budgets
+2. Support Angular zoneless change detection
+3. Interface with the Rust host via FFI
+4. Run on Android (ARM64), iOS (ARM64), Desktop (x64)
+5. Meet binary size and startup budgets — **small build size is a primary user-facing goal**
+6. No JIT on iOS
+7. Active security maintenance and stable supply chain
 
-## Decision Drivers
+## Decision drivers (ordered by priority for AngNative)
 
-1. **Angular Runtime Compatibility** - Engine must execute Angular 22+ without modification
-2. **Zoneless Change Detection** - Angular 18+ zoneless must work without Zone.js polyfill
-3. **Binary Size** - Target < 5MB for mobile
-4. **Startup Performance** - Cold start < 100ms, warm start < 20ms
-5. **Memory Footprint** - Runtime heap < 10MB idle
-6. **Cross-Platform** - Android ARM64, iOS ARM64, Desktop x64
-7. **iOS JIT Constraints** - No JIT compilation on iOS
-8. **Rust Integration** - Safe, ergonomic FFI
-9. **Debugging** - Source maps, breakpoints, inspection
-10. **Long-term Maintenance** - Active upstream, stable API
+1. **Binary / APK delta** — users download the app; engine + bundles dominate
+2. **iOS compatibility** — no JIT allowed
+3. **Angular compatibility** — verified, not assumed
+4. **Security maintenance / CVE cadence**
+5. **Time-to-first-native-frame**
+6. **Rust FFI ergonomics**
+7. **GC pause / UI jank**
+8. **Debug tooling**
+9. **Cross-platform build complexity**
 
-## Options Evaluated
+## Evidence gathered (2026-11-23)
 
-### Option 1: QuickJS-NG (Current: rquickjs)
+### What is actually proven in this repo
+- Angular 22 AOT bundle boots inside the embedded engine; renderer flushes reach
+  `Host::process_batch_json`; native views are created; a real tap reaches an
+  Angular listener and updates the UI (`Count: 0 → Count: 1`) — emulator
+  (`emulator-5554`) and physical OnePlus (`b6640c8f`).
+- Router, forms, i18n, animations engine, HttpClient platform surface, and RxJS
+  7.8.2 all execute in the runtime (15 ignored acceptance tests pass).
+- **Measured locally:** shipped `libangnative_runtime_bridge.so` = **1.56 MB**;
+  flagship APK = **27.02 MB**; feature bundles = **2.0–2.6 MB each, unminified**.
+- **Correction to earlier docs:** `rquickjs 0.5.1` vendors QuickJS with
+  `VERSION = 2021-03-27` — it is NOT QuickJS-NG 2024 as previously claimed.
 
-**Pros**:
-- Tiny binary (~1.5MB stripped)
-- Fast cold start (~20ms)
-- Low memory (2-4MB)
-- MIT license
-- Pure Rust bindings (rquickjs)
-- ES2023 support
-- Bytecode compilation
-- No JIT required (works on iOS)
-
-**Cons**:
-- No native Zone.js / zoneless support (requires shims)
-- No native timer/microtask queue (requires shims)
-- No native DOM/EventTarget (requires shims)
-- No native fetch/XHR
-- Interpreter only (no JIT)
-- GC pauses scale with heap
-- Single-threaded, no Workers
-- Manual shim maintenance burden
-- Limited debugging (no DevTools)
-
-### Option 2: Hermes (Facebook)
-
-**Pros**:
-- Bytecode precompilation (hbc)
-- Small binary (~3-4MB)
-- JIT on Android, AOT on iOS
-- Generational GC
-- Used in production (React Native, Expo)
-- ES2022+ support
-- Snapshots
-
-**Cons**:
-- Larger binary (~3-4MB)
-- Unofficial Rust bindings (hermes-rs incomplete)
-- No Zone.js / zoneless (requires shims)
-- iOS AOT compilation complexity
-- Less Angular-specific testing
-- Meta-controlled roadmap
-
-### Option 3: V8 via deno_core
-
-**Pros**:
-- **Angular's native target** (V8/Chrome)
-- **Zoneless works natively** (no Zone.js needed)
-- V8 Snapshots (sub-10ms startup)
-- Full ES2024 + WASM
-- Incremental GC (low pause)
-- DevTools debugging
-- deno_core: excellent Rust embedding API
-- TypeScript transpilation built-in
-- Module loader trait
-- Active Google + Deno maintenance
-
-**Cons**:
-- Larger binary (~8-15MB)
-- No JIT on iOS (interpreter mode via rusty_v8)
-- Larger memory footprint (~15MB baseline)
-- Complex cross-platform build
-- deno_core event loop integration (tokio)
-
-### Option 4: JavaScriptCore (iOS/macOS only)
-
-**Pros**:
-- Native iOS/macOS integration
-- JIT on macOS, interpreter on iOS
-- Full ES2023
-
-**Cons**:
-- Apple platforms only
-- Not cross-platform
-- Low-level Rust bindings only
-
-## Comparison Matrix
-
-| Criterion | QuickJS-NG | Hermes | V8 (deno_core) |
-|-----------|------------|--------|----------------|
-| **Angular Native Target** | ❌ | ❌ | ✅ |
-| **Zoneless Without Shims** | ❌ | ❌ | ✅ |
-| **Binary Size** | ~1.5MB | ~3-4MB | ~8-15MB |
-| **Cold Startup** | ~20ms | ~15ms | ~5ms (snapshot) |
-| **Warm Startup** | ~5ms | ~8ms | ~1ms |
-| **Memory (idle)** | 2-4MB | 4-8MB | 8-15MB |
-| **GC Pause** | ~5ms | ~2ms | ~1ms (incremental) |
-| **iOS Support** | ✅ | ✅ AOT | ⚠️ JIT-less |
-| **Android JIT** | ❌ | ✅ | ⚠️ JIT-less |
-| **Rust Integration** | Good (rquickjs) | Partial (hermes-rs) | **Excellent (deno_core)** |
-| **Snapshots** | Bytecode | ✅ Full | ✅ **V8 Snapshots** |
-| **Debugging** | Basic | Good | **DevTools** |
-| **Long-term Maintenance** | Active (QuickJS-NG) | Active (Meta) | **Active (Google/Deno)** |
+### Upstream state (authoritative GitHub release data)
+| Engine | Latest / cadence | Binary |
+|---|---|---|
+| QuickJS-ng | **v0.18.0, 1 Nov 2026**; v0.16–0.18 contain dozens of UAF/OOB/leak/hash-hardening fixes, SECURITY.md, mimalloc, register regexp, GC-stress CI | **1.17–2.44 MB** release binaries |
+| Hermes | **v0.13.0 for RN 0.75 (Aug 2024)** is the last tagged release; RN now builds Hermes from source → version coupling | ~3–4 MB (estimate) |
+| V8 via deno_core | merged into denoland/deno; very active | **8–20 MB** (estimate); JIT banned on iOS |
+| JSC | system framework on Apple | 0 MB on Apple; not cross-platform |
+| MuJS / Duktape | active | 200–400 KB, but **ES5 only — cannot run Angular AOT** |
 
 ## Decision
 
-**Pending Phase G benchmarks**. The ADR will be finalized after:
+**Retain the QuickJS family as the single primary engine.** Do NOT migrate to V8
+or Hermes for the current product goals. Concretely:
 
-1. Phase C: Angular execution proof on QuickJS-NG
-2. Phase G: Benchmarks on physical Android device
-3. V8/deno_core proof-of-concept integration
-4. Binary size / startup / memory measurements
+1. **Keep rquickjs/QuickJS as the embedded engine.** Its 1.2–2.4 MB footprint is
+   4–10× smaller than V8, it has no iOS JIT problem, and Angular compatibility is
+   already proven with our shim layer — which neutralizes V8's main advantage.
+2. **Upgrade the vendored engine.** Move from the 2021 snapshot to QuickJS-ng
+   v0.18 (or a maintained binding that vendors it). This is a security and
+   performance upgrade, not an architecture change.
+3. **Ship bytecode / minified bundles.** Current bundles are 2.0–2.6 MB
+   unminified; `minify: true` plus `qjsbc` bytecode are the largest available
+   size wins without changing engines.
+4. **Lazy-load feature bundles** (forms, router, animations, http) instead of
+   bundling all into the boot path.
+5. **Re-benchmark on a physical device** (startup ms, APK delta, jank, peak
+   memory) before any future engine migration.
 
-## Provisional Recommendation
+### Why not V8
+8–20 MB binary (4–10× larger), iOS JIT ban forces interpreter mode, and the
+"Angular runs natively" benefit is already achieved via shims. Revisit only if
+users demand DevTools debugging or full browser API compatibility and accept
+the size cost.
 
-**Primary**: V8 via deno_core (if benchmarks confirm)
-**Fallback**: QuickJS-NG (current, with shims)
+### Why not Hermes
+Version-coupled to React Native releases (last standalone tag 2024), Rust
+bindings (`hermes-rs`) incomplete, and ~3–4 MB for a capability we already have
+at ~1.5 MB. Migration cost exceeds benefit.
+
+### JSC as a future *complement*, not a replacement
+On Apple platforms JSC costs zero binary size (system framework). Evaluate as a
+platform-specific engine behind the engine-neutral `JsEngine` trait once macOS
+work is possible. Keep Android/iOS on one engine for behavioral parity until
+then.
 
 ## Consequences
 
-### If V8 Selected:
-- Binary size increases ~8MB
-- Build complexity increases (V8 toolchain)
-- iOS requires JIT-less V8 build
-- Angular runs "natively" with minimal shims
-- Best debugging experience
-- Best long-term alignment with Angular
+- Positive: smallest possible APK, consistent iOS behavior, existing shim
+  investment retained, clear upgrade path to a maintained engine.
+- Negative: shim layer must be maintained as Angular evolves; no DevTools;
+  interpreter-only throughput; GC pauses scale with heap.
+- Risk: the current 2021 engine is a security liability until the upgrade in
+  action #2 lands — treat that upgrade as high priority.
 
-### If QuickJS-NG Retained:
-- Binary stays ~2MB
-- Continuous shim maintenance required
-- Angular boot time longer
-- Debugging more difficult
-- Zone.js/zoneless shims permanent
+## Revisit criteria
 
-## Next Steps
-
-1. Complete Phase C (Angular on QuickJS-NG)
-2. Implement V8/deno_core proof-of-concept
-3. Phase G benchmarks on physical device
-4. Finalize ADR with evidence
+Reconsider V8/JSC only when at least one is true:
+- users require DevTools/source-map debugging in production, or
+- a full browser API surface (routing via History, XHR, DOM libs) becomes a
+  shipping requirement, or
+- QuickJS-ng maintenance stalls for >12 months, or
+- physical-device benchmarks show QuickJS bootstrap/jank below an agreed UX bar.
 
 ## References
 
-- Angular v22 source: https://github.com/angular/angular
-- NativeScript Angular: https://github.com/NativeScript/angular
-- QuickJS-NG: https://github.com/quickjs-ng/quickjs
+- QuickJS-ng releases: https://github.com/quickjs-ng/quickjs/releases (v0.18.0)
+- QuickJS-ng security policy: SECURITY.md in the same repo
 - rquickjs: https://github.com/DelSkayn/rquickjs
 - Hermes: https://github.com/facebook/hermes
-- deno_core: https://github.com/denoland/deno_core
-- rusty_v8: https://github.com/denoland/rusty_v8
-- Angular Zoneless: https://angular.dev/guide/zoneless
+- deno_core: https://github.com/denoland/deno_core (merged into denoland/deno)
+- Angular zoneless: https://angular.dev/guide/zoneless
+- Local evidence: `docs/benchmarks/`, `docs/evidence/`, retained device screenshots
