@@ -19,3 +19,5 @@ export {
   AngNativeRendererFactory2,
   AngNativeRenderer,
 } from './native-angular';
+
+export { provideNativeAnimations } from './native-animations';

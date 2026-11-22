@@ -153,9 +153,9 @@ for opt-in use only.
 
 | Check | Result |
 |---|---|
-| `cargo test --workspace` | 134 passed |
-| `cargo test -p angnative-runtime-bridge -- --ignored` | 8 acceptance tests passed |
-| `pnpm test` | 220 passed |
+| `cargo test --workspace` | 134 passed, 9 ignored (acceptance tests) |
+| `cargo test -p angnative-runtime-bridge -- --ignored` | 9 acceptance tests passed |
+| `pnpm test` | 221 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
 | Layout parity | Rust unit tests in `angnative-host-layout`; on-device ecosystem-core run produced a layout response for all 8 nodes. **No cross-backend layout parity fixture is retained** — treat as partial evidence |
 | `python scripts/check-ffi-declarations.py` | 11 JNI methods, 9 Swift bindings, 20 header declarations |
@@ -163,11 +163,13 @@ for opt-in use only.
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
 | CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
 
-The eight acceptance tests require regenerated `dist/aot/*` bundles, which are
+The nine acceptance tests require regenerated `dist/aot/*` bundles, which are
 gitignored. Reproduce locally with:
+`pnpm --filter @angnative/core build && pnpm --filter @angnative/testing build &&
+pnpm --filter @angnative/platform build` then
 `pnpm compile:aot && pnpm compile:aot:router && pnpm compile:aot:forms &&
-pnpm compile:aot:i18n && pnpm bundle:quickjs && pnpm bundle:forms &&
-pnpm bundle:framework`, then
+pnpm compile:aot:i18n && pnpm compile:aot:animations && pnpm bundle:quickjs &&
+pnpm bundle:forms && pnpm bundle:framework`, then
 `cargo test -p angnative-runtime-bridge -- --ignored`. Workspace packages
 (`@angnative/contract`, `core`, `platform`) must be rebuilt first — a stale
 `packages/platform/dist` was a real past source of incorrect behavior.
@@ -195,8 +197,34 @@ but is relevant when reasoning about event handling.
 2. **Thread identity on native click callbacks**: load and node inspection ran
    on the UI thread; a dedicated cross-thread dispatch test on-device is not
    done. A cross-thread call panics by design (caught by the C shim → 0).
-3. **Angular animation engine integration**: only the API + a no-op
-   `Element.animate()` driver are verified, not the real engine.
+3. **Angular animation engine integration — RESOLVED (deterministic samples)**:
+   `provideNativeAnimations()` wires Angular's real `AnimationEngine` and
+   `AnimationRendererFactory` around `AngNativeRendererFactory2`. The AOT `fade`
+   fixture (`apps/demo-app/src/animations/main.animations.ts`,
+   `tsconfig.aot.animations.json`) uses explicit keyframes at offsets `0 / 0.5 / 1`.
+   Five root causes were identified and fixed:
+   - Angular creates the root component renderer with `hostElement = null`;
+     stock `AnimationRendererFactory` then uses `BaseAnimationRenderer` and
+     ignores `@trigger`. A flat synthetic root host is supplied.
+   - Angular's engine requires `node.nodeType === 1`; `NativeElement.nodeType`
+     is now numeric (`1 | 3 | 8`) with the Rust kind preserved as
+     `nativeNodeType`.
+   - `eraseStyles` writes `element.style[...] = ''`; a flat style mirror was
+     added to `NativeElement` (the renderer's `styles` map stays authoritative).
+   - Angular's orphan check calls `containsElement(document.body, element)`;
+     the native animation driver now treats native elements as attached to the
+     DOM-shim body so transitions are not downgraded to no-op players.
+   - `animate('100ms')` with only state styles builds zero keyframes and a
+     `NoopAnimationPlayer`; the fixture uses explicit keyframes.
+   Evidence: ignored acceptance test
+   `angular_animation_engine_interpolates_native_styles` asserts an intermediate
+   native `SetStyle opacity: 0.5` between `start` and `done` callbacks and a
+   final native `opacity: 1`. The player emits three deterministic samples via
+   flat numeric-id global registries (no object cycles); real-time easing
+   fidelity is **not verified**. The JIT-only test
+   `packages/testing/src/integration.spec.ts` imports
+   `@angular/platform-browser-dynamic` so Vitest can JIT-fallback-process the
+   partially-compiled `@angular/animations/browser` declarations.
 4. **DI-based `HttpClient.get()` — RESOLVED (NG0201)**: the real
    `@angular/common/http` bundle loads and a DI-resolved `HttpClient` performs
    `get('/api/x')` through `HttpHandler`/`FetchBackend`. The failure sequence was

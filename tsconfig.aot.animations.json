@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.aot.json",
+  "compilerOptions": {
+    "outDir": "dist/aot-animations"
+  },
+  "files": [
+    "apps/demo-app/src/animations/main.animations.ts"
+  ],
+  "include": [
+    "apps/demo-app/src/animations/**/*.ts"
+  ]
+}

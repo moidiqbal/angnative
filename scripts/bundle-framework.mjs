@@ -41,6 +41,10 @@ const i18nAppEntry = path
   .join(root, 'dist', 'aot-i18n', 'i18n', 'main.i18n.js')
   .replaceAll('\\', '/');
 
+const animationsAppEntry = path
+  .join(root, 'dist', 'aot-animations', 'animations', 'main.animations.js')
+  .replaceAll('\\', '/');
+
 const features = [
   { name: 'router', pkg: '@angular/router', global: '__ngRouter' },
   { name: 'animations', pkg: '@angular/animations', global: '__ngAnimations' },
@@ -55,6 +59,10 @@ const features = [
   {
     name: 'i18n-app',
     source: `import ${JSON.stringify(i18nAppEntry)};`,
+  },
+  {
+    name: 'animations-app',
+    source: `import ${JSON.stringify(animationsAppEntry)};`,
   },
   {
     name: 'http',

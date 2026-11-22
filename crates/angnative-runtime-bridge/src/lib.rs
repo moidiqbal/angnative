@@ -701,6 +701,108 @@ mod tests {
         );
     }
 
+    /// Real Angular animation engine over the native renderer. Requires:
+    ///   pnpm compile:aot:animations && pnpm bundle:framework
+    #[test]
+    #[ignore = "requires generated dist/aot/animations-app-bundle.js"]
+    fn angular_animation_engine_interpolates_native_styles() {
+        let handle = std::thread::Builder::new()
+            .name("animations-test-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_angular_animation_engine_interpolates_native_styles)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_angular_animation_engine_interpolates_native_styles() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/animations-app-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm compile:aot:animations && pnpm bundle:framework` first");
+        assert!(
+            source.contains("fade"),
+            "AOT bundle must contain the real Angular animation trigger"
+        );
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge
+            .load_script(&source)
+            .expect("animations AOT bundle must load");
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __animationsError === 'undefined' ? null : __animationsError")
+                .unwrap(),
+            JsValue::Null,
+            "animations AOT bootstrap rejected"
+        );
+
+        // Drive the real Angular trigger. The driver applies start, midpoint
+        // and end samples synchronously; the factory flushes them as one batch.
+        bridge
+            .load_script("__resetAnimationEvents(); __setAnimationState('visible'); 0;")
+            .expect("state transition must run");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+
+        let style_values = bridge
+            .runtime_mut()
+            .eval(
+                r#"(function () {
+                    var values = [];
+                    for (var i = 0; i < __angnativeBatches.length; i++) {
+                        var batch = JSON.parse(__angnativeBatches[i]);
+                        for (var j = 0; j < batch.commands.length; j++) {
+                            var command = batch.commands[j];
+                            if (command.kind === 'SetStyle' && command.key === 'opacity') {
+                                values.push(command.value);
+                            }
+                        }
+                    }
+                    return values.join(',');
+                })()"#,
+            )
+            .unwrap();
+        let style_values = match style_values {
+            JsValue::String(value) => value,
+            other => panic!("expected opacity style history, got {:?}", other),
+        };
+        let start = style_values
+            .find("0.5")
+            .unwrap_or_else(|| panic!("no intermediate opacity mutation; history={}", style_values));
+        assert!(
+            style_values[..start].contains('0'),
+            "start opacity must precede the midpoint: {}",
+            style_values
+        );
+        assert!(
+            style_values[start..].contains('1'),
+            "final opacity must follow the midpoint: {}",
+            style_values
+        );
+
+        let events = bridge
+            .runtime_mut()
+            .eval("__animationEvents ? __animationEvents().join(',') : ''")
+            .unwrap();
+        assert_eq!(
+            events,
+            JsValue::String("start,done".to_string()),
+            "Angular trigger callbacks must fire; got {:?}",
+            events
+        );
+
+        let snapshot = bridge.host_mut().engine().snapshot();
+        assert!(
+            snapshot.nodes.iter().any(|node| {
+                node.styles.get("opacity").map(String::as_str) == Some("1")
+            }),
+            "native tree must end at opacity 1; got {:?}",
+            snapshot.nodes.iter().map(|n| n.styles.clone()).collect::<Vec<_>>()
+        );
+    }
+
     /// Router API compatibility. Requires: pnpm bundle:framework
     #[test]
     #[ignore = "requires generated dist/aot/router-bundle.js"]

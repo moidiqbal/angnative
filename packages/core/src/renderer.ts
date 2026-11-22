@@ -37,6 +37,14 @@ import {
   type NodeId,
   ElementRegistry,
 } from './native-element';
+import {
+  createNativeAnimationPlayer,
+  registerAnimationHost,
+  unregisterAnimationHost,
+  type AnimationHost,
+} from './animation';
+
+let nextAnimationHostId = 1;
 
 /** Hook the renderer uses to flush a command batch to the backend. */
 export interface FlushHandler {
@@ -134,7 +142,8 @@ export function canonicalElementTag(tag: string): string {
  * (including AOT-compiled `ɵɵ*` instructions) into native view mutations
  * and batches them for flush.
  */
-export class AngNativeRenderer implements Renderer2 {
+export class AngNativeRenderer implements Renderer2, AnimationHost {
+  readonly animationHostId: number;
   private readonly registry: ElementRegistry;
   private readonly flush: FlushHandler | null;
   private readonly mutations: Command[] = [];
@@ -151,10 +160,13 @@ export class AngNativeRenderer implements Renderer2 {
 
   constructor(private readonly options: AngNativeRendererOptions = {}) {
     this.registry = new ElementRegistry();
+    this.animationHostId = nextAnimationHostId++;
+    registerAnimationHost(this);
     this.flush = options.flush ?? null;
     // Router/embedded views may pass a null parent host. Anchor them to a
     // synthetic root so appendChild/insertBefore never throw.
     this.rootElement = new NativeElement(0, '#root', 'View');
+    this.rootElement.animationHostId = this.animationHostId;
 
     // In native QuickJS, `na_onEvent(listenerId, payload)` is the single
     // entry point from Rust. Route it back to this renderer's Angular
@@ -171,9 +183,26 @@ export class AngNativeRenderer implements Renderer2 {
     };
   }
 
+  /**
+   * AnimationHost implementation. Called through the flat global hook from
+   * `NativeElement.animate`; the returned player writes styles back through
+   * this renderer so every interpolated frame becomes a native mutation.
+   */
+  animateElement(nodeId: number, keyframes: unknown, options?: unknown): unknown {
+    const element = this.registry.get(nodeId);
+    if (!element) return null;
+    return createNativeAnimationPlayer(
+      nodeId,
+      keyframes,
+      options,
+      (property, value) => this.setStyle(element, property, value),
+    );
+  }
+
   /* ---------- lifecycle ---------- */
 
   destroy(): void {
+    unregisterAnimationHost(this);
     this.mutations.length = 0;
     this.listeners.clear();
     this.listenerIndex.clear();
@@ -214,6 +243,7 @@ export class AngNativeRenderer implements Renderer2 {
     const id = this.registry.allocateId();
 
     const element = new NativeElement(id, canonicalTag, nodeType);
+    element.animationHostId = this.animationHostId;
     element.applyDefaults(contract.defaultStyles);
     this.registry.register(element);
     this.recordMutation({ kind: 'CreateNode', id, nodeType });
@@ -241,6 +271,7 @@ export class AngNativeRenderer implements Renderer2 {
     // Comments are not native nodes; return a lightweight marker node.
     const id = this.registry.allocateId();
     const element = new NativeElement(id, '#comment', 'Custom');
+    element.animationHostId = this.animationHostId;
     element.setTextContent(value);
     this.registry.register(element);
     this.recordMutation({

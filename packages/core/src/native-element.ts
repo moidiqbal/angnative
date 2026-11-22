@@ -34,21 +34,38 @@ export interface NativeElementProps {
 export class NativeElement {
   readonly id: NodeId;
   readonly tag: string;
-  readonly nodeType: NativeNodeType;
+  /**
+   * DOM-compatible numeric node kind used by Angular internals that test
+   * `node.nodeType === 1` (notably the animation engine). Native view types
+   * stay available as `nativeNodeType` for the command protocol and backends.
+   */
+  readonly nodeType: 1 | 3 | 8;
+  readonly nativeNodeType: NativeNodeType;
   parentId: NodeId | null;
   readonly children: NodeId[];
   properties: Map<string, unknown>;
   styles: Map<string, string>;
+  /**
+   * Flat inline-style mirror for Angular internals that touch `element.style`
+   * directly (for example animation cleanup). The renderer's `styles` map is
+   * authoritative for the native tree; this object has no closures or cycles.
+   */
+  readonly style: Record<string, string>;
   textContent: string | null;
+  /** Numeric animation host id set by the renderer that created this node. */
+  animationHostId: number;
 
   constructor(id: NodeId, tag: string, nodeType: NativeNodeType) {
     this.id = id;
     this.tag = tag;
-    this.nodeType = nodeType;
+    this.nativeNodeType = nodeType;
+    this.nodeType = tag === '#text' ? 3 : tag === '#comment' ? 8 : 1;
+    this.animationHostId = 0;
     this.parentId = null;
     this.children = [];
     this.properties = new Map();
     this.styles = new Map();
+    this.style = {};
     this.textContent = null;
   }
 
@@ -57,16 +74,33 @@ export class NativeElement {
     for (const [key, value] of Object.entries(defaults)) {
       if (!this.styles.has(key)) {
         this.styles.set(key, value);
+        this.style[key] = value;
       }
     }
   }
 
   setStyle(key: string, value: string): void {
     this.styles.set(key, value);
+    this.style[key] = value;
+  }
+
+  /**
+   * Web Animations API entry point used by Angular's `WebAnimationsDriver`.
+   * The implementation is a flat global hook keyed by numeric ids; storing a
+   * renderer closure here would create a QuickJS object cycle.
+   */
+  animate(keyframes: unknown, options?: unknown): unknown {
+    const globals = globalThis as unknown as Record<string, unknown>;
+    const hook = globals['__angnativeAnimateElement'] as
+      | ((hostId: number, nodeId: number, keyframes: unknown, options?: unknown) => unknown)
+      | undefined;
+    if (typeof hook !== 'function') return null;
+    return hook(this.animationHostId, this.id, keyframes, options);
   }
 
   removeStyle(key: string): void {
     this.styles.delete(key);
+    delete this.style[key];
   }
 
   setProperty(key: string, value: unknown): void {

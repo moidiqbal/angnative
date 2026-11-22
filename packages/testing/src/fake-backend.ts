@@ -224,7 +224,7 @@ export class FakeBackend {
     return {
       id: el.id,
       tag: el.tag,
-      nodeType: el.nodeType,
+      nodeType: el.nativeNodeType,
       parentId: el.parentId,
       children: [...el.children],
       properties: new Map(el.properties),

@@ -22,3 +22,11 @@ export {
   type NodeId,
   type NativeNodeType,
 } from './native-element';
+
+export {
+  createNativeAnimationPlayer,
+  registerAnimationHost,
+  unregisterAnimationHost,
+  type AnimationHost,
+  type NativeAnimationPlayer,
+} from './animation';

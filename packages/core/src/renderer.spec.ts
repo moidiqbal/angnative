@@ -89,6 +89,28 @@ describe('AngNativeRenderer mutation batching', () => {
     expect(setWidth.value).toBe('200px');
   });
 
+  it('animate() emits interpolated native style mutations and a finish event', async () => {
+    const el = renderer.createElement(null, 'na-view');
+    let finished = 0;
+    const player = (el as any).animate(
+      [{ offset: 0, opacity: 0 }, { offset: 1, opacity: 1 }],
+      { duration: 100 },
+    ) as {
+      addEventListener(type: string, listener: () => void): void;
+      play(): unknown;
+    };
+    player.addEventListener('finish', () => { finished++; });
+    player.play();
+
+    const values = lastBatch().commands
+      .filter((command: any) => command.kind === 'SetStyle' && command.key === 'opacity')
+      .map((command: any) => command.value);
+    expect(values).toEqual(['0', '0.5', '1']);
+
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+    expect(finished).toBe(1);
+  });
+
   it('setStyle throws on unknown property', () => {
     const el = renderer.createElement(null, 'na-view');
     expect(() => renderer.setStyle(el, 'border-box', '1px')).toThrow(/Unknown/);

@@ -6,6 +6,11 @@
  * Verifies T4 (na- element wiring) and T5 (M0 review fixes) end-to-end.
  */
 
+// @angnative/platform now imports @angular/animations/browser, which ships
+// partially-compiled declarations. Vitest does not run the Angular linker, so
+// load the JIT-capable platform (which imports @angular/compiler) before that
+// module is evaluated.
+import '@angular/platform-browser-dynamic';
 import { describe, it, expect } from 'vitest';
 import { AngNativeRenderer } from '@angnative/core/renderer';
 import { bootstrapNativeAngularApp } from '@angnative/platform';
