@@ -27,6 +27,15 @@ pub const DISPATCH_PANIC: u32 = u32::MAX;
 /// 0 = success, 1 = script error / invalid input, 2 = panic caught.
 pub const LOAD_SCRIPT_PANIC: i32 = 2;
 
+/// Test-only instrumentation: how many C ABI calls were rejected by the
+/// owner-thread guard. In a debug (`unwind`) test build, an unguarded call
+/// would still return `DISPATCH_PANIC` because `catch_unwind` swallows the
+/// assertion panic — the counter lets the regression test prove the guard was
+/// taken instead. Compiled out of release builds.
+#[cfg(test)]
+static WRONG_THREAD_FFI_REJECTIONS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
 thread_local! {
     static CURRENT_BRIDGE_RUNTIME: RefCell<Option<*mut AngNativeRuntime<QuickJsEngine>>> =
         RefCell::new(None);
@@ -182,6 +191,32 @@ pub struct AngNativeRuntimeBridge {
     _private: [u8; 0],
 }
 
+/// Read the immutable owner thread id from a C ABI handle without forming a
+/// reference to the whole bridge. The caller may be on the wrong thread while
+/// the owner thread is mutating other fields, so creating an aliasing
+/// `&RuntimeBridge` / `&mut RuntimeBridge` here would be unsound. `owner_thread`
+/// is never written after construction, so this raw field read is safe.
+unsafe fn bridge_owner_thread(handle: *mut AngNativeRuntimeBridge) -> Option<ThreadId> {
+    if handle.is_null() {
+        return None;
+    }
+    Some(std::ptr::addr_of!((*(handle as *mut RuntimeBridge)).owner_thread).read())
+}
+
+/// Non-panicking guard shared by every C ABI entry point that dereferences a
+/// bridge handle. On the wrong thread these functions must return a sentinel
+/// *before* touching QuickJS (which is not Send/Sync) or tripping an
+/// `assert_owner_thread()` that would abort an Android release build.
+fn bridge_is_owner_thread(handle: *mut AngNativeRuntimeBridge) -> bool {
+    let owner = unsafe { bridge_owner_thread(handle) };
+    let is_owner = matches!(owner, Some(id) if thread::current().id() == id);
+    #[cfg(test)]
+    if owner.is_some() && !is_owner {
+        WRONG_THREAD_FFI_REJECTIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+    is_owner
+}
+
 #[no_mangle]
 pub extern "C" fn angnative_runtime_bridge_create() -> *mut AngNativeRuntimeBridge {
     let result = std::panic::catch_unwind(|| {
@@ -195,7 +230,7 @@ pub extern "C" fn angnative_runtime_bridge_create() -> *mut AngNativeRuntimeBrid
 
 #[no_mangle]
 pub unsafe extern "C" fn angnative_runtime_bridge_destroy(handle: *mut AngNativeRuntimeBridge) {
-    if handle.is_null() { return; }
+    if !bridge_is_owner_thread(handle) { return; }
     let _ = std::panic::catch_unwind(|| {
         drop(Box::from_raw(handle as *mut RuntimeBridge));
     });
@@ -209,6 +244,11 @@ pub unsafe extern "C" fn angnative_runtime_bridge_dispatch_event(
     payload_json: *const c_char,
 ) -> u32 {
     if handle.is_null() || event_name.is_null() { return 0; }
+    // Guard BEFORE any owner-asserting call or QuickJS access. Under
+    // `panic = "abort"` (Android release), `catch_unwind` cannot save us from
+    // `assert_owner_thread()`, so a wrong-thread call must return the sentinel
+    // without unwinding.
+    if !bridge_is_owner_thread(handle) { return DISPATCH_PANIC; }
     let name = match CStr::from_ptr(event_name).to_str() { Ok(s) => s, Err(_) => return 0 };
     let payload = if payload_json.is_null() {
         "{}"
@@ -232,6 +272,9 @@ pub unsafe extern "C" fn angnative_runtime_bridge_load_script(
     if handle.is_null() || source.is_null() {
         return 1;
     }
+    if !bridge_is_owner_thread(handle) {
+        return LOAD_SCRIPT_PANIC;
+    }
     let source = match CStr::from_ptr(source).to_str() {
         Ok(s) => s,
         Err(_) => return 1,
@@ -251,7 +294,7 @@ pub unsafe extern "C" fn angnative_runtime_bridge_load_script(
 pub unsafe extern "C" fn angnative_runtime_bridge_get_host(
     handle: *mut AngNativeRuntimeBridge,
 ) -> *mut Host {
-    if handle.is_null() { return std::ptr::null_mut(); }
+    if !bridge_is_owner_thread(handle) { return std::ptr::null_mut(); }
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let bridge = &mut *(handle as *mut RuntimeBridge);
         bridge.host_mut() as *mut Host
@@ -1114,6 +1157,53 @@ mod tests {
             })).is_err()
         }).join();
         assert!(joined.unwrap_or(false), "cross-thread use must panic");
+        unsafe { angnative_runtime_bridge_destroy(handle) };
+    }
+
+    /// Regression for the Android release build: `panic = "abort"` means the
+    /// `catch_unwind` inside the C ABI cannot catch `assert_owner_thread()`, so
+    /// a wrong-thread JNI dispatch would kill the app. The C ABI must reject
+    /// the call with a sentinel *before* any owner-asserting method runs.
+    #[test]
+    fn test_c_abi_dispatch_from_non_owner_thread_returns_sentinel_without_panicking() {
+        use std::sync::atomic::Ordering;
+        use std::ffi::CString;
+
+        let handle = angnative_runtime_bridge_create();
+        assert!(!handle.is_null(), "bridge creation must succeed");
+
+        let before = WRONG_THREAD_FFI_REJECTIONS.load(Ordering::SeqCst);
+        // Raw pointers are not Send; carry the address as usize so no unsafe
+        // Send impl is needed to move it into the worker thread.
+        let address = handle as usize;
+        let result = thread::spawn(move || {
+            let foreign = address as *mut AngNativeRuntimeBridge;
+            let name = CString::new("press").unwrap();
+            let payload = CString::new("{}").unwrap();
+            unsafe {
+                angnative_runtime_bridge_dispatch_event(
+                    foreign,
+                    1,
+                    name.as_ptr(),
+                    payload.as_ptr(),
+                )
+            }
+        })
+        .join()
+        .expect("wrong-thread C ABI dispatch must not panic");
+
+        assert_eq!(
+            result,
+            DISPATCH_PANIC,
+            "wrong-thread C ABI dispatch must return the sentinel"
+        );
+        assert_eq!(
+            WRONG_THREAD_FFI_REJECTIONS.load(Ordering::SeqCst),
+            before + 1,
+            "the C ABI guard must reject the call, not rely on a caught panic \
+             (which would abort under the Android release profile)"
+        );
+
         unsafe { angnative_runtime_bridge_destroy(handle) };
     }
 }

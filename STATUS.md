@@ -86,14 +86,14 @@ elevation (error 740). Git's copy does not. Workaround:
 ```powershell
 $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
 cargo build --workspace
-cargo test --workspace   # 134 tests pass, 9 ignored; includes host-engine and desktop (11)
+cargo test --workspace   # 135 tests pass, 9 ignored; includes host-engine and desktop (11)
 ```
 
 ## Verification summary
 
 | Item | Status |
 |---|---|
-| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **134 tests pass** (with Git `patch.exe` on PATH — see note above) |
+| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **135 tests pass** (with Git `patch.exe` on PATH — see note above) |
 | JS/TS (16 spec files) | ✅ 221 tests pass |
 | Android JNI + emulator run | ✅ verified |
 | Desktop window | ✅ verified |
@@ -104,6 +104,7 @@ cargo test --workspace   # 134 tests pass, 9 ignored; includes host-engine and d
 | Template-driven `ngModel` in QuickJS | ✅ verified by ignored acceptance test `angular_template_driven_forms_round_trip_in_quickjs`: AOT `FormsAppComponent` uses `FormsModule`/`ngModel` on `<input>`; JS model changes emit native `SetProperty`/text mutations, and a Rust-dispatched native `input` event updates the model. `<input>` now maps to the `na-text-input` primitive; `navigator.userAgent` shim added for Angular's DefaultValueAccessor. |
 | AOT i18n markers in QuickJS | ✅ verified by ignored acceptance test `angular_aot_i18n_translated_text_in_native_tree`: `tsconfig.aot.i18n.json` compiles `<na-text i18n>Hello {{ name }}!</na-text>` to `$localize` + `ɵɵi18n`/`ɵɵi18nExp`; a registered translation renders `Assalam-o-Alaikum AngNative!` in the native tree. Root causes: `$localize` placeholder self-substitution loop and missing `Node` DOM constants. |
 | Angular Animations engine in QuickJS | ✅ verified by ignored acceptance test `angular_animation_engine_interpolates_native_styles`: `pnpm compile:aot:animations && pnpm bundle:framework` builds the AOT `fade` trigger; the real `AnimationEngine` over `AngNativeRendererFactory2` emits a native `SetStyle opacity: 0.5` midpoint between lifecycle `start,done`, ending at native `opacity: 1`. Native player uses three deterministic samples (`0 / 0.5 / 1`) via flat numeric-id registries — real-time easing fidelity is **not verified**. Root causes: null root renderer host, string `nodeType`, missing `element.style` mirror, orphan-element check, and zero-keyframe `animate('100ms')`. |
+| Android cross-thread bridge safety | ⚠️ host/C ABI verified, device NOT verified | Fixed the release `panic = "abort"` defect: C ABI entry points reject wrong-thread calls with a sentinel before any `assert_owner_thread()` panic can occur (`test_c_abi_dispatch_from_non_owner_thread_returns_sentinel_without_panicking` + `test_thread_affinity` pass). No wrong-thread JNI call has been executed on device (no `androidTest` sources, no background-thread trigger in Kotlin, no UI-thread marshalling in JNI callbacks). Details in `docs/EVENT-BRIDGE.md`. |
 | Production AOT (`pnpm run compile:aot`, `angnative build`) | ✅ real Angular `ngc` (not shadowed 0.1.0 binary), Ivy definitions verified in `dist/aot/`, esbuild bundle produced |
 
 Full history: `docs/PROJECT-REVIEW-2026-11-20.md`

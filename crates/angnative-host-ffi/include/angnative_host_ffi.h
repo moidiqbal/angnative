@@ -154,25 +154,34 @@ unsigned int angnative_host_dispatch_event(AngNativeHost* handle, uint64_t node_
  * Unified runtime bridge — single owner of Host + QuickJS + Angular runtime
  * ========================================================================= */
 
-/** Create a runtime bridge. Returns NULL on failure. Must be used on one thread. */
+/** Create a runtime bridge. Returns NULL on failure. The bridge is thread-affine
+ * to the creating thread: every other entry point below rejects calls from any
+ * other thread without unwinding (Android release builds use panic="abort",
+ * where a caught panic would still terminate the process). */
 AngNativeRuntimeBridge* angnative_runtime_bridge_create(void);
 
-/** Destroy a runtime bridge (and the Host it owns). Safe to call with NULL. */
+/** Destroy a runtime bridge (and the Host it owns). Safe to call with NULL.
+ * A call from a non-owner thread is a no-op (the bridge is leaked rather than
+ * torn down cross-thread); always destroy from the creating thread. */
 void angnative_runtime_bridge_destroy(AngNativeRuntimeBridge* handle);
 
 /** Dispatch a native event through the single JS event pipeline.
- * Returns the number of JS listeners invoked (0 on error / no match). */
+ * Returns the number of JS listeners invoked (0 on error / no match).
+ * Returns UINT_MAX (DISPATCH_PANIC) when called from a non-owner thread; no
+ * QuickJS code runs in that case. */
 unsigned int angnative_runtime_bridge_dispatch_event(AngNativeRuntimeBridge* handle,
                                                     uint64_t node_id,
                                                     const char* event_name,
                                                     const char* payload_json);
 
 /** Load a raw JS source string (e.g. a self-contained AOT bundle) and drain
- * its microtasks. Returns 0 on success, 1 on invalid input or script error. */
+ * its microtasks. Returns 0 on success, 1 on invalid input or script error,
+ * 2 when called from a non-owner thread. */
 int angnative_runtime_bridge_load_script(AngNativeRuntimeBridge* handle,
                                          const char* source);
 
-/** Borrow the Host owned by the bridge (valid until the bridge is destroyed). */
+/** Borrow the Host owned by the bridge (valid until the bridge is destroyed).
+ * Returns NULL when called from a non-owner thread. */
 AngNativeHost* angnative_runtime_bridge_get_host(AngNativeRuntimeBridge* handle);
 
 #ifdef __cplusplus

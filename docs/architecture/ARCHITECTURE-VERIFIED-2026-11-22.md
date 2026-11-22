@@ -100,9 +100,17 @@ fires per event and a new native batch follows.
 - All exported C ABI lifecycle/dispatch functions (`create`, `destroy`,
   `dispatch_event`, `load_script`, `get_host`) and the internal
   `js_runtime_dispatch_callback` validate their inputs and wrap work in
-  `catch_unwind`; a panic returns a null pointer / 0 instead of unwinding across
-  the FFI boundary. (The architect review flagged `get_host` and the dispatch
-  callback as unwrapped; both were subsequently fixed.)
+  `catch_unwind`; a caught panic returns a null pointer / sentinel instead of
+  unwinding across the FFI boundary. (The architect review flagged `get_host`
+  and the dispatch callback as unwrapped; both were subsequently fixed.)
+- **Owner-thread guard at the C ABI boundary.** Rust callers hit
+  `assert_owner_thread()`, but Android release builds use `panic = "abort"`, so
+  `catch_unwind` cannot catch that panic — it would kill the process. Every C
+  ABI entry point that dereferences a bridge handle now checks the immutable
+  `owner_thread` field with a non-panicking raw-pointer read first. Wrong-thread
+  `dispatch_event` returns `DISPATCH_PANIC` (`u32::MAX`), `load_script` returns
+  `2`, `get_host` returns `NULL`, and `destroy` is a no-op. No QuickJS code runs
+  on the wrong thread.
 - Host `create`/`destroy` legacy JNI exports remain for ABI compatibility. The
   **10 unified showcases** do not declare them from Kotlin, but
   `platforms/android` still declares and calls `nativeHostCreate` /
@@ -153,7 +161,7 @@ for opt-in use only.
 
 | Check | Result |
 |---|---|
-| `cargo test --workspace` | 134 passed, 9 ignored (acceptance tests) |
+| `cargo test --workspace` | 135 passed, 9 ignored (acceptance tests) |
 | `cargo test -p angnative-runtime-bridge -- --ignored` | 9 acceptance tests passed |
 | `pnpm test` | 221 passed |
 | Shared conformance fixtures (TS fake backend + Rust host) | 10 fixtures, including `angular-bootstrap-native` — the real Angular batch shape; Rust also runs it through `Host::process_batch_json` |
@@ -194,9 +202,23 @@ but is relevant when reasoning about event handling.
      when Angular passes null/synthetic-root during outlet component deactivation.
    - Verified end-to-end via `angular_router_bootstraps_with_outlet` asserting
      both initial and destination route batches in QuickJS.
-2. **Thread identity on native click callbacks**: load and node inspection ran
-   on the UI thread; a dedicated cross-thread dispatch test on-device is not
-   done. A cross-thread call panics by design (caught by the C shim → 0).
+2. **Thread identity on native click callbacks - C ABI fixed, device unverified.**
+    Root cause: `RuntimeBridge::assert_owner_thread()` panics on a wrong-thread
+    call; the C ABI's `catch_unwind` would normally convert that to a sentinel,
+    but Android static libs are built with `cargo build --release` under
+    `[profile.release] panic = "abort"`, so the process aborts instead. Fixed by
+    a non-panicking owner-thread guard at every C ABI entry point that
+    dereferences a bridge handle (raw read of the immutable `owner_thread`, so
+    no aliasing reference is formed). Verified on the host by
+    `test_c_abi_dispatch_from_non_owner_thread_returns_sentinel_without_panicking`
+    and `test_thread_affinity`; the header contract is updated in
+    `crates/angnative-host-ffi/include/angnative_host_ffi.h`. **Not verified on
+    device:** there are no `androidTest` sources / instrumentation runner, every
+    Kotlin `nativeRuntimeBridgeDispatchEvent` call comes from a UI
+    `OnClickListener`, JNI callbacks only `AttachCurrentThread` (no UI-thread
+    marshalling), and `EcosystemCoreActivity` destroys the bridge immediately
+    after loading the bundle. No wrong-thread JNI call has been executed on an
+    emulator or physical device; see `docs/EVENT-BRIDGE.md`.
 3. **Angular animation engine integration — RESOLVED (deterministic samples)**:
    `provideNativeAnimations()` wires Angular's real `AnimationEngine` and
    `AnimationRendererFactory` around `AngNativeRendererFactory2`. The AOT `fade`
