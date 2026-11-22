@@ -11,10 +11,12 @@
  *
  * Output: dist/aot/quickjs-bundle.js (IIFE, no imports, Angular included).
  *
- * NOTE: loading this bundle into QuickJS currently reaches Angular bootstrap
- * but fails with "JIT compiler unavailable" because the @angnative/common
- * primitive components are not AOT-compiled. This script is the first step of
- * that work, not a claim that a real Angular app boots yet.
+ * The bundle includes @angular/compiler explicitly so the decorated
+ * @angnative/common primitives can be JIT-compiled. It is verified to boot a
+ * real Angular app in QuickJS:
+ *   pnpm compile:aot && pnpm bundle:quickjs
+ *   cargo test -p angnative-runtime-bridge -- --ignored
+ * (acceptance test angular_bootstrap_runs_in_quickjs, with generated bundles).
  */
 import { build } from 'esbuild';
 import path from 'node:path';
