@@ -65137,53 +65137,50 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
   __publicField(_CounterComponent, "\u0275fac", function CounterComponent_Factory(__ngFactoryType__) {
     return new (__ngFactoryType__ || _CounterComponent)();
   });
-  __publicField(_CounterComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _CounterComponent, selectors: [["demo-counter"]], decls: 13, vars: 48, consts: [[3, "text"], [3, "click"]], template: function CounterComponent_Template(rf, ctx) {
+  __publicField(_CounterComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _CounterComponent, selectors: [["demo-counter"]], decls: 8, vars: 52, consts: [[3, "text"], [3, "click", "text"]], template: function CounterComponent_Template(rf, ctx) {
     if (rf & 1) {
-      \u0275\u0275elementStart(0, "na-view")(1, "na-text");
-      \u0275\u0275text(2, "Counter");
-      \u0275\u0275elementEnd();
-      \u0275\u0275element(3, "na-text", 0);
-      \u0275\u0275elementStart(4, "na-view")(5, "na-button", 1);
-      \u0275\u0275listener("click", function CounterComponent_Template_na_button_click_5_listener() {
+      \u0275\u0275elementStart(0, "na-view");
+      \u0275\u0275element(1, "na-text", 0)(2, "na-text", 0);
+      \u0275\u0275elementStart(3, "na-view")(4, "na-button", 1);
+      \u0275\u0275listener("click", function CounterComponent_Template_na_button_click_4_listener() {
         return ctx.decrement();
       });
-      \u0275\u0275text(6, "\u2212");
       \u0275\u0275elementEnd();
-      \u0275\u0275elementStart(7, "na-button", 1);
-      \u0275\u0275listener("click", function CounterComponent_Template_na_button_click_7_listener() {
+      \u0275\u0275elementStart(5, "na-button", 1);
+      \u0275\u0275listener("click", function CounterComponent_Template_na_button_click_5_listener() {
         return ctx.reset();
       });
-      \u0275\u0275text(8, "reset");
       \u0275\u0275elementEnd();
-      \u0275\u0275elementStart(9, "na-button", 1);
-      \u0275\u0275listener("click", function CounterComponent_Template_na_button_click_9_listener() {
+      \u0275\u0275elementStart(6, "na-button", 1);
+      \u0275\u0275listener("click", function CounterComponent_Template_na_button_click_6_listener() {
         return ctx.increment();
       });
-      \u0275\u0275text(10, "+");
       \u0275\u0275elementEnd()();
-      \u0275\u0275elementStart(11, "na-text");
-      \u0275\u0275text(12);
-      \u0275\u0275elementEnd()();
+      \u0275\u0275element(7, "na-text", 0);
+      \u0275\u0275elementEnd();
     }
     if (rf & 2) {
       \u0275\u0275styleProp("flex-direction", "column")("padding", "16px");
       \u0275\u0275advance();
       \u0275\u0275styleProp("width", "160px")("height", "30px")("font-size", "24px")("font-weight", "bold");
-      \u0275\u0275advance(2);
+      \u0275\u0275property("text", "Counter");
+      \u0275\u0275advance();
       \u0275\u0275styleProp("width", "120px")("height", "28px");
       \u0275\u0275property("text", ctx.counterDisplay());
       \u0275\u0275advance();
       \u0275\u0275styleProp("width", "160px")("height", "40px")("flex-direction", "row")("gap", "8px")("margin-top", "12px");
       \u0275\u0275advance();
       \u0275\u0275styleProp("width", "48px")("height", "36px");
-      \u0275\u0275advance(2);
-      \u0275\u0275styleProp("width", "48px")("height", "36px");
-      \u0275\u0275advance(2);
-      \u0275\u0275styleProp("width", "48px")("height", "36px");
-      \u0275\u0275advance(2);
-      \u0275\u0275styleProp("width", "80px")("height", "20px")("color", ctx.isEven() ? "green" : "red")("margin-top", "8px");
+      \u0275\u0275property("text", "\u2212");
       \u0275\u0275advance();
-      \u0275\u0275textInterpolate1(" ", ctx.isEven() ? "even" : "odd", " ");
+      \u0275\u0275styleProp("width", "48px")("height", "36px");
+      \u0275\u0275property("text", "reset");
+      \u0275\u0275advance();
+      \u0275\u0275styleProp("width", "48px")("height", "36px");
+      \u0275\u0275property("text", "+");
+      \u0275\u0275advance();
+      \u0275\u0275styleProp("width", "80px")("height", "20px")("color", ctx.isEven() ? "green" : "red")("margin-top", "8px");
+      \u0275\u0275property("text", ctx.isEven() ? "even" : "odd");
     }
   }, dependencies: [NaViewComponent, NaTextComponent, NaButtonComponent], encapsulation: 2 }));
   var CounterComponent = _CounterComponent;
@@ -65195,23 +65192,20 @@ If '${prop}' is a directive input, make sure the directive is imported by the cu
   __publicField(_AppComponent, "\u0275fac", function AppComponent_Factory(__ngFactoryType__) {
     return new (__ngFactoryType__ || _AppComponent)();
   });
-  __publicField(_AppComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _AppComponent, selectors: [["demo-app"]], decls: 6, vars: 20, template: function AppComponent_Template(rf, ctx) {
+  __publicField(_AppComponent, "\u0275cmp", /* @__PURE__ */ \u0275\u0275defineComponent({ type: _AppComponent, selectors: [["demo-app"]], decls: 4, vars: 22, consts: [[3, "text"]], template: function AppComponent_Template(rf, ctx) {
     if (rf & 1) {
-      \u0275\u0275elementStart(0, "na-view")(1, "na-text");
-      \u0275\u0275text(2, "AngNative Demo");
-      \u0275\u0275elementEnd();
-      \u0275\u0275elementStart(3, "na-text");
-      \u0275\u0275text(4, "Angular running natively \u2014 no WebView.");
-      \u0275\u0275elementEnd();
-      \u0275\u0275element(5, "demo-counter");
+      \u0275\u0275elementStart(0, "na-view");
+      \u0275\u0275element(1, "na-text", 0)(2, "na-text", 0)(3, "demo-counter");
       \u0275\u0275elementEnd();
     }
     if (rf & 2) {
       \u0275\u0275styleProp("flex-direction", "column")("padding", "24px")("gap", "16px");
       \u0275\u0275advance();
       \u0275\u0275styleProp("width", "220px")("height", "28px")("font-size", "20px")("font-weight", "bold");
-      \u0275\u0275advance(2);
+      \u0275\u0275property("text", "AngNative Demo");
+      \u0275\u0275advance();
       \u0275\u0275styleProp("width", "320px")("height", "20px")("color", "#666");
+      \u0275\u0275property("text", "Angular running natively \u2014 no WebView.");
     }
   }, dependencies: [NaViewComponent, NaTextComponent, CounterComponent], encapsulation: 2 }));
   var AppComponent = _AppComponent;

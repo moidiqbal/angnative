@@ -97,11 +97,10 @@ class RuntimeBridgeLifecycleTest {
     fun lifecycleWrappersTrackSuspendResumeAndStop() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val bridge = JniBridge(context)
-        val handleRef = AtomicReference<Long>()
 
-        runOnMain { handleRef.set(bridge.nativeRuntimeBridgeCreate()) }
-        val handle = handleRef.get() ?: throw AssertionError("bridge handle was not created")
-        assertTrue("bridge creation must succeed", handle != 0L)
+        // The wrappers read the handle stored by initHost(); calling the raw
+        // nativeRuntimeBridgeCreate() directly leaves that field at zero.
+        runOnMain { bridge.initHost() }
 
         try {
             // A fresh bridge is Created -> Initializing -> Ready -> Running.
@@ -119,7 +118,7 @@ class RuntimeBridgeLifecycleTest {
             assertEquals(0, bridge.stopRuntime())
             assertEquals(6, bridge.lifecycleState())
         } finally {
-            runOnMain { bridge.nativeRuntimeBridgeDestroy(handle, 0L) }
+            runOnMain { bridge.destroyHost() }
         }
     }
 

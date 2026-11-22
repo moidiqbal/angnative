@@ -76,9 +76,13 @@ class ViewFactoryMainThreadTest {
                 bridge.loadScript(bundle)
             })
 
-            // Node 17 is the "+" click host in the tracked AOT bundle; the
-            // retained emulator logcat shows one listener on this node.
-            val invoked = onWorkerThread { bridge.dispatchNativeEvent(17L, "click") }
+            // Find the "+" click host from the loaded bundle instead of
+            // hardcoding a node id that shifts when the AOT template changes.
+            val plusId = bridge.snapshot().nodes
+                .firstOrNull { it.textContent == "+" }
+                ?.id
+                ?: throw AssertionError("Angular '+' node missing from host snapshot")
+            val invoked = onWorkerThread { bridge.dispatchNativeEvent(plusId, "click") }
             assertTrue("Expected a live Angular listener, got $invoked", invoked > 0)
 
             val calls = sink.snapshot()

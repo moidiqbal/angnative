@@ -20,12 +20,14 @@ import { CounterComponent } from './counter.component';
         [style.height]="'28px'"
         [style.fontSize]="'20px'"
         [style.fontWeight]="'bold'"
-      >AngNative Demo</na-text>
+        [text]="'AngNative Demo'"
+      ></na-text>
       <na-text
         [style.width]="'320px'"
         [style.height]="'20px'"
         [style.color]="'#666'"
-      >Angular running natively — no WebView.</na-text>
+        [text]="'Angular running natively — no WebView.'"
+      ></na-text>
       <demo-counter></demo-counter>
     </na-view>
   `,

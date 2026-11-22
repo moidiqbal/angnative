@@ -978,6 +978,11 @@ mod tests {
                 .iter()
                 .find(|node| node.id == text_id)
                 .expect("button text node");
+            // The demo binds `[text]` directly on na-button, so the label may
+            // live on the button node itself rather than in a child text node.
+            if text_node.tag == "na-button" {
+                return text_id;
+            }
             let parent_id = text_node.parent_id.expect("button text must have a parent");
             let parent = snapshot
                 .nodes
@@ -1104,6 +1109,9 @@ mod tests {
             ("reset", reset),
             ("plus", plus),
         ];
+        for (label, rect) in &controls {
+            eprintln!("{label}: ({:.0}, {:.0}, {:.0}, {:.0})", rect.0, rect.1, rect.2, rect.3);
+        }
         for (label, rect) in &controls {
             assert!(
                 rect.2 > 0.0 && rect.3 > 0.0,

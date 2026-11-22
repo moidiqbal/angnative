@@ -102,3 +102,17 @@ Full gate only at the end, in order:
 
 No commit/push if any step fails. After a clean pass, commit with
 `fix(showcase): apply canonical styles and explicit demo sizing`, then push.
+
+## Post-delivery verification (2026-11-23)
+
+Physical OnePlus `b6640c8f` was reconnected and the full instrumentation suite
+was executed locally: **8 passed, 0 failed**. The device run exposed that static
+`ɵɵtext` children get zero-size frames on Android, leaving the counter buttons
+unlabeled; the demo now binds text through the supported `text` input. Two stale
+test assumptions were also corrected (a lifecycle test that bypassed
+`initHost()`, and a hardcoded node `17`). The earlier caveat "no device
+screenshot/video can be produced" applies only to the original implementation
+round: a valid OnePlus screenshot and UI XML are now retained. See
+`docs/evidence/ANGULAR-COUNTER-ONEPLUS.md` for the full result and scope. CI,
+the one-command CLI, the other nine shells, and DOM-doc cleanup remain out of
+scope.

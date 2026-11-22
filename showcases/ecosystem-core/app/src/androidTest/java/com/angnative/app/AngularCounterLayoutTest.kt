@@ -22,9 +22,8 @@ import java.util.concurrent.atomic.AtomicReference
  * tree, applies the result through [NativeViewFactory], and asserts that the
  * four Angular counter controls occupy distinct, non-overlapping screen rects.
  *
- * Added in the layout-fix round but NOT executed locally: no emulator or
- * physical device was available. Treat it as an unrun regression guard until a
- * device run is retained.
+ * Added in the layout-fix round and executed on physical OnePlus `b6640c8f`
+ * after the demo text-binding fix; see `docs/evidence/ANGULAR-COUNTER-ONEPLUS.md`.
  */
 @RunWith(AndroidJUnit4::class)
 class AngularCounterLayoutTest {

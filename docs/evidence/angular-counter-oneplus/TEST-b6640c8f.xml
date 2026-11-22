@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="8" failures="0" errors="0" skipped="0" time="0.000" timestamp="2026-11-22T21:31:11" hostname="localhost">
+  <testsuite name="com.angnative.app.AngularCounterLayoutTest" tests="1" failures="0" errors="0" skipped="0" time="1.101" timestamp="2026-11-22T21:31:11" hostname="localhost">
+    <properties>
+      <property name="device" value="b6640c8f" />
+    </properties>
+    <testcase name="angularCounterViewsDoNotOverlap" classname="com.angnative.app.AngularCounterLayoutTest" time="1.101" />
+  </testsuite>
+  <testsuite name="com.angnative.app.RuntimeBridgeLifecycleTest" tests="3" failures="0" errors="0" skipped="0" time="0.062" timestamp="2026-11-22T21:31:11" hostname="localhost">
+    <properties>
+      <property name="device" value="b6640c8f" />
+    </properties>
+    <testcase name="lifecycleWrappersTrackSuspendResumeAndStop" classname="com.angnative.app.RuntimeBridgeLifecycleTest" time="0.008" />
+    <testcase name="staleU64HandleReturnsSafeSentinels" classname="com.angnative.app.RuntimeBridgeLifecycleTest" time="0.009" />
+    <testcase name="taggedCustomPrimitivesMaterializeWithCanonicalTags" classname="com.angnative.app.RuntimeBridgeLifecycleTest" time="0.045" />
+  </testsuite>
+  <testsuite name="com.angnative.app.RuntimeBridgeThreadAffinityTest" tests="2" failures="0" errors="0" skipped="0" time="0.021" timestamp="2026-11-22T21:31:11" hostname="localhost">
+    <properties>
+      <property name="device" value="b6640c8f" />
+    </properties>
+    <testcase name="wrongThreadDestroyIsANoOpAndDoesNotAbortTheProcess" classname="com.angnative.app.RuntimeBridgeThreadAffinityTest" time="0.010" />
+    <testcase name="wrongThreadDispatchLoadAndGetHostReturnSentinelsAndBridgeStaysAlive" classname="com.angnative.app.RuntimeBridgeThreadAffinityTest" time="0.011" />
+  </testsuite>
+  <testsuite name="com.angnative.app.ViewFactoryMainThreadTest" tests="2" failures="0" errors="0" skipped="0" time="2.239" timestamp="2026-11-22T21:31:11" hostname="localhost">
+    <properties>
+      <property name="device" value="b6640c8f" />
+    </properties>
+    <testcase name="dispatchNativeEventFromWorkerRunsOnMainAndReachesAngularListener" classname="com.angnative.app.ViewFactoryMainThreadTest" time="1.065" />
+    <testcase name="viewFactoryCallbacksFromWorkerEntryAreMarshalledToMainLooper" classname="com.angnative.app.ViewFactoryMainThreadTest" time="1.174" />
+  </testsuite>
+</testsuites>

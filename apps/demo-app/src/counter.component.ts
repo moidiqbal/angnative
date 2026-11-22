@@ -28,7 +28,8 @@ import { counter, increment, decrement, reset, isEven } from './counter-signal';
         [style.height]="'30px'"
         [style.fontSize]="'24px'"
         [style.fontWeight]="'bold'"
-      >Counter</na-text>
+        [text]="'Counter'"
+      ></na-text>
       <na-text
         [style.width]="'120px'"
         [style.height]="'28px'"
@@ -44,27 +45,29 @@ import { counter, increment, decrement, reset, isEven } from './counter-signal';
         <na-button
           [style.width]="'48px'"
           [style.height]="'36px'"
+          [text]="'−'"
           (click)="decrement()"
-        >−</na-button>
+        ></na-button>
         <na-button
           [style.width]="'48px'"
           [style.height]="'36px'"
+          [text]="'reset'"
           (click)="reset()"
-        >reset</na-button>
+        ></na-button>
         <na-button
           [style.width]="'48px'"
           [style.height]="'36px'"
+          [text]="'+'"
           (click)="increment()"
-        >+</na-button>
+        ></na-button>
       </na-view>
       <na-text
         [style.width]="'80px'"
         [style.height]="'20px'"
         [style.color]="isEven() ? 'green' : 'red'"
         [style.marginTop]="'8px'"
-      >
-        {{ isEven() ? 'even' : 'odd' }}
-      </na-text>
+        [text]="isEven() ? 'even' : 'odd'"
+      ></na-text>
     </na-view>
   `,
 })
