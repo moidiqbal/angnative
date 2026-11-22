@@ -24,7 +24,9 @@ On this machine all toolchains are installed and every item below was actually e
 | iOS app | ⚠️ NOT TESTED | Swift config + runtime-bridge bindings exist under `platforms/ios/`; `check-ffi-declarations.py` statically verifies 14 Swift bindings and unified staticlib wiring, but no macOS/Xcode here — `swift build`, `swift test`, Simulator and device runs intentionally skipped |
 
 ## Bottom line
-All correctness blockers outside iOS/macOS are closed and pushed to `master`.
+All P0 correctness blockers outside iOS/macOS are closed and pushed to `master`;
+the remaining P1/P2/P3 items are explicitly tracked as pending or deferred in
+`docs/architecture/issue-register.md` and `docs/UNSUPPORTED-FEATURES.md`.
 The flagship `ecosystem-core` shell loads a real AOT bundle and a native tap
 reaches a live Angular listener, verified on emulator and OnePlus
 (`docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`). The other 9 showcases remain

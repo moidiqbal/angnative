@@ -97,9 +97,11 @@ Do **not** market "any Angular app runs natively". The defensible statement is:
 > AngNative demonstrates that an Angular AOT component tree can execute inside
 > an embedded QuickJS engine and drive a native view tree with no WebView.
 > Routing, DI-based HTTP, template-driven forms, AOT i18n and the real animation
-> engine (deterministic samples only) are now verified in QuickJS. Remaining
-> gaps (real-time easing fidelity, on-device shell loading, iOS) are still being
-> closed before claiming general framework compatibility.
+> engine (deterministic samples only) are now verified in QuickJS. The flagship
+> shell loads a real AOT bundle on-device with a verified live tap; the remaining
+> gaps (real-time easing fidelity, iOS runtime verification) are explicitly
+> deferred — see `docs/UNSUPPORTED-FEATURES.md`. No general framework
+> compatibility is claimed.
 
 This is the adoption story to finish — it is currently a roadmap item, not a
 shipped product claim.

@@ -109,20 +109,20 @@
 **Files**: `crates/angnative-host-ffi/src/bridge.rs:291-317`
 **Remediation**: `destroy_host` clears all listeners. Callback registry owns callbacks.
 
-### P1-06: No Angular Platform Adapter
-**Evidence**: `packages/platform/src/native-angular.ts` provides providers but no QuickJS integration.
-**Files**: `packages/platform/src/native-angular.ts`, `packages/platform/src/bootstrap.ts`
-**Remediation**: Implement `AngNativePlatform` with QuickJS runtime. Wire `bootstrapApplication`.
+### P1-06: No Angular Platform Adapter — CLOSED
+**Evidence**: `provideNativeAngular()` in `packages/platform/src/native-angular.ts` supplies the native `RendererFactory2`; the Rust host loads the AOT bundle into QuickJS and the flagship shell keeps the bridge alive on-device. Verified by the ignored `angular_bootstrap_runs_in_quickjs` test and the flagship live-tap evidence (`docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`).
+**Files**: `packages/platform/src/native-angular.ts`, `crates/angnative-host-engine/src/quickjs.rs`, `showcases/ecosystem-core/app/src/main/java/com/angnative/app/EcosystemCoreActivity.kt`.
+**Remediation**: None; the integration is verified on the supported path.
 
-### P1-07: AOT Bundle Not Loaded
-**Evidence**: `dist/aot/bundle.js` exists but never loaded into QuickJS.
-**Files**: `scripts/compile-aot.mjs`, `crates/angnative-host-engine/src/runtime.rs`
-**Remediation**: `RuntimeController.loadApplication(bundle_js)`. Module loading support.
+### P1-07: AOT Bundle Not Loaded — CLOSED
+**Evidence**: Real AOT bundles are loaded and executed in QuickJS: ignored tests `angular_bootstrap_runs_in_quickjs`, `angular_router_bootstraps_with_outlet` and `angular_aot_i18n_translated_text_in_native_tree`; the flagship shell also loads a real AOT bundle on-device (live-tap evidence above).
+**Files**: `crates/angnative-host-engine/src/quickjs.rs`, `scripts/compile-aot.mjs`, `docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`.
+**Remediation**: None; the earlier stale claim is superseded by passing tests and retained artifacts.
 
-### P1-08: No Module System in QuickJS
-**Evidence**: `install_api()` only registers global functions. No `require`/`import`.
+### P1-08: No Module System in QuickJS — DEFERRED (not a blocker)
+**Evidence**: `install_api()` registers globals and has no `require`/`import`, but the verified AOT bundles are self-contained IIFEs (`docs/CODE-REVIEW-2026-11-22.md`), so no module loader is needed for the supported path. An ES module loader remains unimplemented and unverified.
 **Files**: `crates/angnative-host-engine/src/runtime.rs:55-245`
-**Remediation**: Implement ES module loader. `require()` for Angular bundle.
+**Remediation**: Optional future ES module loader; no current claim depends on it.
 
 ### P1-09: Missing Angular Error Handling
 **Evidence**: JS exceptions not propagated to Angular `ErrorHandler`.
@@ -163,10 +163,10 @@
 **Files**: `showcases/ecosystem-core/app/src/main/cpp/jni_bridge.cpp:49-55`
 **Remediation**: RAII for JNI global refs. `ScopedGlobalRef`.
 
-### P2-04: No Android UI Thread Enforcement
-**Evidence**: ViewFactory callbacks may execute off UI thread.
-**Files**: `showcases/ecosystem-core/app/src/main/java/com/angnative/app/NativeViewFactory.kt`
-**Remediation**: `runOnUiThread` enforcement. Assert UI thread.
+### P2-04: No Android UI Thread Enforcement — CLOSED
+**Evidence**: Every `JniBridge` native entry point marshals to `Looper.getMainLooper()` with one post/latch per call; `NativeViewSink` records `Looper.myLooper()` inside callbacks and `ViewFactoryMainThreadTest.kt` asserts a main looper on emulator and OnePlus (4 tests / 0 failures each).
+**Files**: `showcases/ecosystem-core/app/src/main/java/com/angnative/app/JniBridge.kt`, `ViewFactoryMainThreadTest.kt`, `docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`.
+**Remediation**: None; enforcement and verification are retained.
 
 ### P2-05: No Stress Tests
 **Evidence**: Tests only cover happy paths.
@@ -193,10 +193,10 @@
 **Files**: `crates/angnative-desktop/`
 **Remediation**: Desktop integration test.
 
-### P2-10: CLI Build Pipeline Gaps
-**Evidence**: `compile:aot` works but no verification of output.
-**Files**: `scripts/compile-aot.mjs`, `packages/cli/src/bundle.ts`
-**Remediation**: Verify AOT output loads in QuickJS.
+### P2-10: CLI Build Pipeline Gaps — CLOSED
+**Evidence**: `pnpm compile:aot` produces real `ngc` output in `dist/aot/*.js` and multiple ignored tests load those AOT bundles in QuickJS and assert native tree mutations (`angular_bootstrap_runs_in_quickjs`, `angular_router_bootstraps_with_outlet`, `angular_aot_i18n_translated_text_in_native_tree`, `angular_animation_engine_interpolates_native_styles`).
+**Files**: `scripts/compile-aot.mjs`, `packages/cli/src/bundle.ts`, `docs/UNSUPPORTED-FEATURES.md`.
+**Remediation**: None for AOT output verification; the web-demo JIT-to-AOT migration is separately deferred.
 
 ### P2-11: Size Budget Enforcement
 **Evidence**: Size budget passes but Rust binary size not enforced per-target.
@@ -213,10 +213,10 @@
 **Files**: `crates/` - no `angnative-engine-hermes` or `angnative-engine-v8`
 **Remediation**: Isolated proof-of-concept crates.
 
-### P2-14: Benchmark Infrastructure Missing
-**Evidence**: No automated benchmark runner.
-**Files**: `scripts/` - no benchmark scripts
-**Remediation**: Benchmark harness. Physical device automation.
+### P2-14: Benchmark Infrastructure Missing — CLOSED (partial scope)
+**Evidence**: Collector scripts and retained artifacts now exist: `scripts/measure-showcase.ps1`, `scripts/measure-frames.ps1`, `scripts/measure-multisample.ps1`; `docs/benchmarks/frame-pacing.json`, `docs/benchmarks/emulator-multisample.json`, `docs/benchmarks/physical/results.json` and `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md`.
+**Files**: `scripts/`, `docs/benchmarks/`, `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md`.
+**Remediation**: Physical-device multi-sample/CPU/warm-start automation remains pending (`b6640c8f` was offline for the 2026-11-23 run); no physical multi-sample claim is made.
 
 ### P2-15: Documentation Gaps
 **Evidence**: Architecture docs created but not linked from code.
@@ -286,9 +286,9 @@
 | P1-03 | ⬜ Pending | - | B |
 | P1-04 | ⬜ Pending | - | B |
 | P1-05 | ⬜ Pending | - | B |
-| P1-06 | ⬜ Pending | - | C |
-| P1-07 | ⬜ Pending | - | C |
-| P1-08 | ⬜ Pending | - | C |
+| P1-06 | ✅ Closed (provider + QuickJS integration verified) | - | C |
+| P1-07 | ✅ Closed (real AOT bundle loaded and executed) | - | C |
+| P1-08 | ⬜ Deferred (self-contained IIFE bundles; no ES module loader) | - | C |
 | P1-09 | ⬜ Pending | - | C |
 | P1-10 | ⬜ Pending | - | B |
 | P1-11 | ⬜ Pending | - | E |
@@ -296,17 +296,17 @@
 | P2-01 | ⬜ Pending | - | C |
 | P2-02 | ⬜ Pending | - | C |
 | P2-03 | ⬜ Pending | - | D |
-| P2-04 | ⬜ Pending | - | D |
+| P2-04 | ✅ Closed (UI-thread marshalling verified on emulator + OnePlus) | - | D |
 | P2-05 | ⬜ Pending | - | E |
 | P2-06 | ⬜ Pending | - | E |
 | P2-07 | ⬜ Pending | - | E |
 | P2-08 | 🔴 Blocked | - | - |
 | P2-09 | ⬜ Pending | - | - |
-| P2-10 | ⬜ Pending | - | C |
+| P2-10 | ✅ Closed (AOT output load verified in QuickJS) | - | C |
 | P2-11 | ⬜ Pending | - | E |
 | P2-12 | ⬜ Pending | - | F |
 | P2-13 | ⬜ Pending | - | F |
-| P2-14 | ⬜ Pending | - | G |
+| P2-14 | ✅ Closed (benchmark scripts + artifacts retained; physical multi-sample pending) | - | G |
 | P2-15 | ✅ Done | - | A |
 | P3-01 | ⬜ Pending | - | - |
 | P3-02 | ⬜ Pending | - | - |

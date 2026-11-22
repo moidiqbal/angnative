@@ -31,17 +31,17 @@ Mixing the two makes the repository's honesty claims unreliable.
 
 ## Phases
 
-1. **Docs/evidence consistency.** Fix stale lines in `ROADMAP.md`,
+0. **Docs/evidence consistency.** Fix stale lines in `ROADMAP.md`,
    `VERIFICATION-REPORT.md`, `docs/architecture/issue-register.md`,
    `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`,
    `docs/UNSUPPORTED-FEATURES.md`, and related notes. Keep the OnePlus
    screenshot-not-retained caveat.
-2. **Scope formalization.** Record the flagship-only decision and update P0-08 /
+1. **Scope formalization.** Record the flagship-only decision and update P0-08 /
    Gate D / ADR cross-references. No shell code rewrite.
-3. **Benchmarks.** Collect emulator multi-sample frame pacing and CPU using
+2. **Benchmarks.** Collect emulator multi-sample frame pacing and CPU using
    existing scripts; retain raw JSON. Mark physical multi-sample as not verified
    because `b6640c8f` is not connected.
-4. **Feature status.** Convert remaining open rows into explicit
+3. **Feature status.** Convert remaining open rows into explicit
    unsupported/deferred decisions with reasons. No new implementation in this
    phase.
 
