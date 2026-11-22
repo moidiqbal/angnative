@@ -26,6 +26,7 @@ const coreEntry = require
   .resolve('@angular/core', { paths: [pnpmStore] })
   .replaceAll('\\', '/');
 
+
 const outDir = path.join(root, 'dist', 'aot');
 
 const routerAppEntry = path
@@ -72,6 +73,7 @@ globalThis.${feature.global} = ng;`;
     target: 'es2018',
     minify: false,
     define: { ngDevMode: 'false' },
+    // Secondary entry points are not resolvable from the generated dist dir.
     logLevel: 'info',
   });
   console.log(`Wrote ${outfile}`);

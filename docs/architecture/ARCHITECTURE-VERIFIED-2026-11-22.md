@@ -183,10 +183,16 @@ but is relevant when reasoning about event handling.
    bootstraps and emits an outlet anchor. During development diagnostics the
    navigation promise remained pending and no route-component swap was observed;
    those diagnostics were not retained as a repo artifact, so the claim is
-   limited to "not verified". **Blocked on** a fuller Angular event-loop /
-   stability integration (`ApplicationRef.whenStable`, RxJS scheduler,
-   zoneless `PendingTasks`) inside the QuickJS host. Not scheduled in the current
-   fix batch; do not treat route-based navigation as supported.
+   limited to "not verified". Deep-dive finding: Angular's
+   `NavigationTransitions.setupNavigations` constructs `AbortController`, which
+   this runtime did not provide — the pipeline throws inside an RxJS operator
+   and its error handler swallows it, so no `NavigationStart` is ever emitted.
+   Adding a naive `AbortController` shim makes the pipeline advance but the
+   controller/signal callbacks create a cyclic object graph that overflows
+   rquickjs GC, so the shim was reverted. **Blocked on** a cycle-free
+   `AbortController`/`AbortSignal` implementation plus the fuller event-loop /
+   stability integration (`ApplicationRef.whenStable`, RxJS scheduler, zoneless
+   `PendingTasks`). Do not treat route-based navigation as supported.
 2. **Thread identity on native click callbacks**: load and node inspection ran
    on the UI thread; a dedicated cross-thread dispatch test on-device is not
    done. A cross-thread call panics by design (caught by the C shim → 0).

@@ -550,25 +550,23 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         function clearTimeout(id) { _angTimerQueue.delete(id); }
         // RxJS asyncScheduler (used by Angular Router) flushes through
         // setInterval(0), so a no-op here leaves the navigation pipeline dead.
+        // One-shot, NOT auto-repeating: an auto-repeating microtask chain never
+        // drains and starves the host's bounded job loop. RxJS asyncScheduler
+        // requests a fresh interval after each flush when it has more work.
         var _angIntervalId = 1;
         var _angIntervalQueue = new Map();
         function setInterval(handler, delay) {
             var id = _angIntervalId++;
-            var active = true;
-            var tick = function () {
-                if (!active || !_angIntervalQueue.has(id)) return;
+            var run = function () {
+                if (!_angIntervalQueue.has(id)) return;
+                _angIntervalQueue.delete(id);
                 handler();
-                if (active && _angIntervalQueue.has(id)) queueMicrotask(tick);
             };
-            _angIntervalQueue.set(id, function () { active = false; });
-            queueMicrotask(tick);
+            _angIntervalQueue.set(id, run);
+            queueMicrotask(run);
             return id;
         }
-        function clearInterval(id) {
-            var cancel = _angIntervalQueue.get(id);
-            if (cancel) cancel();
-            _angIntervalQueue.delete(id);
-        }
+        function clearInterval(id) { _angIntervalQueue.delete(id); }
         // Angular's zoneless scheduler uses an rAF-vs-setTimeout race. Drive
         // rAF from the same queue the host drains after each event, otherwise
         // change detection never ticks in QuickJS.
