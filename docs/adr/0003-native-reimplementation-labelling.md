@@ -7,3 +7,15 @@
 - **Consequences:**
   - Community sees an honest compatibility story instead of marketing.
   - Some categories remain unimplemented; they are listed in `docs/UNSUPPORTED-FEATURES.md` rather than hidden.
+
+## 2026-11-23 addendum — flagship-only Angular shell scope
+
+- **Decision:** `showcases/ecosystem-core` is the single supported Angular-driven
+  shell. It keeps the unified runtime bridge alive, loads a real AOT bundle, and
+  has a verified native tap into a live listener on emulator and OnePlus
+  (`docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`). Its remaining concept
+  sections and the other 9 showcases stay imperative native reimplementations by
+  design; `platforms/android` keeps the legacy host.
+- **Consequence:** P0-08 is closed as a scope decision, not by rewriting every
+  shell. Gate D is passed for the flagship E2E with this limitation stated. No
+  claim of Angular parity is made for the other shells.
