@@ -2,8 +2,10 @@
 
 **Status (2026-11-22):** Implemented and verified in-process. `angnative-runtime-bridge`
 owns Host + QuickJS + `AngNativeRuntime`, a real Angular AOT bundle boots, and a native
-event reaches the Angular listener (9 ignored acceptance tests pass —
-`cargo test -p angnative-runtime-bridge -- --ignored`). Loading that bundle inside a
+event reaches the Angular listener (10 ignored tests pass — 9 Angular acceptance tests
+plus 1 RxJS spot-check — via `cargo test -p angnative-runtime-bridge -- --ignored`).
+The cross-thread C ABI fix is now verified on an Android 14 emulator with real wrong-thread
+JNI calls; physical-device verification is still outstanding. Loading that bundle inside a
 shipping native shell on-device is the remaining integration step. See
 `docs/CODE-REVIEW-2026-11-22.md` for the full evidence and honest gaps.
 
@@ -53,7 +55,7 @@ native button click (Kotlin / Swift / winit)
   → component (click) handler runs
 ```
 
-## Cross-thread safety (verified on host, NOT on device)
+## Cross-thread safety (verified on host + Android emulator; NOT on physical device)
 
 `RuntimeBridge` records its creating `ThreadId`. Rust callers hit
 `assert_owner_thread()` and panic loudly on misuse (`test_thread_affinity`).
@@ -78,15 +80,27 @@ a worker thread calls `angnative_runtime_bridge_dispatch_event` and the test
 asserts both the sentinel and (via a test-only counter) that the guard was
 taken rather than a panic being swallowed by `catch_unwind`.
 
-**Not verified on device.** No `androidTest` sources, instrumentation runner,
-or background-thread dispatch path exist in any shell: every Kotlin call to
-`nativeRuntimeBridgeDispatchEvent` originates from an Android UI
-`OnClickListener`. `EcosystemCoreActivity` loads the AOT bundle and immediately
-destroys the bridge, leaving no live listener to dispatch to. No wrong-thread
-JNI call has been executed on an emulator or physical device, and no Android
-UI-thread marshalling is implemented in the JNI callbacks (which only
-`AttachCurrentThread` for Rust→Kotlin view callbacks). Device verification
-remains a concrete open task, not a claim.
+**Verified on Android emulator.** `showcases/ecosystem-core` now has an
+`androidTest` instrumentation suite,
+`RuntimeBridgeThreadAffinityTest.kt`, that calls the JNI entry points from a
+real non-owner `Thread`. On `emulator-5554` (SDK `sdk_gphone64_x86_64`, Android
+14, x86_64), the wrong-thread calls returned the sentinels above, the owner-thread
+bridge stayed usable, and a wrong-thread `destroy` did not abort the process.
+`.\gradlew.bat connectedDebugAndroidTest --no-daemon` reported 2 tests, 0
+failures. Root cause of the first failing run: the prebuilt `jniLibs` archive
+predated commit `fe8f08a`; rebuilding with `scripts/build-android-native.ps1`
+and rerunning the instrumentation test produced the pass. Evidence:
+`docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md` and
+`docs/evidence/android-thread-affinity-emulator.html`.
+
+**Still not verified on a physical device.** At the time of the run,
+`adb devices -l` showed only `emulator-5554`; the OnePlus Open was not attached.
+No wrong-thread JNI call has been executed on a physical device. Separately,
+no Android UI-thread marshalling is implemented in the JNI callbacks (which only
+`AttachCurrentThread` for Rust→Kotlin view callbacks), and
+`EcosystemCoreActivity` still loads the AOT bundle and immediately destroys the
+bridge, leaving no live listener for a native tap. Those remain concrete open
+tasks, not claims.
 
 ## Remaining work
 
@@ -108,10 +122,11 @@ Still open (honest):
   the real AOT bundle (`EcosystemCoreActivity.kt:170-179`) and reports
   `nodes=... (load rc=0)`, but it destroys the bridge immediately afterwards, so
   no live Angular listener survives for a tap. The other 9 showcases and
-  `platforms/android` still use the legacy host + imperative batches. iOS has no
-  runtime-bridge bindings. Until a shell keeps the bridge alive and a tap reaches
+  `platforms/android` still use the legacy host + imperative batches. iOS has
+  static runtime-bridge bindings only (no Swift compile or simulator/device run
+  on this host). Until a shell keeps the bridge alive and a tap reaches
   Angular, the framework-level claim is "verified in the embedded runtime," not
-  "runs natively." See the cross-thread section above for the separate device gap.
+  "runs natively." See the cross-thread section above for the physical-device gap.
 - **Animation-engine integration** is now verified with deterministic three-sample
   interpolation (`angular_animation_engine_interpolates_native_styles`); real-time
   easing fidelity is still unverified. DI-based `HttpClient.get()` is verified by

@@ -110,7 +110,9 @@ fires per event and a new native batch follows.
   `owner_thread` field with a non-panicking raw-pointer read first. Wrong-thread
   `dispatch_event` returns `DISPATCH_PANIC` (`u32::MAX`), `load_script` returns
   `2`, `get_host` returns `NULL`, and `destroy` is a no-op. No QuickJS code runs
-  on the wrong thread.
+  on the wrong thread. This is now verified on an Android 14 emulator with real
+  wrong-thread JNI calls (2 tests / 0 failures); physical-device verification
+  is still outstanding. See `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md`.
 - Host `create`/`destroy` legacy JNI exports remain for ABI compatibility. The
   **10 unified showcases** do not declare them from Kotlin, but
   `platforms/android` still declares and calls `nativeHostCreate` /
@@ -171,6 +173,7 @@ for opt-in use only.
 | iOS static verification | `SwiftFFI.swift` binds `angnative_runtime_bridge_{create,destroy,dispatch_event,load_script,get_host}` with `UInt64`/`UInt32` signatures; `Package.swift` links `angnative_runtime_bridge`; `build-ios-native.sh` builds/stages that archive. No Swift compile, `swift test`, Simulator or device run on this host. |
 | All 10 Android `assembleDebug` | SUCCESS observed during development; no CI Android job and no retained build log |
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
+| Wrong-thread JNI instrumentation (API 34 emulator) | `connectedDebugAndroidTest`: 2 tests, 0 failures; sentinels `-1` / `2` / NULL, bridge survives. Evidence: `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md` and `docs/evidence/android-thread-affinity-emulator.html`. Physical device not attached — no physical-device claim. |
 | CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
 
 The ten ignored tests require regenerated `dist/aot/*` bundles, which are
@@ -204,7 +207,8 @@ but is relevant when reasoning about event handling.
      when Angular passes null/synthetic-root during outlet component deactivation.
    - Verified end-to-end via `angular_router_bootstraps_with_outlet` asserting
      both initial and destination route batches in QuickJS.
-2. **Thread identity on native click callbacks - C ABI fixed, device unverified.**
+2. **Thread identity on native click callbacks — C ABI fixed and emulator-verified;
+    physical device unverified.**
     Root cause: `RuntimeBridge::assert_owner_thread()` panics on a wrong-thread
     call; the C ABI's `catch_unwind` would normally convert that to a sentinel,
     but Android static libs are built with `cargo build --release` under
@@ -214,13 +218,16 @@ but is relevant when reasoning about event handling.
     no aliasing reference is formed). Verified on the host by
     `test_c_abi_dispatch_from_non_owner_thread_returns_sentinel_without_panicking`
     and `test_thread_affinity`; the header contract is updated in
-    `crates/angnative-host-ffi/include/angnative_host_ffi.h`. **Not verified on
-    device:** there are no `androidTest` sources / instrumentation runner, every
-    Kotlin `nativeRuntimeBridgeDispatchEvent` call comes from a UI
-    `OnClickListener`, JNI callbacks only `AttachCurrentThread` (no UI-thread
-    marshalling), and `EcosystemCoreActivity` destroys the bridge immediately
-    after loading the bundle. No wrong-thread JNI call has been executed on an
-    emulator or physical device; see `docs/EVENT-BRIDGE.md`.
+    `crates/angnative-host-ffi/include/angnative_host_ffi.h`. Verified on Android
+    emulator by `RuntimeBridgeThreadAffinityTest.kt` (`connectedDebugAndroidTest`,
+    2 tests / 0 failures). The first run failed because the staged `jniLibs`
+    archive predated `fe8f08a`; rebuilding via `scripts/build-android-native.ps1`
+    and rerunning produced the pass. **Not verified on a physical device:** at
+    the time of the run `adb devices -l` showed only `emulator-5554`. Separately,
+    JNI callbacks only `AttachCurrentThread` (no UI-thread marshalling), and
+    `EcosystemCoreActivity` destroys the bridge immediately after loading the
+    bundle. See `docs/EVENT-BRIDGE.md` and
+    `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md`.
 3. **Angular animation engine integration — RESOLVED (deterministic samples)**:
    `provideNativeAnimations()` wires Angular's real `AnimationEngine` and
    `AnimationRendererFactory` around `AngNativeRendererFactory2`. The AOT `fade`

@@ -81,6 +81,7 @@ Live run opens a window titled **"AngNative Desktop"**. A WGSL validation panic
 - APK runs; UI is built from Rust `PlatformOp`s; click round trip verified
   (`onNativePress → SetText → "Hello World!"`)
 - Screenshots: `docs/assets/android-demo.png`, `docs/assets/android-demo-clicked.png`
+- Wrong-thread JNI guard: `connectedDebugAndroidTest` passed 2/2 on `emulator-5554` (Android 14, x86_64); evidence in `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md`
 
 ---
 
@@ -102,7 +103,7 @@ cargo test --workspace   # 135 tests pass, 10 ignored; includes host-engine and 
 |---|---|
 | Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **135 tests pass** (with Git `patch.exe` on PATH — see note above) |
 | JS/TS (16 spec files) | ✅ 221 tests pass |
-| Android JNI + emulator run | ✅ verified |
+| Android JNI + emulator run | ✅ verified, including wrong-thread JNI instrumentation (2 tests / 0 failures) |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified |
 | iOS shell | ⚠️ Swift runtime-bridge bindings + unified staticlib wiring statically verified; Swift compile / Simulator / device run NOT verified (no Mac/Xcode here). Runbook in `docs/IOS-BUILD.md`. |
@@ -112,7 +113,7 @@ cargo test --workspace   # 135 tests pass, 10 ignored; includes host-engine and 
 | AOT i18n markers in QuickJS | ✅ verified by ignored acceptance test `angular_aot_i18n_translated_text_in_native_tree`: `tsconfig.aot.i18n.json` compiles `<na-text i18n>Hello {{ name }}!</na-text>` to `$localize` + `ɵɵi18n`/`ɵɵi18nExp`; a registered translation renders `Assalam-o-Alaikum AngNative!` in the native tree. Root causes: `$localize` placeholder self-substitution loop and missing `Node` DOM constants. |
 | Angular Animations engine in QuickJS | ✅ verified by ignored acceptance test `angular_animation_engine_interpolates_native_styles`: `pnpm compile:aot:animations && pnpm bundle:framework` builds the AOT `fade` trigger; the real `AnimationEngine` over `AngNativeRendererFactory2` emits a native `SetStyle opacity: 0.5` midpoint between lifecycle `start,done`, ending at native `opacity: 1`. Native player uses three deterministic samples (`0 / 0.5 / 1`) via flat numeric-id registries — real-time easing fidelity is **not verified**. Root causes: null root renderer host, string `nodeType`, missing `element.style` mirror, orphan-element check, and zero-keyframe `animate('100ms')`. |
 | Third-party library spot-check (RxJS 7.8.2) | ✅ verified in embedded QuickJS (native JS path) | `pnpm bundle:third-party` + ignored test `third_party_rxjs_runs_unchanged_in_quickjs`: unmodified RxJS `of(1,2,3).pipe(map(x => x*2))` yields `[2,4,6]` with `complete`, no error. Single DOM-free library only — no DOM-heavy UI library or third-party app was run unchanged; see `docs/COMPATIBILITY.md` §2b. |
-| Android cross-thread bridge safety | ⚠️ host/C ABI verified, device NOT verified | Fixed the release `panic = "abort"` defect: C ABI entry points reject wrong-thread calls with a sentinel before any `assert_owner_thread()` panic can occur (`test_c_abi_dispatch_from_non_owner_thread_returns_sentinel_without_panicking` + `test_thread_affinity` pass). No wrong-thread JNI call has been executed on device (no `androidTest` sources, no background-thread trigger in Kotlin, no UI-thread marshalling in JNI callbacks). Details in `docs/EVENT-BRIDGE.md`. |
+| Android cross-thread bridge safety | ✅ verified on Android emulator; ⚠️ physical device NOT verified | Fixed the release `panic = "abort"` defect: C ABI entry points reject wrong-thread calls with a sentinel before any `assert_owner_thread()` panic can occur (`test_c_abi_dispatch_from_non_owner_thread_returns_sentinel_without_panicking` + `test_thread_affinity` pass). Added `RuntimeBridgeThreadAffinityTest.kt`; `connectedDebugAndroidTest` passed 2/2 on `emulator-5554` (Android 14, x86_64) after rebuilding stale `jniLibs`. Physical OnePlus Open was not attached to `adb`; no physical-device wrong-thread run is claimed. Evidence: `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md`. |
 | Production AOT (`pnpm run compile:aot`, `angnative build`) | ✅ real Angular `ngc` (not shadowed 0.1.0 binary), Ivy definitions verified in `dist/aot/`, esbuild bundle produced |
 
 Full history: `docs/PROJECT-REVIEW-2026-11-20.md`

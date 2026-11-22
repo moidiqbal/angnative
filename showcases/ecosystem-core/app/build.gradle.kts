@@ -17,6 +17,11 @@ android {
     versionCode = 1
     versionName = "0.1.0"
 
+    // Instrumentation test for the wrong-thread JNI/C ABI guard. The Rust
+    // staticlib is release (panic="abort"), so returning a sentinel instead of
+    // aborting the process is device-side proof that the guard ran.
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
     externalNativeBuild {
       cmake {
         arguments("-DANDROID_PLATFORM=android-24", "-DANDROID_STL=c++_shared")
@@ -75,4 +80,8 @@ dependencies {
   implementation("androidx.appcompat:appcompat:1.6.1")
   implementation("com.google.android.material:material:1.11.0")
   implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+  androidTestImplementation("androidx.test:runner:1.5.2")
+  androidTestImplementation("androidx.test:core:1.5.0")
+  androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
