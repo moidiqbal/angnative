@@ -179,11 +179,14 @@ but is relevant when reasoning about event handling.
 
 ## 8. Known, honest gaps (NOT claims)
 
-1. **Full Router navigation**: the AOT router app bootstraps and emits an outlet
-   anchor. During development diagnostics the navigation promise remained
-   pending and no route-component swap was observed; those diagnostics were not
-   retained as a repo artifact, so the claim is limited to "not verified".
-   Needs a fuller Angular event-loop / stability integration.
+1. **Full Router navigation — BLOCKED (separate epic, F7)**: the AOT router app
+   bootstraps and emits an outlet anchor. During development diagnostics the
+   navigation promise remained pending and no route-component swap was observed;
+   those diagnostics were not retained as a repo artifact, so the claim is
+   limited to "not verified". **Blocked on** a fuller Angular event-loop /
+   stability integration (`ApplicationRef.whenStable`, RxJS scheduler,
+   zoneless `PendingTasks`) inside the QuickJS host. Not scheduled in the current
+   fix batch; do not treat route-based navigation as supported.
 2. **Thread identity on native click callbacks**: load and node inspection ran
    on the UI thread; a dedicated cross-thread dispatch test on-device is not
    done. A cross-thread call panics by design (caught by the C shim → 0).
