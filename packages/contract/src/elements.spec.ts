@@ -48,6 +48,17 @@ describe('element contracts (§8 / D9 na- prefix)', () => {
     expect(list.capabilities).toContain('recycle');
   });
 
+  it('uses tagged custom node types on the wire for the three custom primitives', () => {
+    expect(getContract('na-list')!.nodeType).toBe('Custom:na-list');
+    expect(getContract('na-switch')!.nodeType).toBe('Custom:na-switch');
+    expect(getContract('na-activity-indicator')!.nodeType).toBe(
+      'Custom:na-activity-indicator',
+    );
+    // Generic component hosts stay untagged.
+    expect(getContract('na-view')!.nodeType).toBe('View');
+    expect(getContract('na-pressable')!.nodeType).toBe('Button');
+  });
+
   it('validates element styles', () => {
     const out = validateElementStyles('na-view', { width: '20', padding: '8' });
     expect(out.width).toBe('20px');

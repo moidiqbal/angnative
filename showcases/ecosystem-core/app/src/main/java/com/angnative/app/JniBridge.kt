@@ -44,6 +44,8 @@ class JniBridge(private val context: Context) {
     private const val RESET_NODE_ID = 7L
     /** Upper bound for a posted native call; failures are propagated, not ignored. */
     private const val NATIVE_CALL_TIMEOUT_MS = 10_000L
+    /** Stable FFI ErrorCode::InvalidHandle, used by the safe lifecycle wrappers. */
+    private const val FFI_INVALID_HANDLE = 4
 
     init {
       System.loadLibrary("angnative")
@@ -67,6 +69,12 @@ class JniBridge(private val context: Context) {
   external fun nativeRuntimeBridgeDispatchEvent(handle: Long, nodeId: Long, eventName: String, payloadJson: String?): Int
   external fun nativeRuntimeBridgeGetHost(handle: Long): Long
   external fun nativeRuntimeBridgeLoadScript(handle: Long, source: String): Int
+  external fun nativeRuntimeBridgeLifecycleState(handle: Long): Int
+  external fun nativeRuntimeBridgeSuspend(handle: Long): Int
+  external fun nativeRuntimeBridgeResume(handle: Long): Int
+  external fun nativeRuntimeBridgeStop(handle: Long): Int
+  external fun nativeRuntimeBridgeMetricsJson(handle: Long): String?
+  external fun nativeRuntimeBridgeLastErrorJson(handle: Long): String?
 
   private var hostHandle: Long = 0
   private var runtimeBridgeHandle: Long = 0
@@ -127,17 +135,75 @@ class JniBridge(private val context: Context) {
     // Get the underlying host for ViewFactory registration
     hostHandle = nativeRuntimeBridgeGetHost(runtimeBridgeHandle)
     if (hostHandle == 0L) {
+      // No host means no ViewFactory context was registered. Destroy the bridge
+      // now so a failed init never leaks the u64 handle or its Rust owner.
+      nativeRuntimeBridgeDestroy(runtimeBridgeHandle, 0L)
+      runtimeBridgeHandle = 0L
       throw RuntimeException("Failed to get host from runtime bridge")
     }
 
     // C++ allocates a real ViewFactoryContext (JNI global ref) from `this`.
-    nativeHostRegisterViewFactory(hostHandle)
+    // On any failure C++ releases its context before throwing; passing the
+    // hostHandle below still lets C++ clean up a partially registered context
+    // exactly once, with no double free.
+    try {
+      nativeHostRegisterViewFactory(hostHandle)
+    } catch (t: Throwable) {
+      nativeRuntimeBridgeDestroy(runtimeBridgeHandle, hostHandle)
+      runtimeBridgeHandle = 0L
+      hostHandle = 0L
+      isInitialized = false
+      throw t
+    }
     isInitialized = true
   }
 
   fun initHostWithCallbacks() {
     initHost()
   }
+
+  /* =======================================================================
+   * Runtime lifecycle / diagnostics (main-thread marshalled, handle-guarded).
+   * A zero/stale handle can only reach the explicit native* externals above;
+   * these wrappers never call native with an uninitialized bridge.
+   * ======================================================================= */
+
+  /** -1 invalid/wrong thread, 0 Created … 3 Running … 7 Failed. */
+  fun lifecycleState(): Int = runOnMainForNative {
+    if (runtimeBridgeHandle == 0L) -1
+    else nativeRuntimeBridgeLifecycleState(runtimeBridgeHandle)
+  }
+
+  /** Returns 0 on success or a stable FFI error code. */
+  fun suspendRuntime(): Int = runOnMainForNative {
+    if (runtimeBridgeHandle == 0L) FFI_INVALID_HANDLE
+    else nativeRuntimeBridgeSuspend(runtimeBridgeHandle)
+  }
+
+  /** Returns 0 on success or a stable FFI error code. */
+  fun resumeRuntime(): Int = runOnMainForNative {
+    if (runtimeBridgeHandle == 0L) FFI_INVALID_HANDLE
+    else nativeRuntimeBridgeResume(runtimeBridgeHandle)
+  }
+
+  /** Returns 0 on success or a stable FFI error code. */
+  fun stopRuntime(): Int = runOnMainForNative {
+    if (runtimeBridgeHandle == 0L) FFI_INVALID_HANDLE
+    else nativeRuntimeBridgeStop(runtimeBridgeHandle)
+  }
+
+  /** Structured runtime counters as JSON (freed by the JNI layer). */
+  fun metricsJson(): String = runOnMainForNative<String?> {
+    if (runtimeBridgeHandle == 0L) null
+    else nativeRuntimeBridgeMetricsJson(runtimeBridgeHandle)
+  } ?: "{\"error\":\"metrics unavailable\"}"
+
+  /** Last structured runtime error as JSON (freed by the JNI layer). */
+  fun lastErrorJson(): String = runOnMainForNative<String?> {
+    if (runtimeBridgeHandle == 0L) null
+    else nativeRuntimeBridgeLastErrorJson(runtimeBridgeHandle)
+  } ?: "{\"code\":$FFI_INVALID_HANDLE,\"category\":\"invalid_handle\"," +
+    "\"phase\":\"none\",\"message\":\"runtime bridge not initialized\",\"stack\":null}"
 
   /** Load a self-contained JS bundle (e.g. compiled Angular AOT output). */
   fun loadScript(source: String): Int = runOnMainForNative {

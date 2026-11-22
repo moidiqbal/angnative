@@ -180,7 +180,7 @@ export const ELEMENT_CONTRACTS: ReadonlyMap<ElementTag, ElementContract> = new M
     {
       tag: ELEMENT_TAGS.list,
       kind: 'view',
-      nodeType: 'Custom', // na-list is a recycled-list host
+      nodeType: 'Custom:na-list', // tagged custom: native shells materialize a list view
       defaultStyles: LIST_DEFAULTS,
       allowedChildren: ['na-view', 'na-slot'],
       capabilities: ['recycle'],
@@ -219,7 +219,7 @@ export const ELEMENT_CONTRACTS: ReadonlyMap<ElementTag, ElementContract> = new M
     {
       tag: ELEMENT_TAGS.switch,
       kind: 'button',
-      nodeType: 'Custom',
+      nodeType: 'Custom:na-switch',
       defaultStyles: SWITCH_DEFAULTS,
       allowedChildren: [],
       capabilities: ['toggle'],
@@ -232,7 +232,7 @@ export const ELEMENT_CONTRACTS: ReadonlyMap<ElementTag, ElementContract> = new M
     {
       tag: ELEMENT_TAGS.activityIndicator,
       kind: 'custom',
-      nodeType: 'Custom',
+      nodeType: 'Custom:na-activity-indicator',
       defaultStyles: ACTIVITY_DEFAULTS,
       allowedChildren: [],
       capabilities: [],

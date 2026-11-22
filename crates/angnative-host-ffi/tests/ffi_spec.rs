@@ -51,7 +51,7 @@ fn batch(commands: Vec<Command>) -> CommandBatch {
 
 #[test]
 fn host_create_destroy_round_trip() {
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null(), "host create should return non-null");
 
     unsafe { ffi::angnative_host_destroy(handle) };
@@ -76,7 +76,7 @@ fn host_free_string_null_is_safe() {
 
 #[test]
 fn register_view_factory_and_process_batch() {
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
 
     let factory = RecordingViewFactory::new();
@@ -149,7 +149,7 @@ fn register_view_factory_and_process_batch() {
 
 #[test]
 fn process_batch_updates_shadow_tree() {
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
 
     let batch_json = serde_json::to_string(&batch(vec![
@@ -215,7 +215,7 @@ fn native_event_bridge_dispatches_to_registered_listener() {
     EVENT_INVOKED.store(0, Ordering::SeqCst);
     EVENT_LISTENER.store(0, Ordering::SeqCst);
 
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
 
     assert_eq!(
@@ -287,7 +287,7 @@ fn native_event_bridge_dispatches_to_registered_listener() {
 
 #[test]
 fn process_batch_invalid_json_returns_error() {
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
 
     let mut out_len: u32 = 0;
@@ -342,7 +342,7 @@ fn process_batch_null_handle_returns_error() {
 
 #[test]
 fn run_layout_single_node() {
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
 
     let request = serde_json::to_string(&LayoutRequestJson {
@@ -386,7 +386,7 @@ fn run_layout_single_node() {
 
 #[test]
 fn run_layout_invalid_json_returns_error() {
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
 
     let mut out_len: u32 = 0;
@@ -412,7 +412,7 @@ fn run_layout_invalid_json_returns_error() {
 
 #[test]
 fn free_string_round_trip() {
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
 
     // Get a non-null string from last_error (should be {"ok":true} initially).
@@ -498,7 +498,7 @@ fn angular_bootstrap_fixture_drives_real_host_pipeline() {
     })
     .to_string();
 
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
     let ops = unsafe {
         ffi::angnative_host_process_batch(handle, cstr(&batch_json).as_ptr(), std::ptr::null_mut())
@@ -537,7 +537,7 @@ fn js_dispatch_returning_zero_does_not_trigger_legacy_fallback() {
         LEGACY_CALLS.fetch_add(1, Ordering::SeqCst);
     }
 
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
     set_js_runtime_dispatch_for_thread(js_cb);
     unsafe {
@@ -581,7 +581,7 @@ fn js_runtime_dispatch_callback_is_invoked() {
         1 // return 1 listener invoked
     }
     
-    let handle = unsafe { ffi::angnative_host_create() };
+    let handle = ffi::angnative_host_create();
     assert!(!handle.is_null());
     
     // Register the JS runtime dispatch callback via thread-local

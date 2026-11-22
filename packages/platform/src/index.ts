@@ -16,8 +16,12 @@ export {
   provideNativeRendererFactory,
   type NativeAngularConfig,
   type FlushHandler,
+  type HostErrorHook,
+  type NativeErrorHandlerConfig,
   AngNativeRendererFactory2,
   AngNativeRenderer,
+  NativeErrorHandler,
+  provideNativeErrorHandler,
 } from './native-angular';
 
 export { provideNativeAnimations } from './native-animations';

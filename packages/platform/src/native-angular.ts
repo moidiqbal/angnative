@@ -13,6 +13,7 @@
 
 import {
   type Provider,
+  ErrorHandler,
   RendererFactory2,
   Renderer2,
 } from '@angular/core';
@@ -23,10 +24,23 @@ import {
 } from '@angnative/core';
 import { type FlushHandler } from '@angnative/core/renderer';
 
+/** Host error hook installed by the native shell (P1-09). */
+export type HostErrorHook = (error: unknown, stack?: string) => void;
+
+/** Enable/disable native error forwarding, or supply a custom host hook. */
+export type NativeErrorHandlerConfig = boolean | HostErrorHook;
+
 /** Configuration for the native Angular platform. */
 export interface NativeAngularConfig {
   /** Flush handler that delivers command batches to the backend (Rust host or fake backend). */
   flush?: FlushHandler;
+  /**
+   * Error forwarding to the host. Defaults to `true`: installs
+   * `NativeErrorHandler`, which forwards to `globalThis.__angnativeOnError`.
+   * Pass `false` to keep Angular's default handler, or a function to use as a
+   * custom host hook.
+   */
+  errorHandler?: NativeErrorHandlerConfig;
 }
 
 /** Global hook native shells can install to receive encoded batches. */
@@ -37,6 +51,9 @@ declare global {
   var __angnativeBatches: string[] | undefined;
   // eslint-disable-next-line no-var
   var __angnativeDispatchBatch: HostDispatch | undefined;
+  /** Installed by the Rust runtime bridge; forwards to `na_reportError`. */
+  // eslint-disable-next-line no-var
+  var __angnativeOnError: HostErrorHook | undefined;
 }
 
 /**
@@ -52,6 +69,40 @@ export function createDefaultFlushHandler(): FlushHandler {
       globalThis.__angnativeDispatchBatch?.(batchJson);
     },
   };
+}
+
+/**
+ * Angular `ErrorHandler` that reports uncaught app errors to the native host.
+ * A custom hook (from `NativeAngularConfig.errorHandler`) takes precedence;
+ * otherwise the host-installed `__angnativeOnError` global is used. When no
+ * hook is installed, Angular's default logging still applies.
+ */
+export class NativeErrorHandler extends ErrorHandler {
+  constructor(private readonly hostHook?: HostErrorHook) {
+    super();
+  }
+
+  override handleError(error: any): void {
+    const hook = this.hostHook ?? globalThis.__angnativeOnError;
+    const stack = error instanceof Error ? error.stack : undefined;
+    if (typeof hook === 'function') {
+      try {
+        hook(error, stack);
+        return;
+      } catch (hookError) {
+        // A broken host hook must never mask the application error.
+        console.error('__angnativeOnError failed', hookError);
+      }
+    }
+    super.handleError(error);
+  }
+}
+
+/** Build the optional native `ErrorHandler` provider. */
+export function provideNativeErrorHandler(config: NativeAngularConfig = {}): Provider[] {
+  if (config.errorHandler === false) return [];
+  const hook = typeof config.errorHandler === 'function' ? config.errorHandler : undefined;
+  return [{ provide: ErrorHandler, useValue: new NativeErrorHandler(hook) }];
 }
 
 /**
@@ -78,6 +129,7 @@ export function provideNativeRendererFactory(config?: NativeAngularConfig): Prov
       provide: ElementRegistry,
       useFactory: () => factory.getRenderer().getRegistry(),
     },
+    ...provideNativeErrorHandler(config),
   ];
 }
 

@@ -35,32 +35,74 @@ REQUIRED_RUNTIME_BRIDGE_SYMBOLS = {
     "angnative_runtime_bridge_dispatch_event",
     "angnative_runtime_bridge_load_script",
     "angnative_runtime_bridge_get_host",
+    "angnative_runtime_bridge_lifecycle_state",
+    "angnative_runtime_bridge_suspend",
+    "angnative_runtime_bridge_resume",
+    "angnative_runtime_bridge_stop",
+    "angnative_runtime_bridge_metrics_json",
+    "angnative_runtime_bridge_last_error_json",
+    "angnative_runtime_bridge_free_string",
+    "angnative_runtime_bridge_set_error_callback",
 }
 
 SWIFT_SIGNATURE_PATTERNS = {
     "angnative_runtime_bridge_create": (
         r"func\s+angnative_runtime_bridge_create\s*\(\s*\)\s*->\s*"
-        r"AngNativeRuntimeBridgeHandle\?"
+        r"AngNativeRuntimeBridgeHandle"
     ),
     "angnative_runtime_bridge_destroy": (
         r"func\s+angnative_runtime_bridge_destroy\s*\(\s*_\s+handle:\s*"
-        r"AngNativeRuntimeBridgeHandle\?\s*\)"
+        r"AngNativeRuntimeBridgeHandle\s*\)"
     ),
     "angnative_runtime_bridge_dispatch_event": (
         r"func\s+angnative_runtime_bridge_dispatch_event\s*\(\s*"
-        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\?\s*,\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*,\s*"
         r"_\s+nodeId:\s*UInt64\s*,\s*"
         r"_\s+eventName:\s*UnsafePointer<CChar>\?\s*,\s*"
         r"_\s+payloadJson:\s*UnsafePointer<CChar>\?\s*\)\s*->\s*UInt32"
     ),
     "angnative_runtime_bridge_load_script": (
         r"func\s+angnative_runtime_bridge_load_script\s*\(\s*"
-        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\?\s*,\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*,\s*"
         r"_\s+source:\s*UnsafePointer<CChar>\?\s*\)\s*->\s*Int32"
     ),
     "angnative_runtime_bridge_get_host": (
         r"func\s+angnative_runtime_bridge_get_host\s*\(\s*"
-        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\?\s*\)\s*->\s*AngNativeHost\?"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*\)\s*->\s*AngNativeHost\?"
+    ),
+    "angnative_runtime_bridge_lifecycle_state": (
+        r"func\s+angnative_runtime_bridge_lifecycle_state\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*\)\s*->\s*Int32"
+    ),
+    "angnative_runtime_bridge_suspend": (
+        r"func\s+angnative_runtime_bridge_suspend\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*\)\s*->\s*Int32"
+    ),
+    "angnative_runtime_bridge_resume": (
+        r"func\s+angnative_runtime_bridge_resume\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*\)\s*->\s*Int32"
+    ),
+    "angnative_runtime_bridge_stop": (
+        r"func\s+angnative_runtime_bridge_stop\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*\)\s*->\s*Int32"
+    ),
+    "angnative_runtime_bridge_metrics_json": (
+        r"func\s+angnative_runtime_bridge_metrics_json\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*\)"
+    ),
+    "angnative_runtime_bridge_last_error_json": (
+        r"func\s+angnative_runtime_bridge_last_error_json\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*\)"
+    ),
+    "angnative_runtime_bridge_free_string": (
+        r"func\s+angnative_runtime_bridge_free_string\s*\(\s*"
+        r"_\s+ptr:\s*UnsafeMutablePointer<CChar>\?\s*\)"
+    ),
+    "angnative_runtime_bridge_set_error_callback": (
+        r"func\s+angnative_runtime_bridge_set_error_callback\s*\(\s*"
+        r"_\s+handle:\s*AngNativeRuntimeBridgeHandle\s*,\s*"
+        r"_\s+callback:\s*AngNativeErrorCallback\?\s*,\s*"
+        r"_\s+userData:\s*UnsafeMutableRawPointer\?\s*\)"
     ),
 }
 
@@ -114,7 +156,8 @@ def main() -> int:
     kt = kotlin_methods(KT.read_text(encoding="utf-8"))
     jni = cpp_jni_methods(CPP.read_text(encoding="utf-8"))
     cpp_text = CPP.read_text(encoding="utf-8")
-    header = header_declarations(HEADER.read_text(encoding="utf-8"))
+    header_text = HEADER.read_text(encoding="utf-8")
+    header = header_declarations(header_text)
     swift_text = SWIFT.read_text(encoding="utf-8")
     swift = swift_symbols(swift_text)
     package_text = IOS_PACKAGE.read_text(encoding="utf-8")
@@ -147,6 +190,10 @@ def main() -> int:
         errors.append(f"Swift runtime bridge binding missing: {name}")
     for name in sorted(REQUIRED_RUNTIME_BRIDGE_SYMBOLS - header):
         errors.append(f"C header runtime bridge declaration missing: {name}")
+    if "typedef uint64_t AngNativeRuntimeBridgeHandle;" not in header_text:
+        errors.append("C header runtime bridge handle must be a uint64_t handle")
+    if "typedef struct AngNativeRuntimeBridge AngNativeRuntimeBridge;" in header_text:
+        errors.append("C header still declares the legacy opaque bridge pointer")
     for name, pattern in sorted(SWIFT_SIGNATURE_PATTERNS.items()):
         if not re.search(pattern, swift_text, re.S):
             errors.append(f"Swift runtime bridge signature mismatch: {name}")

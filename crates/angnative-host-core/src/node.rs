@@ -43,6 +43,43 @@ impl NodeType {
         }
     }
 
+    /// Parse a wire `nodeType` string from the command protocol. Tagged customs
+    /// (`Custom:<tag>`) preserve their suffix; plain `Custom` remains an
+    /// untagged generic host node.
+    pub fn from_wire(name: &str) -> Option<Self> {
+        match name {
+            "View" => Some(NodeType::View),
+            "Text" => Some(NodeType::Text),
+            "Button" => Some(NodeType::Button),
+            "Image" => Some(NodeType::Image),
+            "ScrollView" => Some(NodeType::ScrollView),
+            "TextInput" => Some(NodeType::TextInput),
+            "Custom" => Some(NodeType::Custom(String::new())),
+            tagged if tagged.starts_with("Custom:") => Some(NodeType::Custom(
+                tagged["Custom:".len()..].to_string(),
+            )),
+            _ => None,
+        }
+    }
+
+    /// Suffix of a tagged custom node, if any.
+    pub fn custom_tag(&self) -> Option<&str> {
+        match self {
+            NodeType::Custom(tag) if !tag.is_empty() => Some(tag.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Exact `nodeType` string used on the wire (matches the TypeScript
+    /// `NativeNodeType` values, including tagged customs).
+    pub fn wire_name(&self) -> String {
+        match self {
+            NodeType::Custom(tag) if tag.is_empty() => "Custom".to_string(),
+            NodeType::Custom(tag) => format!("Custom:{tag}"),
+            other => format!("{other:?}"),
+        }
+    }
+
     /// Canonical `na-` tag name for this node type.
     pub fn canonical_tag(&self) -> &'static str {
         match self {
@@ -115,5 +152,40 @@ impl ViewNode {
 
     pub fn set_text_content(&mut self, text: String) {
         self.text_content = Some(text);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NodeType;
+
+    #[test]
+    fn tagged_custom_wire_names_preserve_suffix() {
+        for tag in [
+            "na-list",
+            "na-switch",
+            "na-activity-indicator",
+            "my-widget",
+        ] {
+            let wire = format!("Custom:{tag}");
+            let node_type = NodeType::from_wire(&wire).unwrap();
+            assert_eq!(node_type, NodeType::Custom(tag.to_string()));
+            assert_eq!(node_type.custom_tag(), Some(tag));
+            assert_eq!(node_type.wire_name(), wire);
+        }
+    }
+
+    #[test]
+    fn plain_custom_is_untagged_and_unknown_types_are_rejected() {
+        assert_eq!(
+            NodeType::from_wire("Custom"),
+            Some(NodeType::Custom(String::new()))
+        );
+        let plain = NodeType::from_wire("Custom").unwrap();
+        assert_eq!(plain.custom_tag(), None);
+        assert_eq!(plain.wire_name(), "Custom");
+
+        assert_eq!(NodeType::from_wire("View"), Some(NodeType::View));
+        assert_eq!(NodeType::from_wire("Bogus"), None);
     }
 }

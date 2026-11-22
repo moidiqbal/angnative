@@ -99,6 +99,9 @@ describe('conformance suite — shared fixtures (TS fake backend)', () => {
           const node = result.nodes.get(id);
           expect(node, `node ${id} exists`).toBeDefined();
           if (!node) continue;
+          if (expected.nodeType !== undefined) {
+            expect(node.nodeType, `node ${id} nodeType`).toEqual(expected.nodeType);
+          }
           if (expected.children !== undefined) {
             expect(node.children).toEqual(expected.children);
           }

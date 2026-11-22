@@ -24,8 +24,10 @@ extern "C" {
 /** Opaque handle to a Rust host instance. */
 typedef struct AngNativeHost AngNativeHost;
 
-/** Opaque handle to the unified runtime bridge (Host + QuickJS + runtime). */
-typedef struct AngNativeRuntimeBridge AngNativeRuntimeBridge;
+/** Validated handle to the unified runtime bridge (Host + JS engine + runtime).
+ * 0 is invalid. The value carries a generation counter so stale handles are
+ * rejected before any dereference. */
+typedef uint64_t AngNativeRuntimeBridgeHandle;
 
 /* =========================================================================
  * Lifecycle
@@ -154,22 +156,22 @@ unsigned int angnative_host_dispatch_event(AngNativeHost* handle, uint64_t node_
  * Unified runtime bridge — single owner of Host + QuickJS + Angular runtime
  * ========================================================================= */
 
-/** Create a runtime bridge. Returns NULL on failure. The bridge is thread-affine
+/** Create a runtime bridge. Returns 0 on failure. The bridge is thread-affine
  * to the creating thread: every other entry point below rejects calls from any
  * other thread without unwinding (Android release builds use panic="abort",
  * where a caught panic would still terminate the process). */
-AngNativeRuntimeBridge* angnative_runtime_bridge_create(void);
+AngNativeRuntimeBridgeHandle angnative_runtime_bridge_create(void);
 
-/** Destroy a runtime bridge (and the Host it owns). Safe to call with NULL.
- * A call from a non-owner thread is a no-op (the bridge is leaked rather than
- * torn down cross-thread); always destroy from the creating thread. */
-void angnative_runtime_bridge_destroy(AngNativeRuntimeBridge* handle);
+/** Destroy a runtime bridge (and the Host it owns). Safe to call with 0 or a
+ * stale handle. A call from a non-owner thread is a no-op (the bridge is leaked
+ * rather than torn down cross-thread); always destroy from the creating thread. */
+void angnative_runtime_bridge_destroy(AngNativeRuntimeBridgeHandle handle);
 
-/** Dispatch a native event through the single JS event pipeline.
+/** Dispatch a native event using one delivery per event (canonical JS thread-local path + legacy FFI fallback).
  * Returns the number of JS listeners invoked (0 on error / no match).
  * Returns UINT_MAX (DISPATCH_PANIC) when called from a non-owner thread; no
  * QuickJS code runs in that case. */
-unsigned int angnative_runtime_bridge_dispatch_event(AngNativeRuntimeBridge* handle,
+unsigned int angnative_runtime_bridge_dispatch_event(AngNativeRuntimeBridgeHandle handle,
                                                     uint64_t node_id,
                                                     const char* event_name,
                                                     const char* payload_json);
@@ -177,12 +179,34 @@ unsigned int angnative_runtime_bridge_dispatch_event(AngNativeRuntimeBridge* han
 /** Load a raw JS source string (e.g. a self-contained AOT bundle) and drain
  * its microtasks. Returns 0 on success, 1 on invalid input or script error,
  * 2 when called from a non-owner thread. */
-int angnative_runtime_bridge_load_script(AngNativeRuntimeBridge* handle,
+int angnative_runtime_bridge_load_script(AngNativeRuntimeBridgeHandle handle,
                                          const char* source);
 
 /** Borrow the Host owned by the bridge (valid until the bridge is destroyed).
  * Returns NULL when called from a non-owner thread. */
-AngNativeHost* angnative_runtime_bridge_get_host(AngNativeRuntimeBridge* handle);
+AngNativeHost* angnative_runtime_bridge_get_host(AngNativeRuntimeBridgeHandle handle);
+
+/** Lifecycle state: -1 invalid/stale/wrong thread, 0 Created, 1 Initializing,
+ * 2 Ready, 3 Running, 4 Suspended, 5 Stopping, 6 Destroyed, 7 Failed. */
+int32_t angnative_runtime_bridge_lifecycle_state(AngNativeRuntimeBridgeHandle handle);
+int32_t angnative_runtime_bridge_suspend(AngNativeRuntimeBridgeHandle handle);
+int32_t angnative_runtime_bridge_resume(AngNativeRuntimeBridgeHandle handle);
+int32_t angnative_runtime_bridge_stop(AngNativeRuntimeBridgeHandle handle);
+
+/** Runtime metrics and the last structured error, as newly allocated JSON
+ * strings. Free them with angnative_runtime_bridge_free_string. */
+char* angnative_runtime_bridge_metrics_json(AngNativeRuntimeBridgeHandle handle);
+char* angnative_runtime_bridge_last_error_json(AngNativeRuntimeBridgeHandle handle);
+void angnative_runtime_bridge_free_string(char* ptr);
+
+/** Optional native callback for structured runtime errors. */
+typedef void (*AngNativeErrorCallback)(const char* message,
+                                       const char* stack,
+                                       void* user_data);
+void angnative_runtime_bridge_set_error_callback(
+    AngNativeRuntimeBridgeHandle handle,
+    AngNativeErrorCallback callback,
+    void* user_data);
 
 #ifdef __cplusplus
 } /* extern "C" */

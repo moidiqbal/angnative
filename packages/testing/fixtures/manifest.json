@@ -8,5 +8,6 @@
   "capability-degradation",
   "reparent",
   "multiple-listeners-per-event",
-  "angular-bootstrap-native"
+  "angular-bootstrap-native",
+  "native-primitives-tagged-custom"
 ]

@@ -294,4 +294,13 @@ class EcosystemCoreActivity : AppCompatActivity() {
         emailError.text = ""
         submitResult.text = ""
     }
+
+    override fun onDestroy() {
+        // Destroy the bridge-owned Host and release its ViewFactory JNI global
+        // ref before the activity/views go away, then drop the Kotlin handles.
+        angularBridge?.destroyHost()
+        angularBridge = null
+        angularFactory = null
+        super.onDestroy()
+    }
 }

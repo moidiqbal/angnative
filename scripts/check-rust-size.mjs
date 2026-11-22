@@ -13,16 +13,30 @@
  * Usage:
  *   node scripts/check-rust-size.mjs [--budget-bytes <bytes>] [--target <triple>...] [--host]
  *
- * Default budget: 1 MB (1,048,576 bytes).
+ * Default budget: rustCoreMaxBytesPerPlatform from
+ * packages/cli/src/budgets.json (no hardcoded 1 MB default).
  * Default targets: the crates in the AngNative workspace release profile.
  * `--host` measures the host target without a --target flag.
  */
 
 import { execSync } from 'child_process';
-import { existsSync, statSync, readdirSync } from 'fs';
+import { existsSync, statSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const DEFAULT_BUDGET_BYTES = 1_048_576; // 1 MB
+const BUDGETS_PATH = join(process.cwd(), 'packages', 'cli', 'src', 'budgets.json');
+
+function loadDefaultBudgetBytes() {
+  try {
+    const budgets = JSON.parse(readFileSync(BUDGETS_PATH, 'utf8'));
+    const value = budgets.rustCoreMaxBytesPerPlatform;
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error(`invalid rustCoreMaxBytesPerPlatform in ${BUDGETS_PATH}`);
+    }
+    return value;
+  } catch (err) {
+    throw new Error(`cannot read size budget from ${BUDGETS_PATH}: ${err.message}`);
+  }
+}
 
 // The Rust host crates that contribute to the 1 MB budget (identity D-8).
 const HOST_CRATES = [
@@ -46,7 +60,7 @@ const DEFAULT_TARGETS = [
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  let budgetBytes = DEFAULT_BUDGET_BYTES;
+  let budgetBytes = loadDefaultBudgetBytes();
   const targets = [];
   let hostOnly = false;
 
@@ -66,7 +80,8 @@ function parseArgs() {
 Usage: node scripts/check-rust-size.mjs [options]
 
 Options:
-  --budget-bytes, -b <bytes>  Size budget in bytes (default: 1,048,576 = 1 MB)
+  --budget-bytes, -b <bytes>  Size budget in bytes (default: rustCoreMaxBytesPerPlatform
+                              from packages/cli/src/budgets.json)
   --target, -t <triple>       Target triple to measure (repeatable)
   --host                      Measure the host target (no --target flag)
   --help, -h                  Show this help
@@ -254,11 +269,11 @@ async function main() {
   }
 
   if (!allPassed) {
-    console.log('\n❌ SIZE BUDGET EXCEEDED — Rust core is over 1 MB per platform.');
+    console.log(`\n❌ SIZE BUDGET EXCEEDED — Rust core exceeds ${formatBytes(budgetBytes)} on at least one target.`);
     console.log('   This is a finding, not a reason to move the goalpost (identity D-8).');
     process.exit(1);
   } else {
-    console.log('\n✅ SIZE BUDGET MET — Rust core is within 1 MB per platform.');
+    console.log(`\n✅ SIZE BUDGET MET — Rust core is within ${formatBytes(budgetBytes)} on every measured target.`);
     process.exit(0);
   }
 }

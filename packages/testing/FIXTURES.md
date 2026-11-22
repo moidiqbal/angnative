@@ -16,8 +16,12 @@ Legacy `an-` / `native-` / bare HTML aliases (`div`, `span`, …) are accepted b
 the renderer for backwards compatibility but must not appear in fixtures.
 `fixtures/out/*` is generated output from `pnpm compile:fixtures` and also
 uses `na-`. Fixture commands use the Rust `NodeType` names (`View`, `Text`,
-`TextInput`, `Custom`, …) rather than tags; `Custom` is the host for `na-list`
-and flattened component hosts.
+`TextInput`, `Custom`, …) rather than tags. Plain `Custom` is an untagged
+generic host (including flattened component hosts); the canonical custom
+primitives use the exact tagged wire strings `Custom:na-list`,
+`Custom:na-switch` and `Custom:na-activity-indicator` so native shells can
+materialize them. `FakeBackend` accepts the tagged form, so both the TS
+conformance harness and the Rust generic runner see the exact wire strings.
 
 ## Supported `expect` keys
 
@@ -40,6 +44,7 @@ Supported per-node keys inside `nodes["<id>"]`:
 
 | Key | Assertion |
 | --- | --- |
+| `nodeType` | Exact wire node type (`View`, `Custom`, `Custom:na-list`, …), asserted by both the TS and Rust generic runners. |
 | `children` | Exact ordered child id list. |
 | `parentId` | Exact parent id (or `null`). |
 | `textContent` | Exact text (or `null`). |

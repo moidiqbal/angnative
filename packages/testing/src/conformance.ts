@@ -13,6 +13,8 @@ const FIXTURES_DIR = join(__dirname, '..', 'fixtures');
 
 /** Per-node assertions understood by both the TS and Rust conformance runners. */
 export interface NodeExpect {
+  /** Exact wire node type, e.g. `Custom:na-list` or `Custom`. */
+  nodeType?: string;
   children?: number[];
   parentId?: number | null;
   textContent?: string | null;
@@ -70,6 +72,7 @@ export const SUPPORTED_EXPECT_KEYS: readonly string[] = [
 
 /** All per-node `expect.nodes[id]` keys the TS harness asserts. */
 export const SUPPORTED_NODE_KEYS: readonly string[] = [
+  'nodeType',
   'children',
   'parentId',
   'textContent',

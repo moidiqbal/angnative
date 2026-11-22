@@ -100,6 +100,14 @@ fn assert_nodes_match(engine: &MutationEngine, expect: &Value, fixture_name: &st
             panic!("Fixture {fixture_name}: node {node_id} exists in expect but not in tree");
         });
 
+        // nodeType (exact wire string, e.g. `Custom:na-list`)
+        if let Some(expected_node_type) = expected["nodeType"].as_str() {
+            assert_eq!(
+                actual.node_type, expected_node_type,
+                "Fixture {fixture_name}: node {node_id} nodeType mismatch"
+            );
+        }
+
         // children
         if let Some(expected_children) = expected["children"].as_array() {
             let expected_children: Vec<u64> = expected_children
@@ -405,6 +413,56 @@ fn conformance_capability_degradation() {
     assert_eq!(
         n1.properties.get("capability:unsupported-feature"),
         Some(&serde_json::json!(true))
+    );
+}
+
+#[test]
+fn conformance_native_primitives_tagged_custom() {
+    let fixture = load_fixtures()
+        .into_iter()
+        .find(|f| f.name == "native-primitives-tagged-custom")
+        .unwrap();
+
+    let engine = run_engine(&fixture.commands);
+    for (id, wire) in [
+        (2u64, "Custom:na-list"),
+        (3u64, "Custom:na-switch"),
+        (4u64, "Custom:na-activity-indicator"),
+        (5u64, "Custom"),
+    ] {
+        assert_eq!(
+            engine.get_node(id).unwrap().node_type,
+            wire,
+            "node {id} wire node type"
+        );
+    }
+    assert_eq!(engine.get_node(1).unwrap().children, vec![2, 3, 4, 5]);
+
+    // Tagged customs become real native views; the untagged host stays flat.
+    let batch = CommandBatch {
+        protocol_version: 1,
+        frame_id: 0,
+        timestamp_ms: 0,
+        commands: fixture.commands.clone(),
+    };
+    let ops = OpEmitter::new().process_batch(&batch).unwrap();
+    let create_types: Vec<String> = ops
+        .iter()
+        .filter_map(|op| match op {
+            angnative_host_view::ops::PlatformOp::Create { view_type, .. } => {
+                Some(view_type.clone())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        create_types,
+        vec![
+            "View",
+            "Custom:na-list",
+            "Custom:na-switch",
+            "Custom:na-activity-indicator",
+        ]
     );
 }
 

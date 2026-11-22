@@ -208,6 +208,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Rust core size gate: pinned toolchain + --host on this Linux runner.
+      # Apple (aarch64-apple-darwin, x86_64-apple-darwin, aarch64-apple-ios)
+      # and Windows (x86_64-pc-windows-msvc) targets are explicitly skipped:
+      # their toolchains/targets are unavailable here. Android targets require
+      # an explicitly installed target and are not measured by this job.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-11-14
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check Rust core size budget (gate)
+        run: node scripts/check-rust-size.mjs --host
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:

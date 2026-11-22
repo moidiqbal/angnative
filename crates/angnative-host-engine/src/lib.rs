@@ -11,14 +11,20 @@
  *   - runtime      — AngNative JS runtime API exposed to scripts
  *   - quickjs_shims — DOM/platform shims for QuickJS
  *   - runtime_controller — Application lifecycle controller
+ *   - errors — workspace error boundary + runtime metrics (P1-11 / P3-04)
+ *   - reference_engine — second in-repo JsEngine for abstraction tests (Gate F)
  */
 pub mod engine;
+pub mod errors;
 pub mod quickjs;
+pub mod reference_engine;
 pub mod runtime;
 pub mod quickjs_shims;
 pub mod runtime_controller;
 
 pub use engine::{EngineError, JsEngine, JsValue};
+pub use errors::{AngNativeError, ErrorCode, RuntimeErrorInfo, RuntimeMetrics};
+pub use reference_engine::ReferenceEngine;
 pub use runtime::{AngNativeRuntime, RuntimeConfig};
 pub use runtime_controller::{RuntimeController, RuntimeControllerConfig, LifecycleState};
 

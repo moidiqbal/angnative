@@ -16,6 +16,13 @@ describe('tagToNodeType (mirrors Rust NodeType::from_tag)', () => {
     expect(tagToNodeType('na-image')).toBe('Image');
     expect(tagToNodeType('na-scroll-view')).toBe('ScrollView');
     expect(tagToNodeType('na-text-input')).toBe('TextInput');
+    expect(tagToNodeType('na-pressable')).toBe('Button');
+  });
+
+  it('uses exact tagged custom wire types for the custom primitives', () => {
+    expect(tagToNodeType('na-list')).toBe('Custom:na-list');
+    expect(tagToNodeType('na-switch')).toBe('Custom:na-switch');
+    expect(tagToNodeType('na-activity-indicator')).toBe('Custom:na-activity-indicator');
   });
 
   it('accepts legacy aliases', () => {
@@ -25,7 +32,7 @@ describe('tagToNodeType (mirrors Rust NodeType::from_tag)', () => {
     expect(tagToNodeType('img')).toBe('Image');
   });
 
-  it('defaults unknown to Custom', () => {
+  it('defaults unknown to untagged Custom', () => {
     expect(tagToNodeType('na-foo')).toBe('Custom');
     expect(tagToNodeType('custom-tag')).toBe('Custom');
   });
@@ -34,6 +41,13 @@ describe('tagToNodeType (mirrors Rust NodeType::from_tag)', () => {
 describe('canonicalElementTag', () => {
   it('maps HTML input to the native text input primitive', () => {
     expect(canonicalElementTag('input')).toBe('na-text-input');
+  });
+
+  it('keeps canonical custom primitive tags intact', () => {
+    expect(canonicalElementTag('na-list')).toBe('na-list');
+    expect(canonicalElementTag('na-switch')).toBe('na-switch');
+    expect(canonicalElementTag('NA-ACTIVITY-INDICATOR')).toBe('na-activity-indicator');
+    expect(canonicalElementTag('na-pressable')).toBe('na-pressable');
   });
 });
 
@@ -66,6 +80,22 @@ describe('AngNativeRenderer mutation batching', () => {
 
     const create = batch.commands.find((c: any) => c.kind === 'CreateNode' && c.id === child.id);
     expect(create.nodeType).toBe('Text');
+  });
+
+  it('emit tagged CreateNode ops for canonical custom primitives', () => {
+    for (const [tag, nodeType] of [
+      ['na-list', 'Custom:na-list'],
+      ['na-switch', 'Custom:na-switch'],
+      ['na-activity-indicator', 'Custom:na-activity-indicator'],
+    ] as const) {
+      const el = renderer.createElement(null, tag);
+      expect(el.nativeNodeType).toBe(nodeType);
+
+      const create = lastBatch().commands.find(
+        (c: any) => c.kind === 'CreateNode' && c.id === el.id,
+      );
+      expect(create.nodeType).toBe(nodeType);
+    }
   });
 
   it('rejects unknown elements loudly (§5.3 analogue)', () => {

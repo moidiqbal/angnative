@@ -75,7 +75,7 @@ impl MutationEngine {
             nodes.push(NodeSnapshot {
                 id: el.id,
                 tag: el.node_type.canonical_tag().to_string(),
-                node_type: format!("{:?}", el.node_type),
+                node_type: el.node_type.wire_name(),
                 parent_id: el.parent_id,
                 children: el.children.clone(),
                 properties: el.properties.clone(),
@@ -96,7 +96,7 @@ impl MutationEngine {
         Some(NodeSnapshot {
             id: el.id,
             tag: el.node_type.canonical_tag().to_string(),
-            node_type: format!("{:?}", el.node_type),
+            node_type: el.node_type.wire_name(),
             parent_id: el.parent_id,
             children: el.children.clone(),
             properties: el.properties.clone(),
@@ -124,19 +124,11 @@ impl MutationEngine {
     fn apply(&mut self, cmd: Command) -> Result<String, MutationError> {
         match cmd {
             Command::CreateNode { id, node_type } => {
-                // Validate against known node types (§5.3 analogue).
-                let nt = match node_type.as_str() {
-                    "View" => NodeType::View,
-                    "Text" => NodeType::Text,
-                    "Button" => NodeType::Button,
-                    "Image" => NodeType::Image,
-                    "ScrollView" => NodeType::ScrollView,
-                    "TextInput" => NodeType::TextInput,
-                    "Custom" => NodeType::Custom(String::new()),
-                    unknown => {
-                        return Err(MutationError::UnknownNodeType(unknown.to_string()));
-                    }
-                };
+                // Validate against known node types (§5.3 analogue). Tagged
+                // customs (`Custom:na-list`, …) keep their suffix so native
+                // shells can materialize the matching primitive view.
+                let nt = NodeType::from_wire(&node_type)
+                    .ok_or_else(|| MutationError::UnknownNodeType(node_type.clone()))?;
                 let el = ViewNode::new(id, nt);
                 self.registry.register_with_id(el)?;
                 Ok("CreateNode".to_string())
@@ -252,4 +244,38 @@ pub struct NodeSnapshot {
 pub struct TreeSnapshot {
     pub batches: Vec<Vec<String>>,
     pub nodes: Vec<NodeSnapshot>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create(id: NodeId, node_type: &str) -> Command {
+        Command::CreateNode {
+            id,
+            node_type: node_type.to_string(),
+        }
+    }
+
+    #[test]
+    fn tagged_custom_create_nodes_are_preserved() {
+        let mut engine = MutationEngine::new();
+        for (id, wire) in [
+            (1, "Custom:na-list"),
+            (2, "Custom:na-switch"),
+            (3, "Custom:na-activity-indicator"),
+            (4, "Custom"),
+        ] {
+            engine.run_command(create(id, wire)).unwrap();
+            assert_eq!(engine.get_node(id).unwrap().node_type, wire);
+        }
+        assert_eq!(engine.snapshot().nodes.len(), 4);
+    }
+
+    #[test]
+    fn unknown_node_types_are_still_rejected() {
+        let mut engine = MutationEngine::new();
+        let err = engine.run_command(create(1, "Customish")).unwrap_err();
+        assert!(matches!(err, MutationError::UnknownNodeType(_)));
+    }
 }

@@ -36,6 +36,13 @@ class NativeViewFactory(
   private val childParents = mutableMapOf<Long, Long>()
   private val density = context.resources.displayMetrics.density
 
+  companion object {
+    /** Canonical tags emitted by the Angular native renderer for custom primitives. */
+    const val CUSTOM_LIST_TAG = "Custom:na-list"
+    const val CUSTOM_SWITCH_TAG = "Custom:na-switch"
+    const val CUSTOM_ACTIVITY_INDICATOR_TAG = "Custom:na-activity-indicator"
+  }
+
   /** Mark a node as a root: it will be attached directly to [rootContainer]. */
   fun setRootNode(nodeId: Long) {
     rootIds.add(nodeId)
@@ -166,6 +173,9 @@ class NativeViewFactory(
 
   fun parentOf(nodeId: Long): Long? = childParents[nodeId]
 
+  /** Live view for a node id (used by instrumentation tag/type assertions). */
+  fun viewFor(nodeId: Long): View? = views[nodeId]
+
   private fun attachChild(parentId: Long, childId: Long, index: Int) {
     childParents[childId] = parentId
     val parent = views[parentId] as? ViewGroup ?: return
@@ -187,6 +197,14 @@ class NativeViewFactory(
 
   private fun createViewForType(nodeId: Long, viewType: String): View {
     return when (viewType) {
+      CUSTOM_LIST_TAG -> FrameLayout(context).apply { markCanonicalTag(CUSTOM_LIST_TAG) }
+      CUSTOM_SWITCH_TAG, "Switch" ->
+        Switch(context).apply { markCanonicalTag(CUSTOM_SWITCH_TAG) }
+      CUSTOM_ACTIVITY_INDICATOR_TAG, "ActivityIndicator" ->
+        ProgressBar(context).apply {
+          isIndeterminate = true
+          markCanonicalTag(CUSTOM_ACTIVITY_INDICATOR_TAG)
+        }
       "View", "Custom", "ScrollView" -> FrameLayout(context)
       "Text" -> TextView(context).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -207,10 +225,14 @@ class NativeViewFactory(
         setOnClickListener { onPress(nodeId) }
       }
       "Image" -> ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
-      "Switch" -> Switch(context)
-      "ActivityIndicator" -> ProgressBar(context).apply { isIndeterminate = true }
       else -> View(context)
     }
+  }
+
+  /** Tag the view (and its accessibility label) with the canonical primitive id. */
+  private fun View.markCanonicalTag(canonicalTag: String) {
+    tag = canonicalTag
+    contentDescription = canonicalTag
   }
 
   private fun applyStyle(view: View, key: String, value: String) {

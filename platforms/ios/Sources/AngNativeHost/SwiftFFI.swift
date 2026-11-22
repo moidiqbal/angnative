@@ -3,7 +3,10 @@
 //
 // All node ids are UInt64, matching `uint64_t` in
 // crates/angnative-host-ffi/include/angnative_host_ffi.h.
-// Every Rust-allocated string is freed with angnative_host_free_string.
+// Runtime bridge handles are validated UInt64 values; 0 is invalid.
+// Every Rust-allocated string is freed with the matching free function.
+//
+// This is static FFI wiring only. No iOS/macOS runtime claim is made here.
 //
 
 import Foundation
@@ -128,7 +131,7 @@ public enum HostError: Error, LocalizedError {
     }
 }
 
-// MARK: - Unified runtime bridge (Host + QuickJS + Angular runtime)
+// MARK: - Unified runtime bridge (Host + JS engine + Angular runtime)
 //
 // These symbols are implemented by `angnative-runtime-bridge`, not by
 // `angnative-host-ffi`. Its staticlib already bundles the host FFI symbols, so
@@ -140,17 +143,17 @@ public enum HostError: Error, LocalizedError {
 // C ABI rather than a panic; call it on the owner thread before releasing the
 // Swift wrapper.
 
-public typealias AngNativeRuntimeBridgeHandle = OpaquePointer
+public typealias AngNativeRuntimeBridgeHandle = UInt64
 
 @_silgen_name("angnative_runtime_bridge_create")
-public func angnative_runtime_bridge_create() -> AngNativeRuntimeBridgeHandle?
+public func angnative_runtime_bridge_create() -> AngNativeRuntimeBridgeHandle
 
 @_silgen_name("angnative_runtime_bridge_destroy")
-public func angnative_runtime_bridge_destroy(_ handle: AngNativeRuntimeBridgeHandle?)
+public func angnative_runtime_bridge_destroy(_ handle: AngNativeRuntimeBridgeHandle)
 
 @_silgen_name("angnative_runtime_bridge_dispatch_event")
 public func angnative_runtime_bridge_dispatch_event(
-    _ handle: AngNativeRuntimeBridgeHandle?,
+    _ handle: AngNativeRuntimeBridgeHandle,
     _ nodeId: UInt64,
     _ eventName: UnsafePointer<CChar>?,
     _ payloadJson: UnsafePointer<CChar>?
@@ -158,21 +161,80 @@ public func angnative_runtime_bridge_dispatch_event(
 
 @_silgen_name("angnative_runtime_bridge_load_script")
 public func angnative_runtime_bridge_load_script(
-    _ handle: AngNativeRuntimeBridgeHandle?,
+    _ handle: AngNativeRuntimeBridgeHandle,
     _ source: UnsafePointer<CChar>?
 ) -> Int32
 
 @_silgen_name("angnative_runtime_bridge_get_host")
 public func angnative_runtime_bridge_get_host(
-    _ handle: AngNativeRuntimeBridgeHandle?
+    _ handle: AngNativeRuntimeBridgeHandle
 ) -> AngNativeHost?
 
-/// Result of dispatching a native event into the single JS event pipeline.
+@_silgen_name("angnative_runtime_bridge_lifecycle_state")
+public func angnative_runtime_bridge_lifecycle_state(
+    _ handle: AngNativeRuntimeBridgeHandle
+) -> Int32
+
+@_silgen_name("angnative_runtime_bridge_suspend")
+public func angnative_runtime_bridge_suspend(
+    _ handle: AngNativeRuntimeBridgeHandle
+) -> Int32
+
+@_silgen_name("angnative_runtime_bridge_resume")
+public func angnative_runtime_bridge_resume(
+    _ handle: AngNativeRuntimeBridgeHandle
+) -> Int32
+
+@_silgen_name("angnative_runtime_bridge_stop")
+public func angnative_runtime_bridge_stop(
+    _ handle: AngNativeRuntimeBridgeHandle
+) -> Int32
+
+@_silgen_name("angnative_runtime_bridge_metrics_json")
+public func angnative_runtime_bridge_metrics_json(
+    _ handle: AngNativeRuntimeBridgeHandle
+) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("angnative_runtime_bridge_last_error_json")
+public func angnative_runtime_bridge_last_error_json(
+    _ handle: AngNativeRuntimeBridgeHandle
+) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("angnative_runtime_bridge_free_string")
+public func angnative_runtime_bridge_free_string(_ ptr: UnsafeMutablePointer<CChar>?)
+
+public typealias AngNativeErrorCallback = @convention(c) (
+    UnsafePointer<CChar>?,
+    UnsafePointer<CChar>?,
+    UnsafeMutableRawPointer?
+) -> Void
+
+@_silgen_name("angnative_runtime_bridge_set_error_callback")
+public func angnative_runtime_bridge_set_error_callback(
+    _ handle: AngNativeRuntimeBridgeHandle,
+    _ callback: AngNativeErrorCallback?,
+    _ userData: UnsafeMutableRawPointer?
+)
+
+public enum RuntimeLifecycleState: Int32 {
+    case invalid = -1
+    case created = 0
+    case initializing = 1
+    case ready = 2
+    case running = 3
+    case suspended = 4
+    case stopping = 5
+    case destroyed = 6
+    case failed = 7
+}
+
+/// Result of dispatching a native event using one delivery per event
+/// (canonical JS thread-local path + legacy FFI fallback).
 public struct RuntimeBridgeDispatchResult {
     public let listenersInvoked: UInt32
 
     /// `DISPATCH_PANIC` (`UInt32.max`) means the C ABI rejected a wrong-thread
-    /// call before QuickJS ran; it is never a real listener count.
+    /// call before JS ran; it is never a real listener count.
     public var rejectedForWrongThread: Bool { listenersInvoked == UInt32.max }
 }
 
@@ -183,9 +245,8 @@ public final class NativeRuntimeBridge {
     /// Create the bridge on the thread that will use it (normally the main
     /// thread). Do not create a second bridge in the same process.
     public init() throws {
-        guard let h = angnative_runtime_bridge_create() else {
-            throw RuntimeBridgeError.createFailed
-        }
+        let h = angnative_runtime_bridge_create()
+        guard h != 0 else { throw RuntimeBridgeError.createFailed }
         self.handle = h
     }
 
@@ -213,8 +274,8 @@ public final class NativeRuntimeBridge {
         return rc
     }
 
-    /// Dispatch a native event (for example a UIKit button press) into the
-    /// Angular listener through the single JS event path.
+    /// Dispatch a native event using one delivery per event (canonical JS
+    /// thread-local path + legacy FFI fallback).
     @discardableResult
     public func dispatchEvent(
         nodeId: UInt64,
@@ -233,6 +294,33 @@ public final class NativeRuntimeBridge {
                 listenersInvoked: angnative_runtime_bridge_dispatch_event(handle, nodeId, name, nil)
             )
         }
+    }
+
+    public var lifecycleState: RuntimeLifecycleState {
+        RuntimeLifecycleState(rawValue: angnative_runtime_bridge_lifecycle_state(handle)) ?? .invalid
+    }
+
+    public func suspend() -> Int32 { angnative_runtime_bridge_suspend(handle) }
+    public func resume() -> Int32 { angnative_runtime_bridge_resume(handle) }
+    public func stop() -> Int32 { angnative_runtime_bridge_stop(handle) }
+
+    public func metricsJson() -> String? {
+        guard let ptr = angnative_runtime_bridge_metrics_json(handle) else { return nil }
+        defer { angnative_runtime_bridge_free_string(ptr) }
+        return String(cString: ptr)
+    }
+
+    public func lastErrorJson() -> String? {
+        guard let ptr = angnative_runtime_bridge_last_error_json(handle) else { return nil }
+        defer { angnative_runtime_bridge_free_string(ptr) }
+        return String(cString: ptr)
+    }
+
+    public func setErrorCallback(
+        _ callback: AngNativeErrorCallback?,
+        userData: UnsafeMutableRawPointer? = nil
+    ) {
+        angnative_runtime_bridge_set_error_callback(handle, callback, userData)
     }
 
     /// Must be called on the creating thread. Calling from another thread is a

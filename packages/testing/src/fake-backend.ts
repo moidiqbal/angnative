@@ -84,6 +84,11 @@ const KNOWN_NODE_TYPES = new Set([
   'Custom',
 ]);
 
+/** Tagged custom primitives use the `Custom:na-*` wire form. */
+export function isKnownNodeType(nodeType: string): boolean {
+  return KNOWN_NODE_TYPES.has(nodeType) || nodeType.startsWith('Custom:');
+}
+
 /**
  * The fake backend. Directly manages a shadow tree; each command mutates the
  * tree and is recorded as a mutation kind. No renderer auto-flush, no Rust.
@@ -152,7 +157,7 @@ export class FakeBackend {
         if (cmd.id === undefined || cmd.id === null) {
           throw new Error('Invalid CreateNode: missing field "id"');
         }
-        if (!KNOWN_NODE_TYPES.has(cmd.nodeType)) {
+        if (!isKnownNodeType(cmd.nodeType)) {
           throw new Error(`Unknown node type: ${cmd.nodeType}`);
         }
         const el = new NativeElement(cmd.id, cmd.nodeType.toLowerCase(), cmd.nodeType as any);

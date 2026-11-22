@@ -63,6 +63,10 @@ export interface AngNativeRendererOptions {
 /**
  * Tag → Rust NodeType mapping. Mirrors `NodeType::from_tag` in
  * `crates/angnative-core/src/node.rs`, canonicalized to the `na-*` prefix.
+ *
+ * Canonical list/switch/spinner primitives are tagged custom nodes on the wire
+ * (`Custom:na-list`, `Custom:na-switch`, `Custom:na-activity-indicator`) so
+ * native shells can materialize them, unlike the untagged generic `Custom`.
  */
 export function tagToNodeType(tag: string): NativeNodeType {
   switch (tag.toLowerCase()) {
@@ -80,6 +84,7 @@ export function tagToNodeType(tag: string): NativeNodeType {
     case 'na-button':
     case 'native-button':
     case 'button':
+    case 'na-pressable':
       return 'Button';
     case 'na-image':
     case 'native-image':
@@ -95,6 +100,12 @@ export function tagToNodeType(tag: string): NativeNodeType {
     case 'native-input':
     case 'input':
       return 'TextInput';
+    case 'na-list':
+      return 'Custom:na-list';
+    case 'na-switch':
+      return 'Custom:na-switch';
+    case 'na-activity-indicator':
+      return 'Custom:na-activity-indicator';
     default:
       return 'Custom';
   }
@@ -130,7 +141,14 @@ export function canonicalElementTag(tag: string): string {
     case 'na-button':
     case 'native-button':
     case 'button':
+    case 'na-pressable':
       return ELEMENT_TAGS.pressable;
+    case 'na-list':
+      return ELEMENT_TAGS.list;
+    case 'na-switch':
+      return ELEMENT_TAGS.switch;
+    case 'na-activity-indicator':
+      return ELEMENT_TAGS.activityIndicator;
     default:
       // Unknown tags pass through unchanged (will become `Custom` nodes)
       return tag;

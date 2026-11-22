@@ -18,6 +18,13 @@ use angnative_host_core::command::{Command, CommandBatch};
 use angnative_host_core::NodeId;
 use angnative_host_layout::LayoutResult;
 
+/// Only the untagged generic `Custom` node is flattenable. Tagged customs
+/// (`Custom:na-list`, `Custom:na-switch`, `Custom:na-activity-indicator`) name
+/// real native primitives and must emit a `Create` op for the shell.
+fn is_untagged_custom(node_type: &str) -> bool {
+    node_type == "Custom"
+}
+
 /// Error emitted by the OpEmitter.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum OpEmitterError {
@@ -79,10 +86,10 @@ impl OpEmitter {
                     return Err(OpEmitterError::ViewAlreadyExists(*id));
                 }
 
-                // Custom/host-only nodes with no visual content are flattened
-        // — they get no native view. Mark as a flattening candidate and
-        // defer the Create op until we know if it gets styles/props/text.
-                if node_type == "Custom" {
+                // Untagged Custom/host-only nodes with no visual content are
+                // flattened — they get no native view. Tagged customs are real
+                // primitives and fall through to a normal Create op.
+                if is_untagged_custom(node_type) {
                     self.flattenable_candidates.insert(*id);
                     self.tree.mark_flattened(*id);
                     self.tree.register_view(*id, node_type.clone());
@@ -619,6 +626,66 @@ mod tests {
             PlatformOp::Remove { .. } => "Remove",
             PlatformOp::Destroy { .. } => "Destroy",
         }
+    }
+
+    /* =========================================================================
+     * Tagged custom primitive tests
+     * ========================================================================= */
+
+    #[test]
+    fn tagged_custom_primitives_emit_real_create_ops() {
+        let mut emitter = OpEmitter::new();
+        let wires = [
+            "Custom:na-list",
+            "Custom:na-switch",
+            "Custom:na-activity-indicator",
+        ];
+
+        for (index, wire) in wires.iter().enumerate() {
+            emitter
+                .process_command(&Command::CreateNode {
+                    id: index as u64 + 1,
+                    node_type: wire.to_string(),
+                })
+                .unwrap();
+        }
+
+        let creates: Vec<&PlatformOp> = emitter
+            .ops()
+            .iter()
+            .filter(|op| matches!(op, PlatformOp::Create { .. }))
+            .collect();
+        assert_eq!(creates.len(), wires.len());
+
+        for (index, wire) in wires.iter().enumerate() {
+            match creates[index] {
+                PlatformOp::Create { node_id, view_type } => {
+                    assert_eq!(*node_id, index as u64 + 1);
+                    assert_eq!(view_type, wire);
+                }
+                other => panic!("Expected Create op, got {other:?}"),
+            }
+            let id = index as u64 + 1;
+            assert!(!emitter.tree().is_flattened(id));
+            assert!(emitter.tree().has_view(id));
+        }
+    }
+
+    #[test]
+    fn untagged_custom_still_stays_flattened_without_create_op() {
+        let mut emitter = OpEmitter::new();
+        emitter
+            .process_command(&Command::CreateNode {
+                id: 1,
+                node_type: "Custom".to_string(),
+            })
+            .unwrap();
+
+        assert!(emitter.tree().is_flattened(1));
+        assert!(emitter
+            .ops()
+            .iter()
+            .all(|op| !matches!(op, PlatformOp::Create { .. })));
     }
 
     /* =========================================================================

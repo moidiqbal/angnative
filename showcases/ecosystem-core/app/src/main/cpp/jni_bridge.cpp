@@ -3,7 +3,9 @@
  *
  * Implements the native methods declared in JniBridge.kt:
  *   - nativeRuntimeBridgeCreate / nativeRuntimeBridgeDestroy / ...GetHost
- *   - nativeRuntimeBridgeDispatchEvent
+ *   - nativeRuntimeBridgeDispatchEvent / nativeRuntimeBridgeLoadScript
+ *   - nativeRuntimeBridgeLifecycleState / Suspend / Resume / Stop
+ *   - nativeRuntimeBridgeMetricsJson / nativeRuntimeBridgeLastErrorJson
  *   - nativeHostRegisterViewFactory
  *   - nativeHostProcessBatch
  *   - nativeHostRunLayout
@@ -13,9 +15,12 @@
  * NOTE: nativeHostCreate / nativeHostDestroy remain as LEGACY C exports but are
  * no longer declared by Kotlin — the runtime bridge owns the Host.
  *
- * The 8 ViewFactory callbacks are real C function pointers that call back into
- * the JniBridge instance (held as a JNI global ref inside ViewFactoryContext).
- * All strings returned by the Rust C ABI are freed with angnative_host_free_string.
+ * The runtime bridge is identified by a validated u64 handle
+ * (AngNativeRuntimeBridgeHandle); Kotlin keeps it as a Long. The 8 ViewFactory
+ * callbacks are real C function pointers that call back into the JniBridge
+ * instance (held as a JNI global ref inside ViewFactoryContext, owned by a
+ * ScopedGlobalRef). All strings returned by the Rust C ABI are freed with the
+ * matching free function for that ABI.
  */
 
 #include <jni.h>
@@ -28,36 +33,6 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "AngNative", __VA_ARGS__)
 
 namespace {
-
-/**
- * Heap-allocated context passed to Rust as the opaque `user_data` pointer.
- * It owns a JNI global reference to the JniBridge instance so callbacks can
- * invoke Kotlin methods even if Rust calls them from a non-JNI thread.
- */
-struct ViewFactoryContext {
-  JavaVM* vm = nullptr;
-  jobject bridge = nullptr;  // JNI global ref (JniBridge instance)
-  jmethodID createView = nullptr;
-  jmethodID setFrame = nullptr;
-  jmethodID setProps = nullptr;
-  jmethodID setText = nullptr;
-  jmethodID appendChild = nullptr;
-  jmethodID insertChild = nullptr;
-  jmethodID removeChild = nullptr;
-  jmethodID destroyView = nullptr;
-};
-
-// Keyed by host handle so nativeRuntimeBridgeDestroy can release the context +
-// JNI global ref (nativeHostDestroy only does this for the legacy path).
-std::unordered_map<jlong, ViewFactoryContext*> g_contexts;
-
-void destroyContext(JNIEnv* env, ViewFactoryContext* ctx) {
-  if (ctx == nullptr) return;
-  if (env != nullptr && ctx->bridge != nullptr) {
-    env->DeleteGlobalRef(ctx->bridge);
-  }
-  delete ctx;
-}
 
 /** Gets a JNIEnv for the current thread, attaching/detaching if necessary. */
 class ScopedEnv {
@@ -91,6 +66,14 @@ void reportException(JNIEnv* env, const char* where) {
   }
 }
 
+void throwJavaException(JNIEnv* env, const char* className, const char* message) {
+  if (env == nullptr) return;
+  jclass cls = env->FindClass(className);
+  if (cls == nullptr) return;
+  env->ThrowNew(cls, message);
+  env->DeleteLocalRef(cls);
+}
+
 void freeRustString(const char* s) {
   if (s != nullptr) {
     // The Rust ABI allocates it as char*; the header exposes const char*.
@@ -105,6 +88,86 @@ jstring rustStringToJString(JNIEnv* env, const char* s) {
   return out;
 }
 
+/** Runtime-bridge strings use their own allocator/free function. */
+void freeRuntimeBridgeString(const char* s) {
+  if (s != nullptr) {
+    angnative_runtime_bridge_free_string(const_cast<char*>(s));
+  }
+}
+
+jstring runtimeStringToJString(JNIEnv* env, const char* s) {
+  if (s == nullptr) return nullptr;
+  jstring out = env->NewStringUTF(s);
+  freeRuntimeBridgeString(s);
+  return out;
+}
+
+/**
+ * RAII owner of a single JNI global reference. The JavaVM is retained so the
+ * reference can be released from any thread (including Rust callback threads).
+ */
+class ScopedGlobalRef {
+ public:
+  ScopedGlobalRef() = default;
+  ~ScopedGlobalRef() { reset(); }
+
+  ScopedGlobalRef(const ScopedGlobalRef&) = delete;
+  ScopedGlobalRef& operator=(const ScopedGlobalRef&) = delete;
+
+  void reset(JNIEnv* env, JavaVM* vm, jobject obj) {
+    reset();
+    vm_ = vm;
+    if (env != nullptr && obj != nullptr) {
+      ref_ = env->NewGlobalRef(obj);
+    }
+  }
+
+  void reset() {
+    if (ref_ != nullptr) {
+      if (vm_ != nullptr) {
+        ScopedEnv se(vm_);
+        JNIEnv* env = se.get();
+        if (env != nullptr) env->DeleteGlobalRef(ref_);
+      }
+      ref_ = nullptr;
+    }
+    vm_ = nullptr;
+  }
+
+  jobject get() const { return ref_; }
+
+ private:
+  JavaVM* vm_ = nullptr;
+  jobject ref_ = nullptr;
+};
+
+/**
+ * Heap-allocated context passed to Rust as the opaque `user_data` pointer.
+ * It owns a JNI global reference to the JniBridge instance so callbacks can
+ * invoke Kotlin methods even if Rust calls them from a non-JNI thread.
+ */
+struct ViewFactoryContext {
+  JavaVM* vm = nullptr;
+  ScopedGlobalRef bridge;  // owns the JNI global ref (JniBridge instance)
+  jmethodID createView = nullptr;
+  jmethodID setFrame = nullptr;
+  jmethodID setProps = nullptr;
+  jmethodID setText = nullptr;
+  jmethodID appendChild = nullptr;
+  jmethodID insertChild = nullptr;
+  jmethodID removeChild = nullptr;
+  jmethodID destroyView = nullptr;
+};
+
+// Keyed by host handle so nativeRuntimeBridgeDestroy can release the context +
+// JNI global ref (nativeHostDestroy only does this for the legacy path).
+std::unordered_map<jlong, ViewFactoryContext*> g_contexts;
+
+/** Deleting the context runs ScopedGlobalRef's destructor and releases the ref. */
+void destroyContext(ViewFactoryContext* ctx) {
+  delete ctx;
+}
+
 }  // namespace
 
 /* =========================================================================
@@ -114,7 +177,7 @@ extern "C" {
 
 static void cb_create_view(uint64_t node_id, const char* view_type, void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr || view_type == nullptr) return;
+  if (ctx == nullptr || view_type == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) {
@@ -122,7 +185,7 @@ static void cb_create_view(uint64_t node_id, const char* view_type, void* user_d
     return;
   }
   jstring jt = env->NewStringUTF(view_type);
-  env->CallVoidMethod(ctx->bridge, ctx->createView, static_cast<jlong>(node_id), jt);
+  env->CallVoidMethod(ctx->bridge.get(), ctx->createView, static_cast<jlong>(node_id), jt);
   env->DeleteLocalRef(jt);
   reportException(env, "onNativeCreateView");
 }
@@ -130,14 +193,14 @@ static void cb_create_view(uint64_t node_id, const char* view_type, void* user_d
 static void cb_set_frame(uint64_t node_id, float x, float y, float width, float height,
                          void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr) return;
+  if (ctx == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) {
     LOGE("cb_set_frame: could not obtain JNIEnv");
     return;
   }
-  env->CallVoidMethod(ctx->bridge, ctx->setFrame, static_cast<jlong>(node_id),
+  env->CallVoidMethod(ctx->bridge.get(), ctx->setFrame, static_cast<jlong>(node_id),
                       static_cast<jfloat>(x), static_cast<jfloat>(y),
                       static_cast<jfloat>(width), static_cast<jfloat>(height));
   reportException(env, "onNativeSetFrame");
@@ -145,7 +208,7 @@ static void cb_set_frame(uint64_t node_id, float x, float y, float width, float 
 
 static void cb_set_props(uint64_t node_id, const char* props_json, void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr || props_json == nullptr) return;
+  if (ctx == nullptr || props_json == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) {
@@ -153,14 +216,14 @@ static void cb_set_props(uint64_t node_id, const char* props_json, void* user_da
     return;
   }
   jstring jp = env->NewStringUTF(props_json);
-  env->CallVoidMethod(ctx->bridge, ctx->setProps, static_cast<jlong>(node_id), jp);
+  env->CallVoidMethod(ctx->bridge.get(), ctx->setProps, static_cast<jlong>(node_id), jp);
   env->DeleteLocalRef(jp);
   reportException(env, "onNativeSetProps");
 }
 
 static void cb_set_text(uint64_t node_id, const char* text, void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr || text == nullptr) return;
+  if (ctx == nullptr || text == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) {
@@ -168,18 +231,18 @@ static void cb_set_text(uint64_t node_id, const char* text, void* user_data) {
     return;
   }
   jstring jt = env->NewStringUTF(text);
-  env->CallVoidMethod(ctx->bridge, ctx->setText, static_cast<jlong>(node_id), jt);
+  env->CallVoidMethod(ctx->bridge.get(), ctx->setText, static_cast<jlong>(node_id), jt);
   env->DeleteLocalRef(jt);
   reportException(env, "onNativeSetText");
 }
 
 static void cb_append_child(uint64_t parent_id, uint64_t child_id, void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr) return;
+  if (ctx == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) return;
-  env->CallVoidMethod(ctx->bridge, ctx->appendChild, static_cast<jlong>(parent_id),
+  env->CallVoidMethod(ctx->bridge.get(), ctx->appendChild, static_cast<jlong>(parent_id),
                       static_cast<jlong>(child_id));
   reportException(env, "onNativeAppendChild");
 }
@@ -187,33 +250,33 @@ static void cb_append_child(uint64_t parent_id, uint64_t child_id, void* user_da
 static void cb_insert_child(uint64_t parent_id, uint64_t child_id, uint32_t index,
                             void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr) return;
+  if (ctx == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) return;
-  env->CallVoidMethod(ctx->bridge, ctx->insertChild, static_cast<jlong>(parent_id),
+  env->CallVoidMethod(ctx->bridge.get(), ctx->insertChild, static_cast<jlong>(parent_id),
                       static_cast<jlong>(child_id), static_cast<jint>(index));
   reportException(env, "onNativeInsertChild");
 }
 
 static void cb_remove_child(uint64_t parent_id, uint64_t child_id, void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr) return;
+  if (ctx == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) return;
-  env->CallVoidMethod(ctx->bridge, ctx->removeChild, static_cast<jlong>(parent_id),
+  env->CallVoidMethod(ctx->bridge.get(), ctx->removeChild, static_cast<jlong>(parent_id),
                       static_cast<jlong>(child_id));
   reportException(env, "onNativeRemoveChild");
 }
 
 static void cb_destroy_view(uint64_t node_id, void* user_data) {
   auto* ctx = static_cast<ViewFactoryContext*>(user_data);
-  if (ctx == nullptr) return;
+  if (ctx == nullptr || ctx->bridge.get() == nullptr) return;
   ScopedEnv se(ctx->vm);
   JNIEnv* env = se.get();
   if (env == nullptr) return;
-  env->CallVoidMethod(ctx->bridge, ctx->destroyView, static_cast<jlong>(node_id));
+  env->CallVoidMethod(ctx->bridge.get(), ctx->destroyView, static_cast<jlong>(node_id));
   reportException(env, "onNativeDestroyView");
 }
 
@@ -242,7 +305,7 @@ Java_com_angnative_app_JniBridge_nativeHostDestroy(JNIEnv* env, jobject /*thiz*/
   // Release the JNI global ref + context before destroying the Rust host.
   auto it = g_contexts.find(handle);
   if (it != g_contexts.end()) {
-    destroyContext(env, it->second);
+    destroyContext(it->second);
     g_contexts.erase(it);
   }
   AngNativeHost* h = reinterpret_cast<AngNativeHost*>(handle);
@@ -258,15 +321,30 @@ Java_com_angnative_app_JniBridge_nativeHostRegisterViewFactory(JNIEnv* env, jobj
   // Replace any previous context for this host (e.g. after reload).
   auto it = g_contexts.find(handle);
   if (it != g_contexts.end()) {
-    destroyContext(env, it->second);
+    destroyContext(it->second);
     g_contexts.erase(it);
   }
 
   auto* ctx = new ViewFactoryContext();
   env->GetJavaVM(&ctx->vm);
-  ctx->bridge = env->NewGlobalRef(thiz);  // real global ref, not an identity hash
+  ctx->bridge.reset(env, ctx->vm, thiz);  // real global ref, not an identity hash
+  if (ctx->bridge.get() == nullptr) {
+    LOGE("Could not allocate JNI global ref for ViewFactory context");
+    reportException(env, "NewGlobalRef");
+    destroyContext(ctx);  // not stored in g_contexts; release immediately
+    throwJavaException(env, "java/lang/IllegalStateException",
+                       "Could not create ViewFactory JNI global reference");
+    return;
+  }
 
   jclass cls = env->GetObjectClass(thiz);
+  if (cls == nullptr) {
+    reportException(env, "GetObjectClass");
+    destroyContext(ctx);
+    throwJavaException(env, "java/lang/IllegalStateException",
+                       "Could not resolve JniBridge class");
+    return;
+  }
   auto mid = [&](const char* name, const char* sig) -> jmethodID {
     jmethodID m = env->GetMethodID(cls, name, sig);
     reportException(env, name);
@@ -286,6 +364,10 @@ Java_com_angnative_app_JniBridge_nativeHostRegisterViewFactory(JNIEnv* env, jobj
       ctx->setText == nullptr || ctx->appendChild == nullptr || ctx->insertChild == nullptr ||
       ctx->removeChild == nullptr || ctx->destroyView == nullptr) {
     LOGE("One or more ViewFactory callback method IDs could not be resolved");
+    destroyContext(ctx);  // release the global ref now; never publish this context
+    throwJavaException(env, "java/lang/IllegalStateException",
+                       "ViewFactory callback method IDs could not be resolved");
+    return;
   }
 
   int rc = angnative_host_register_view_factory(
@@ -293,6 +375,10 @@ Java_com_angnative_app_JniBridge_nativeHostRegisterViewFactory(JNIEnv* env, jobj
       cb_append_child, cb_insert_child, cb_remove_child, cb_destroy_view, ctx);
   if (rc != 0) {
     LOGE("angnative_host_register_view_factory failed: %d", rc);
+    destroyContext(ctx);  // registration did not take ownership: no double free
+    throwJavaException(env, "java/lang/IllegalStateException",
+                       "ViewFactory registration failed");
+    return;
   }
 
   g_contexts[handle] = ctx;
@@ -397,39 +483,39 @@ Java_com_angnative_app_JniBridge_nativeHostDispatchEvent(JNIEnv* env, jobject /*
                                                          jstring eventName, jstring payloadJson) {
   AngNativeHost* h = reinterpret_cast<AngNativeHost*>(handle);
   if (h == nullptr) return 0;
-  
+
   const char* event_name = env->GetStringUTFChars(eventName, nullptr);
   if (event_name == nullptr) return 0;
-  
-  const char* payload = payloadJson != nullptr 
-      ? env->GetStringUTFChars(payloadJson, nullptr) 
+
+  const char* payload = payloadJson != nullptr
+      ? env->GetStringUTFChars(payloadJson, nullptr)
       : nullptr;
-  
+
   unsigned int invoked = angnative_host_dispatch_event(h, static_cast<uint64_t>(nodeId), event_name, payload);
-  
+
   env->ReleaseStringUTFChars(eventName, event_name);
   if (payload != nullptr) {
     env->ReleaseStringUTFChars(payloadJson, payload);
   }
-  
+
   return static_cast<jint>(invoked);
 }
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_angnative_app_JniBridge_nativeRuntimeBridgeCreate(JNIEnv* /*env*/, jobject /*thiz*/) {
-  AngNativeRuntimeBridge* bridge = angnative_runtime_bridge_create();
-  if (bridge == nullptr) {
+  AngNativeRuntimeBridgeHandle bridge = angnative_runtime_bridge_create();
+  if (bridge == 0) {
     LOGE("Failed to create AngNative runtime bridge");
     return 0;
   }
-  LOGI("AngNative runtime bridge created: %p", bridge);
-  return reinterpret_cast<jlong>(bridge);
+  LOGI("AngNative runtime bridge created: %llu", static_cast<unsigned long long>(bridge));
+  return static_cast<jlong>(bridge);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDestroy(JNIEnv* env, jobject /*thiz*/,
                                                             jlong handle, jlong hostHandle) {
-  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
   // The bridge owns the Host. Destroy it first so no ViewFactory callback can
   // fire with a dangling ViewFactoryContext, then release the JNI global ref.
   // This also fixes the leak where the old Kotlin destroyHost() dropped the
@@ -438,42 +524,42 @@ Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDestroy(JNIEnv* env, jobject
   if (hostHandle != 0) {
     auto it = g_contexts.find(hostHandle);
     if (it != g_contexts.end()) {
-      destroyContext(env, it->second);
+      destroyContext(it->second);
       g_contexts.erase(it);
     }
   }
-  LOGI("AngNative runtime bridge destroyed: %p", b);
+  LOGI("AngNative runtime bridge destroyed: %llu", static_cast<unsigned long long>(b));
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDispatchEvent(JNIEnv* env, jobject /*thiz*/,
                                                                   jlong handle, jlong nodeId,
                                                                   jstring eventName, jstring payloadJson) {
-  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
-  if (b == nullptr) return 0;
-  
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  if (b == 0) return 0;
+
   const char* event_name = env->GetStringUTFChars(eventName, nullptr);
   if (event_name == nullptr) return 0;
-  
-  const char* payload = payloadJson != nullptr 
-      ? env->GetStringUTFChars(payloadJson, nullptr) 
+
+  const char* payload = payloadJson != nullptr
+      ? env->GetStringUTFChars(payloadJson, nullptr)
       : nullptr;
-  
+
   unsigned int invoked = angnative_runtime_bridge_dispatch_event(b, static_cast<uint64_t>(nodeId), event_name, payload);
-  
+
   env->ReleaseStringUTFChars(eventName, event_name);
   if (payload != nullptr) {
     env->ReleaseStringUTFChars(payloadJson, payload);
   }
-  
+
   return static_cast<jint>(invoked);
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLoadScript(JNIEnv* env, jobject /*thiz*/,
                                                               jlong handle, jstring source) {
-  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
-  if (b == nullptr || source == nullptr) return 1;
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  if (b == 0 || source == nullptr) return 1;
   const char* script = env->GetStringUTFChars(source, nullptr);
   if (script == nullptr) return 1;
   int rc = angnative_runtime_bridge_load_script(b, script);
@@ -484,11 +570,56 @@ Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLoadScript(JNIEnv* env, jobj
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_angnative_app_JniBridge_nativeRuntimeBridgeGetHost(JNIEnv* /*env*/, jobject /*thiz*/, jlong handle) {
-  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
-  if (b == nullptr) return 0;
-  
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  if (b == 0) return 0;
+
   AngNativeHost* h = angnative_runtime_bridge_get_host(b);
   if (h == nullptr) return 0;
-  
+
   return reinterpret_cast<jlong>(h);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLifecycleState(JNIEnv* /*env*/,
+                                                                  jobject /*thiz*/,
+                                                                  jlong handle) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  return static_cast<jint>(angnative_runtime_bridge_lifecycle_state(b));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeSuspend(JNIEnv* /*env*/, jobject /*thiz*/,
+                                                           jlong handle) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  return static_cast<jint>(angnative_runtime_bridge_suspend(b));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeResume(JNIEnv* /*env*/, jobject /*thiz*/,
+                                                          jlong handle) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  return static_cast<jint>(angnative_runtime_bridge_resume(b));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeStop(JNIEnv* /*env*/, jobject /*thiz*/,
+                                                        jlong handle) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  return static_cast<jint>(angnative_runtime_bridge_stop(b));
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeMetricsJson(JNIEnv* env, jobject /*thiz*/,
+                                                               jlong handle) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  const char* json = angnative_runtime_bridge_metrics_json(b);
+  return runtimeStringToJString(env, json);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLastErrorJson(JNIEnv* env, jobject /*thiz*/,
+                                                                  jlong handle) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  const char* json = angnative_runtime_bridge_last_error_json(b);
+  return runtimeStringToJString(env, json);
 }

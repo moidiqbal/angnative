@@ -22,7 +22,10 @@ export type NativeNodeType =
   | 'Image'
   | 'ScrollView'
   | 'TextInput'
-  | 'Custom';
+  /** Untagged generic host node (no native view until it gets visual content). */
+  | 'Custom'
+  /** Tagged custom primitive, e.g. `Custom:na-list` — materialized by native shells. */
+  | `Custom:${string}`;
 
 export interface NativeElementProps {
   readonly [key: string]: unknown;
