@@ -218,7 +218,12 @@ static void cb_destroy_view(uint64_t node_id, void* user_data) {
  * Exported JNI methods
  * ========================================================================= */
 
-extern "C" JNIEXPORT jlong JNICALL
+// DEPRECATED legacy host path. The 10 showcase shells use the unified
+// RuntimeBridge (single owner of Host + QuickJS). Calling nativeHostDestroy on
+// a bridge-owned handle is a double-free — never copy this pattern into a
+// shell that uses nativeRuntimeBridgeCreate.
+extern "C" JNIEXPORT [[deprecated("legacy host path; use angnative_runtime_bridge_create instead")]]
+jlong JNICALL
 Java_com_angnative_app_JniBridge_nativeHostCreate(JNIEnv* /*env*/, jobject /*thiz*/) {
   AngNativeHost* host = angnative_host_create();
   if (host == nullptr) {
@@ -229,7 +234,8 @@ Java_com_angnative_app_JniBridge_nativeHostCreate(JNIEnv* /*env*/, jobject /*thi
   return reinterpret_cast<jlong>(host);
 }
 
-extern "C" JNIEXPORT void JNICALL
+extern "C" JNIEXPORT [[deprecated("legacy host path; never call on a RuntimeBridge-owned Host")]]
+void JNICALL
 Java_com_angnative_app_JniBridge_nativeHostDestroy(JNIEnv* env, jobject /*thiz*/, jlong handle) {
   // Release the JNI global ref + context before destroying the Rust host.
   auto it = g_contexts.find(handle);

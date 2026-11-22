@@ -97,11 +97,12 @@ fires per event and a new native batch follows.
 - `RuntimeController` is lifecycle state only (no runtime, no events).
 - Both owned objects are boxed; thread-local raw pointers target the boxes.
 - `Drop` clears both thread-local pointers and the JS dispatch callback.
-- The exported C ABI lifecycle/dispatch functions (`create`, `destroy`,
-  `dispatch_event`, `load_script`) validate null/UTF-8 and wrap work in
-  `catch_unwind`. `angnative_runtime_bridge_get_host` null-checks its handle but
-  has no `catch_unwind`; the internal `js_runtime_dispatch_callback` validates
-  its inputs but is also not panic-wrapped. Do not assume blanket panic safety.
+- All exported C ABI lifecycle/dispatch functions (`create`, `destroy`,
+  `dispatch_event`, `load_script`, `get_host`) and the internal
+  `js_runtime_dispatch_callback` validate their inputs and wrap work in
+  `catch_unwind`; a panic returns a null pointer / 0 instead of unwinding across
+  the FFI boundary. (The architect review flagged `get_host` and the dispatch
+  callback as unwrapped; both were subsequently fixed.)
 - Host `create`/`destroy` legacy JNI exports remain for ABI compatibility. The
   **10 unified showcases** do not declare them from Kotlin, but
   `platforms/android` still declares and calls `nativeHostCreate` /

@@ -138,32 +138,37 @@ extern "C" fn js_runtime_dispatch_callback(
     event_name: *const c_char,
     payload_json: *const c_char,
 ) -> u32 {
-    if event_name.is_null() { return 0; }
-    let event_name_str = match unsafe { CStr::from_ptr(event_name) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return 0,
-    };
-    let payload_str = if payload_json.is_null() {
-        "{}"
-    } else {
-        match unsafe { CStr::from_ptr(payload_json) }.to_str() {
+    // This callback is reached from C (Host::dispatch_event). A panic must
+    // never unwind across the FFI boundary — return 0 instead.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if event_name.is_null() { return 0; }
+        let event_name_str = match unsafe { CStr::from_ptr(event_name) }.to_str() {
             Ok(s) => s,
             Err(_) => return 0,
-        }
-    };
-    CURRENT_BRIDGE_RUNTIME.with(|rt| {
-        let borrow = rt.borrow();
-        match borrow.as_ref() {
-            Some(ptr) => {
-                let runtime = unsafe { &mut **ptr };
-                match runtime.dispatch_event(node_id, event_name_str, payload_str) {
-                    Ok(invoked) => invoked,
-                    Err(_) => 0,
-                }
+        };
+        let payload_str = if payload_json.is_null() {
+            "{}"
+        } else {
+            match unsafe { CStr::from_ptr(payload_json) }.to_str() {
+                Ok(s) => s,
+                Err(_) => return 0,
             }
-            None => 0,
-        }
-    })
+        };
+        CURRENT_BRIDGE_RUNTIME.with(|rt| {
+            let borrow = rt.borrow();
+            match borrow.as_ref() {
+                Some(ptr) => {
+                    let runtime = unsafe { &mut **ptr };
+                    match runtime.dispatch_event(node_id, event_name_str, payload_str) {
+                        Ok(invoked) => invoked,
+                        Err(_) => 0,
+                    }
+                }
+                None => 0,
+            }
+        })
+    }));
+    result.unwrap_or(0)
 }
 
 #[repr(C)]
@@ -240,8 +245,11 @@ pub unsafe extern "C" fn angnative_runtime_bridge_get_host(
     handle: *mut AngNativeRuntimeBridge,
 ) -> *mut Host {
     if handle.is_null() { return std::ptr::null_mut(); }
-    let bridge = &mut *(handle as *mut RuntimeBridge);
-    bridge.host_mut() as *mut Host
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let bridge = &mut *(handle as *mut RuntimeBridge);
+        bridge.host_mut() as *mut Host
+    }));
+    result.unwrap_or(std::ptr::null_mut())
 }
 
 pub fn create_runtime_bridge() -> Result<RuntimeBridge, anyhow::Error> {
@@ -606,6 +614,12 @@ mod tests {
             bridge.runtime_mut().eval("_httpResponse").unwrap(),
             JsValue::String("200|hello-from-native|GET".to_string())
         );
+
+        // NOTE (honest): a custom HttpBackend receiving our fetch response
+        // was prototyped; the response reaches the backend but HttpClient's
+        // subscription chain does not deliver it in this runtime, and DI with
+        // the stock FetchBackend still throws NG0201. Full HttpClient.get()
+        // remains unverified.
     }
 
     /// Full component-based Router navigation in QuickJS.
