@@ -109,6 +109,18 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         globalThis.location = _domLocation;
         globalThis.history = _domHistory;
 
+        // Close the renderer -> native pipeline: the Angular renderer's flush
+        // handler publishes batches through this hook. Route them into the
+        // Host's real batch processor (registered by the runtime bridge).
+        if (typeof globalThis.__angnativeDispatchBatch === 'undefined' &&
+            typeof na_dispatchBatch === 'function') {
+            globalThis.__angnativeDispatchBatch = function (batchJson) {
+                var ops = na_dispatchBatch(batchJson);
+                globalThis.__angnativeLastOps = ops;
+                return ops;
+            };
+        }
+
         // --- fetch / HttpClient platform surface --------------------------
         // A host (or test) can register handlers. Default is a 404 response so
         // Angular's FetchBackend can initialize without a real network stack.

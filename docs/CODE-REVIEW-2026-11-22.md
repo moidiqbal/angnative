@@ -10,7 +10,7 @@
 | Check | Original result | Current result |
 |---|---|---|
 | `pnpm test` | ✅ 208 passed | ✅ 208 passed |
-| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors | ✅ **119 passed, 0 failed** |
+| `cargo test --workspace` | ❌ **BUILD FAILS** — `angnative-host-engine` 7 compile errors | ✅ **124 passed, 0 failed** (6 ignored acceptance tests pass separately) |
 | `cargo check --workspace` | ❌ same 7 errors | ✅ clean (no warnings) |
 | Committed baseline (`fc8b6a2` + earlier) | ✅ was green (108 Rust tests) | ✅ still green |
 | Current working tree | 🔴 broken; do not commit as-is | 🟢 green; fixes applied |
@@ -153,7 +153,8 @@ All *actionable* gaps from the original list were closed:
 
 ### Verification evidence
 
-- `cargo test --workspace`: **119 passed, 0 failed**
+- `cargo test --workspace`: **124 passed, 0 failed** (6 acceptance tests ignored by default)
+- `cargo test -p angnative-runtime-bridge -- --ignored`: **6 passed** (`dist/aot` bundles present)
 - `cargo check --workspace`: clean, no warnings
 - `pnpm test`: **208 passed**
 - `python scripts/check-ffi-declarations.py`: OK (11 JNI methods, 9 Swift bindings, 19 header declarations)
@@ -169,6 +170,7 @@ All *actionable* gaps from the original list were closed:
   - Runtime additions: raw `load_script` API (Rust + C ABI + JNI), `queueMicrotask` shim, native Promise-job drain (`Runtime::execute_pending_job`), polyfills for `Object.hasOwn`, `FinalizationRegistry`, `WeakRef`, `performance`, element-level `querySelector(All)`, kebab→camel style-name normalization, and custom component host tags (non-`na-*`) mapped to generic `na-view` containers.
   - **Acceptance test** `angular_bootstrap_runs_in_quickjs` (ignored by default; requires generated `dist/aot/quickjs-bundle.js`): loads the real AOT bundle, asserts no bootstrap rejection, and asserts the renderer emitted command batches containing `CreateNode`. **It passes**, with `[angnative demo] app bootstrapped on native renderer` logged from inside QuickJS.
   - **Full click round trip is now asserted** in the same acceptance test: the renderer registers its listener through `na_addEventListener`, the shim's `na_onEvent` routes Rust dispatch back to the Angular callback, `requestAnimationFrame` is driven from the host-drained microtask queue (Angular's zoneless rAF-vs-timeout scheduler needs this), and the test asserts a native event fires exactly one listener and produces a new command batch.
+  - **Renderer → native pipeline is CLOSED** (previous highest-value gap): `RuntimeBridge` now registers `na_dispatchBatch(json)`, which calls `Host::process_batch_json` on the bridge-owned Host. The shim wires `__angnativeDispatchBatch` to it, so every renderer flush reaches the real Host `MutationEngine` / `OpEmitter` / `ViewFactory`. The acceptance test now asserts `__angnativeDispatchBatch` is a function, `host.engine().size() > 0`, native ops were emitted, and a click produces further native ops — no longer just `JSON.stringify(__angnativeBatches)`.
   - **On-device smoke test (emulator `AngNative34`, API 34)**: showcase APK installed and launched; logcat shows `AngNative runtime bridge created`, `View factory registered for host`, UI renders without crash. The showcase's ecosystem-core activity uses imperative Kotlin views, so the click round trip is verified in-process (Rust/QuickJS acceptance test), not by tapping this activity's UI.
   - **Phase 1 of Angular feature compatibility is done**: `@angular/forms` installed as a dev dependency, `pnpm bundle:forms` produces a self-contained forms bundle, and `angular_forms_work_in_quickjs` verifies `FormControl` / `FormGroup` / `Validators` values and validity inside QuickJS. `$localize` i18n shim (tagged templates + `loadTranslations`) is verified by `test_localize_i18n_translations`.
   - **Phase 2/3 (platform surface)**: real `@angular/router`, `@angular/animations` and `@angular/common/http` bundles are produced by `pnpm bundle:framework` and load in QuickJS. Browser shims added: `history`/`location`/`popstate` (routing), no-op `Element.animate()` driver (animations), and a host-wirable `fetch` (HttpClient). Five `--ignored` acceptance tests pass in total (bootstrap, forms, router, animations, http platform).

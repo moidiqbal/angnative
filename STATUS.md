@@ -86,20 +86,20 @@ elevation (error 740). Git's copy does not. Workaround:
 ```powershell
 $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
 cargo build --workspace
-cargo test --workspace   # 108 tests pass, including host-engine (6) and desktop (11)
+cargo test --workspace   # 124 tests pass, including host-engine and desktop (11)
 ```
 
 ## Verification summary
 
 | Item | Status |
 |---|---|
-| Rust core (all workspace crates incl. host-engine + desktop) | ✅ **108 tests pass** (with Git `patch.exe` on PATH — see note above) |
+| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **124 tests pass** (with Git `patch.exe` on PATH — see note above) |
 | JS/TS (16 spec files) | ✅ 208 tests pass |
 | Android JNI + emulator run | ✅ verified |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified |
 | iOS shell | ⚠️ code complete, Mac build pending |
-| Native event bridge (FFI + QuickJS API) | ✅ scaffold + tests; full Angular-in-native pending (`docs/EVENT-BRIDGE.md`) |
+| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; single event path; 6 ignored acceptance tests pass (Angular bootstrap + click round trip + forms/router/animations/http) once `dist/aot` bundles exist; on-device shell loading still pending (`docs/EVENT-BRIDGE.md`) |
 | Production AOT (`pnpm run compile:aot`, `angnative build`) | ✅ real Angular `ngc` (not shadowed 0.1.0 binary), Ivy definitions verified in `dist/aot/`, esbuild bundle produced |
 
 Full history: `docs/PROJECT-REVIEW-2026-11-20.md`

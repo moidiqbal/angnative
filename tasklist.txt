@@ -1,6 +1,6 @@
 ================================================================================
 ANGNATIVE — TASKLIST (2026-11-21)
-Current release: v0.2.0 (pushed, master @ 5e276d4)
+Current release: v0.2.0 tag (pushed); master advanced to fc3370c (2026-11-22)
 Rule: nothing below is "done" without execution evidence. No fabricated claims.
 ================================================================================
 
@@ -17,15 +17,17 @@ ONGOING / IMPORTANT — kya abhi karna hai (priority order)
      Blocker : Mac needed — sponsors being collected (README + docs/SPONSORS.md)
      Note    : user said "iOS/Mac abhi chor dain" — keep parked, do not claim done
 
-[P1] Native JS runtime wiring — biggest feature gap
-     Status  : scaffolding only (FFI event bridge + QuickJS API exist)
-     Have    : angnative_host_set_event_callback / add|remove|dispatch_event (host-ffi)
-               na.addEventListener / runtime.dispatch_event (host-engine)
-     Missing : runtime bridge crate (Host callback -> AngNativeRuntime::dispatch_event)
-               load compiled Angular bundle (dist/aot/) into QuickJS in each shell
-               platform button clicks -> angnative_host_dispatch_event
-     Ref     : docs/EVENT-BRIDGE.md
-     Proof   : Angular (click) reaches component handler on Android/iOS/Desktop
+[P0/P1] Native JS runtime wiring — DONE in-process, integration still open
+     Status  : runtime bridge implemented; real AOT bundle boots in QuickJS and a
+               native event reaches the Angular listener (6 --ignored acceptance
+               tests pass when dist/aot bundles are generated)
+     Have    : angnative-runtime-bridge (single Host+QuickJS+runtime owner, single
+               event path, thread affinity), raw load_script C ABI + JNI, DOM shims,
+               forms/router/animations/http bundles, na_addEventListener / na_onEvent
+     Missing : load the bundle in a SHIPPING shell on-device; migrate the 9 legacy
+               showcases + platforms/android off imperative batches; iOS bindings
+     Ref     : docs/EVENT-BRIDGE.md, docs/CODE-REVIEW-2026-11-22.md
+     Proof   : cargo test -p angnative-runtime-bridge -- --ignored (6 passed)
 
 [P1] Sustained-load benchmark (community asked for this)
      Status  : single-burst data only
@@ -92,7 +94,7 @@ FEATURE BACKLOG (after the above)
 ALREADY COMPLETE (do not redo — just maintain)
 --------------------------------------------------------------------------------
 
-[x] Rust host core/layout/view/ffi/engine/services/desktop — cargo test 108 pass
+[x] Rust host core/layout/view/ffi/engine/services/runtime-bridge/desktop — cargo test 124 pass (+6 acceptance)
 [x] Angular renderer/contract/platform/testing/cli/web/native-ui-core — pnpm test 208 pass
 [x] Production AOT: real Angular ngc + Ivy verified + esbuild (angnative build)
 [x] Android JNI bridge: 8 callbacks, free_string, snapshot layout, ops-driven UI

@@ -10,7 +10,18 @@ and runs correctly. Execute each step in order.
 | Rust (rustc/cargo) | nightly-2026-11-14 | https://rustup.rs/ |
 | Android NDK | r25+ | Android Studio → SDK Manager |
 | Android SDK | API 34 | Android Studio → SDK Manager |
-| Gradle | 8.2 | Included (wrapper) |
+| Gradle | 8.2 (or 9.9.2 with the `latest` profile) | Included (wrapper) |
+
+> **Native libraries are not committed.** The `jniLibs/**/*.a` archives are build
+> outputs (about 1.4 GB across all projects) and are gitignored. Before building
+> any Android project, stage them:
+> ```powershell
+> pwsh -File scripts/build-android-native.ps1   # Windows
+> # or: ./scripts/build-android-native.sh all    # Linux/macOS
+> ```
+> This builds the unified `libangnative_runtime_bridge.a` for all three ABIs and
+> copies it into `platforms/android` and every showcase's `jniLibs`, including the
+> legacy `libangnative_host_ffi.a` filename expected by the showcase CMake files.
 
 ## Step 1: Install Rust Toolchain
 

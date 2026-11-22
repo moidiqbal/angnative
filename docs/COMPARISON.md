@@ -23,9 +23,9 @@ NativeScript / Flutter / React Native, so **no performance superiority is claime
 | Rendering brain | Rust host: mutation shadow tree + **Taffy 0.15.1** layout before UI thread | JS runtime (`V8 14.9` on Android, JavaScriptCore on iOS) drives native views | JS (Hermes/JSC) + Yoga layout | Dart VM + own layout engine | Browser engine |
 | WebView in native mode | ❌ none | ❌ none | ❌ none | ❌ none | ✅ **yes** |
 | Angular support | Custom `Renderer2` + `na-*` primitives; Angular 22 signals/zoneless | Mature `@nativescript/angular` (since 2014, OpenJS Foundation) | n/a (React) | n/a (Dart) | Angular web stack runs in WebView |
-| Does your compiled Angular app run in the native shell today? | ⚠️ **No** — shells currently run Rust-built demo batches; QuickJS event bridge is scaffolded but not wired (see `EVENT-BRIDGE.md`) | ✅ **Yes** — that is NativeScript's core product | n/a | n/a | ✅ yes (as a web app) |
+| Does your compiled Angular app run in the native shell today? | ⚠️ **In the embedded runtime, not the shipping shell** — real AOT bundle boots in QuickJS with a working click round trip (6 acceptance tests); shells still render Rust/Kotlin-driven trees (see `EVENT-BRIDGE.md`) | ✅ **Yes** — that is NativeScript's core product | n/a | n/a | ✅ yes (as a web app) |
 | Layout computation | Rust/Taffy, off the UI thread | Native platform layout / Yoga-style | Yoga | Flutter engine | Browser layout |
-| JS runtime | QuickJS scaffolding **not connected** in native shells | V8 / JavaScriptCore, production-proven | Hermes / JSC | none (Dart AOT) | browser JS |
+| JS runtime | QuickJS embedded via `angnative-runtime-bridge`; verified in-process, not yet loading bundles in native shells | V8 / JavaScriptCore, production-proven | Hermes / JSC | none (Dart AOT) | browser JS |
 | Production AOT | ✅ real Angular `ngc` + esbuild (`dist/aot/`, Ivy verified) | Angular AOT via NativeScript build pipeline | Metro/JS bundling | Dart AOT | web bundling |
 | Maturity | 🟡 v0.2.0, new | 🟢 since 2014, OpenJS Foundation, production case studies | 🟢 Meta-backed, huge ecosystem | 🟢 Google-backed | 🟢 widely used |
 | License | MIT | Apache-2.0 (OpenJS) | MIT | BSD-style | MIT |
@@ -40,7 +40,7 @@ Device: **OnePlus Open, CPH2551, Android 16**, real GPU (details: `benchmarks/ph
 | Same grid on SwiftShader emulator | 16.13% jank, 20 ms p50 |
 | WebViews in all 10 showcase APKs | **0** |
 | APK size | ~19.2 MB per showcase |
-| Test suites | 108 Rust + 208 JS tests pass |
+| Test suites | 124 Rust (+6 ignored acceptance, all passing) + 208 JS tests pass |
 
 These are AngNative-only measurements. **We have not built or measured equivalent
 NativeScript/Flutter/React Native apps**, so any claim like "faster than X" would be

@@ -1,7 +1,15 @@
 # Rust
 target/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock is intentionally committed for reproducible builds.
+
+# Generated native libraries — rebuild with scripts/build-android-native.ps1
+# (or .sh). They are large and duplicated per ABI per project, so they are
+# produced locally instead of being tracked.
+**/jniLibs/**/*.a
+
+# TypeScript incremental build cache
+*.tsbuildinfo
 
 # Node / Angular
 node_modules/

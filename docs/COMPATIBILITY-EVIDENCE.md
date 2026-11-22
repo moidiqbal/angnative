@@ -18,7 +18,7 @@
 | Android NDK | 27.2.12479018 |
 | Android SDK | API 34 / 36, build-tools 34.0.0 / 37.0.0 |
 | Emulator | `sdk_gphone64_x86_64`, API 34, 1080×2400 @ 420 dpi, AVD `AngNative34` |
-| Test suites | `pnpm test` 208 passed; `cargo test --workspace` 108 passed (with Git `patch.exe` on PATH) |
+| Test suites | `pnpm test` 208 passed; `cargo test --workspace` 124 passed (with Git `patch.exe` on PATH); 6 ignored Angular-in-QuickJS acceptance tests pass separately |
 
 ## Phase 1 — UI library showcases
 

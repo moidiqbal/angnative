@@ -11,7 +11,7 @@
  *   every callback (P0-04). QuickJS is not Send/Sync.
  * - All extern "C" entry points are panic-protected (P1).
  */
-use angnative_host_engine::{AngNativeRuntime, RuntimeConfig};
+use angnative_host_engine::{AngNativeRuntime, EngineError, JsEngine, RuntimeConfig};
 use angnative_host_engine::quickjs::QuickJsEngine;
 use angnative_host_ffi::bridge::{
     Host, set_js_runtime_dispatch_for_thread, clear_js_runtime_dispatch_for_thread,
@@ -24,6 +24,9 @@ use std::thread_local;
 thread_local! {
     static CURRENT_BRIDGE_RUNTIME: RefCell<Option<*mut AngNativeRuntime<QuickJsEngine>>> =
         RefCell::new(None);
+    /// Stable pointer to the bridge-owned Host, used by the JS-side
+    /// `na_dispatchBatch` function to close the renderer -> native pipeline.
+    static CURRENT_BRIDGE_HOST: RefCell<Option<*mut Host>> = RefCell::new(None);
 }
 
 /// Bridge — single authoritative owner of Host + QuickJS + Angular runtime.
@@ -32,26 +35,52 @@ pub struct RuntimeBridge {
     // a Box by the C API. The thread-local dispatch pointer targets this
     // allocation; pointing at an inline field would dangle after a move.
     runtime: Box<AngNativeRuntime<QuickJsEngine>>,
-    host: Host,
+    // Boxed for the same stability reason as `runtime`: the JS dispatch
+    // function holds a thread-local raw pointer to it.
+    host: Box<Host>,
     owner_thread: ThreadId,
 }
 
 impl RuntimeBridge {
     pub fn new() -> Result<Self, anyhow::Error> {
-        let host = Host::new();
+        let mut host = Box::new(Host::new());
         let engine = QuickJsEngine::new()?;
         let mut runtime = Box::new(AngNativeRuntime::new(engine, RuntimeConfig::default()));
         runtime.install_api()?;
-        // Install the DOM/platform shims into the same engine so Angular code
-        // has `window`, `document`, timers and events available.
-        angnative_host_engine::quickjs_shims::install_dom_shims(runtime.engine())?;
 
         let owner_thread = thread::current().id();
         CURRENT_BRIDGE_RUNTIME.with(|rt| {
-            // Deref the Box: this address is stable even when the bridge is
-            // moved into another Box by the C API entry point.
             *rt.borrow_mut() = Some(&mut *runtime as *mut AngNativeRuntime<QuickJsEngine>);
         });
+        CURRENT_BRIDGE_HOST.with(|h| {
+            *h.borrow_mut() = Some(&mut *host as *mut Host);
+        });
+
+        // THE missing pipeline closure: the Angular renderer flushes JSON
+        // command batches via __angnativeDispatchBatch. Route that straight
+        // into Host::process_batch_json so mutations reach the real shadow
+        // tree, OpEmitter and ViewFactory (no more JS-only batches).
+        runtime.engine().register_function("na_dispatchBatch", |args| {
+            let Some(angnative_host_engine::JsValue::String(json)) = args.first() else {
+                return Ok(angnative_host_engine::JsValue::Null);
+            };
+            CURRENT_BRIDGE_HOST.with(|h| {
+                let Some(ptr) = *h.borrow() else {
+                    return Ok(angnative_host_engine::JsValue::Null);
+                };
+                let host = unsafe { &mut *ptr };
+                match host.process_batch_json(json.as_str()) {
+                    Ok(ops) => Ok(angnative_host_engine::JsValue::String(ops)),
+                    Err(e) => Err(EngineError::CallError(e)),
+                }
+            })
+        });
+
+        // Install the DOM/platform shims into the same engine so Angular code
+        // has `window`, `document`, timers and events available. The shim sets
+        // __angnativeDispatchBatch -> na_dispatchBatch.
+        angnative_host_engine::quickjs_shims::install_dom_shims(runtime.engine())?;
+
         set_js_runtime_dispatch_for_thread(js_runtime_dispatch_callback);
 
         Ok(Self { runtime, host, owner_thread })
@@ -87,17 +116,18 @@ impl RuntimeBridge {
     }
 
     pub fn host_mut(&mut self) -> &mut Host {
-        &mut self.host
+        &mut *self.host
     }
 
     pub fn host(&self) -> &Host {
-        &self.host
+        &*self.host
     }
 }
 
 impl Drop for RuntimeBridge {
     fn drop(&mut self) {
         CURRENT_BRIDGE_RUNTIME.with(|rt| *rt.borrow_mut() = None);
+        CURRENT_BRIDGE_HOST.with(|h| *h.borrow_mut() = None);
         clear_js_runtime_dispatch_for_thread();
     }
 }
@@ -363,6 +393,25 @@ mod tests {
             other => panic!("unexpected batch JSON: {other:?}"),
         }
 
+        // THE REAL PROOF: batches must have flowed through the native hook
+        // into the Host's own MutationEngine / OpEmitter — not just into a
+        // JS array. This closes the renderer -> native pipeline.
+        assert_eq!(
+            bridge.runtime_mut().eval("typeof __angnativeDispatchBatch").unwrap(),
+            JsValue::String("function".to_string()),
+            "native batch dispatch hook must be installed"
+        );
+        let host_nodes = bridge.host_mut().engine().size();
+        assert!(host_nodes > 0, "Host shadow tree must contain native nodes");
+        let last_ops = bridge.runtime_mut().eval("String(__angnativeLastOps)").unwrap();
+        match last_ops {
+            JsValue::String(s) => assert!(
+                s.contains("Create") || s.contains("SetText") || s.contains("SetProps"),
+                "Host must have emitted native ops; got {s}"
+            ),
+            other => panic!("unexpected native ops: {other:?}"),
+        }
+
         // Full round trip: locate the Angular-registered listener from the
         // emitted batch, dispatch a native event through the RuntimeBridge,
         // and assert the component handler produced new native mutations.
@@ -406,6 +455,14 @@ mod tests {
             after > before,
             "Angular click handler must emit new native mutations"
         );
+        let ops_after_click = bridge.runtime_mut().eval("String(__angnativeLastOps)").unwrap();
+        match ops_after_click {
+            JsValue::String(s) => assert!(
+                s.contains("SetText") || s.contains("SetProps") || s.contains("Create"),
+                "click must produce native ops, not just JS JSON; got {s}"
+            ),
+            other => panic!("unexpected native ops: {other:?}"),
+        }
     }
 
     /// Angular Forms compatibility (Phase 1). Requires:

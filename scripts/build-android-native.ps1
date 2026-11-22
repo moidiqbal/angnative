@@ -21,11 +21,19 @@ $env:ANDROID_SDK_ROOT = $sdk
 $env:ANDROID_NDK_HOME = $ndk
 $env:LIBCLANG_PATH = $libclang
 
-# Where the unified archive is staged. Both the platform shell and the
-# showcase copy the same JNI bridge sources and need the same library.
+# Where the unified archive is staged. The platform shell and every showcase
+# copy the same JNI bridge sources and need the same library. Native .a files
+# are deliberately NOT tracked (see .gitignore), so this script must stage
+# all of them — including the showcases that still use the legacy
+# libangnative_host_ffi.a filename in their CMakeLists.txt.
 $destinations = @(
-  (Join-Path $repo 'platforms\android\app\src\main\jniLibs'),
-  (Join-Path $repo 'showcases\ecosystem-core\app\src\main\jniLibs')
+  (Join-Path $repo 'platforms\android\app\src\main\jniLibs')
+)
+$destinations += @(
+  Get-ChildItem (Join-Path $repo 'showcases') -Directory | ForEach-Object {
+    $jni = Join-Path $_.FullName 'app\src\main\jniLibs'
+    if (Test-Path (Split-Path $jni -Parent)) { $jni }
+  }
 )
 
 $targets = @(

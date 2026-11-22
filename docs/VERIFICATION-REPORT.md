@@ -14,7 +14,8 @@ On this machine all toolchains are installed and every item below was actually e
 | AOT compile | ✅ PASS | `pnpm run compile:aot` → "AOT compilation complete (Ivy definitions verified)"; `dist/aot/app.component.js` contains `ɵɵdefineComponent` |
 | CLI production build | ✅ PASS | `node packages/cli/dist/cli.js build` → real ngc + esbuild → `dist/aot/bundle.js` |
 | Rust build | ✅ PASS | `cargo build --workspace` → Finished, 0 errors |
-| Rust tests | ✅ PASS | `cargo test --workspace` → **108 passed, 0 failed** |
+| Rust tests | ✅ PASS | `cargo test --workspace` → **124 passed, 0 failed** (6 acceptance tests ignored by default) |
+| Angular-in-QuickJS acceptance tests | ✅ PASS | `cargo test -p angnative-runtime-bridge -- --ignored` → **6 passed** (real AOT bundle boots, native click reaches Angular listener; forms, router, animations, http bundles load) |
 | JS/TS unit tests | ✅ PASS | `pnpm test` → **208 passed** (16 files) |
 | Desktop app | ✅ PASS | `cargo test --manifest-path crates/angnative-desktop/Cargo.toml` → 11 passed; window "AngNative Desktop" previously launched and click-tested |
 | Android APK | ✅ PASS | **10 APKs** built under `dist/device-testing/` (19.2–19.3 MB each) |
@@ -24,8 +25,10 @@ On this machine all toolchains are installed and every item below was actually e
 
 ## Bottom line
 Everything except iOS/macOS is implemented, built, tested and pushed to `master`
-(latest commit `497f163`). The iOS shell is code-complete but requires a Mac for
-`./scripts/build-ios-native.sh simulator` and simulator verification.
+(latest commit `fc3370c`). The iOS shell is code-complete but requires a Mac for
+`./scripts/build-ios-native.sh simulator` and simulator verification. The embedded
+Angular runtime is verified in-process; loading the bundle in a shipping native
+shell on-device remains the integration milestone (see `CODE-REVIEW-2026-11-22.md`).
 
 ## Reproduce
 ```powershell

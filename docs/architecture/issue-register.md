@@ -278,9 +278,9 @@
 | P0-03 | ✅ Fixed | - | A |
 | P0-04 | ✅ Fixed | - | A |
 | P0-05 | ✅ Fixed | - | A |
-| P0-06 | 🔴 In Progress | - | C |
-| P0-07 | 🔴 In Progress | - | C |
-| P0-08 | 🔴 In Progress | - | D |
+| P0-06 | ✅ Fixed (bootstrap + click round trip verified in QuickJS) | - | C |
+| P0-07 | ✅ Fixed (microtasks + polyfills + raw bundle loading) | - | C |
+| P0-08 | 🔴 Still open (shipping shells remain imperative Kotlin/Rust) | - | D |
 | P1-01 | ⬜ Pending | - | B |
 | P1-02 | ⬜ Pending | - | B |
 | P1-03 | ⬜ Pending | - | B |
@@ -325,7 +325,7 @@
 |------|----------|--------|
 | **Gate A** | All P0 issues resolved | 🟡 In Progress |
 | **Gate B** | Runtime lifecycle deterministic | ⬜ Pending |
-| **Gate C** | Angular bootstrap + execution verified | ⬜ Pending |
+| **Gate C** | Angular bootstrap + execution verified **in QuickJS** (6 acceptance tests) | ✅ Passed in-process |
 | **Gate D** | Android E2E round-trip verified | ⬜ Pending |
 | **Gate E** | All tests pass | ⬜ Pending |
 | **Gate F** | Engine abstraction complete | ⬜ Pending |
@@ -336,6 +336,6 @@
 ## Notes
 
 - P0-01 through P0-05 addressed in runtime bridge refactor (thread-local, single Host, single event path)
-- P0-06, P0-07, P0-08 are the current blocking issues for Gate C/D
+- P0-06 and P0-07 are closed (see `docs/CODE-REVIEW-2026-11-22.md`); P0-08 remains the blocker for Gate D — the embedded runtime works, but shipping shells still use imperative batches.
 - iOS (P2-08) remains BLOCKED pending macOS/Xcode access
 - Documentation (P2-15) completed for research phase

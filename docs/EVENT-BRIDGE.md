@@ -1,7 +1,11 @@
 # Native Event Bridge — Angular `(click)` round trip
 
-**Status (2026-11-21):** FFI + QuickJS-side scaffolding implemented; full
-Angular-bundle-in-native runtime still pending.
+**Status (2026-11-22):** Implemented and verified in-process. `angnative-runtime-bridge`
+owns Host + QuickJS + `AngNativeRuntime`, a real Angular AOT bundle boots, and a native
+event reaches the Angular listener (6 ignored acceptance tests pass —
+`cargo test -p angnative-runtime-bridge -- --ignored`). Loading that bundle inside a
+shipping native shell on-device is the remaining integration step. See
+`docs/CODE-REVIEW-2026-11-22.md` for the full evidence and honest gaps.
 
 ## What was added
 
@@ -20,7 +24,7 @@ unsigned int angnative_host_dispatch_event(AngNativeHost*, uint64_t node_id, con
 - Regression test: `native_event_bridge_dispatches_to_registered_listener`
   (`cargo test -p angnative-host-ffi` → 11 passed).
 
-### 2. QuickJS runtime API (source added; not compile-verified on Windows)
+### 2. QuickJS runtime API (implemented, compiled and tested)
 `AngNativeRuntime` (`crates/angnative-host-engine/src/runtime.rs`) now has:
 
 ```js
@@ -49,17 +53,27 @@ native button click (Kotlin / Swift / winit)
   → component (click) handler runs
 ```
 
-## Remaining work (not done)
+## Remaining work
 
-1. **Runtime bridge crate** connecting `Host::set_event_callback` to
-   `AngNativeRuntime::dispatch_event` (needs a crate depending on both
-   `angnative-host-ffi` and `angnative-host-engine`; verify on Mac/Linux).
-2. **Load the compiled Angular bundle into QuickJS** in each native shell
-   (DOM shims + Angular runtime). The AOT/ngc pipeline itself is now built and
-   verified (`scripts/compile-aot.mjs` → `dist/aot/` with Ivy definitions);
-   what remains is wiring that compiled bundle into the native shells' QuickJS runtime.
-3. **Wire platform shell clicks** to `angnative_host_dispatch_event` instead of
-   the current imperative `SetTextContent` batches.
+Done since the original note:
+1. ✅ **Runtime bridge crate** — `crates/angnative-runtime-bridge` connects the Host
+   event callback to `AngNativeRuntime::dispatch_event` (one owner, one event path,
+   enforced thread affinity, panic-safe C ABI).
+2. ✅ **Load the compiled Angular bundle into QuickJS** — `scripts/bundle-quickjs.mjs`
+   produces a self-contained IIFE; `angular_bootstrap_runs_in_quickjs` proves the real
+   AOT bundle boots and emits native `CreateNode` batches.
+3. ✅ **Wire clicks** — the renderer registers listeners via `na_addEventListener` and
+   `na_onEvent` routes Rust dispatch back to the Angular callback; the acceptance test
+   asserts exactly one listener fires and produces a new batch.
 
-Until steps 1-3 are done, native shells still demo imperative batches; the web
-adapter already has a complete DOM-based click path.
+Still open (honest):
+- **On-device / shipping-shell integration.** `showcases/ecosystem-core` owns a
+  `RuntimeBridge` and exposes `nativeRuntimeBridgeLoadScript`, but its activity is
+  imperative Kotlin and never loads a bundle. The other 9 showcases and
+  `platforms/android` still use the legacy host + imperative batches. iOS has no
+  runtime-bridge bindings. Until a shell loads the bundle and a tap reaches Angular,
+  the framework-level claim is "verified in the embedded runtime," not "runs natively."
+- **Full router navigation, animation-engine integration, DI-based `HttpClient.get()`,
+  template-driven `ngModel`, and AOT i18n markers** remain unverified (see
+  `UNSUPPORTED-FEATURES.md`).
+- The web adapter already has a complete DOM-based click path.

@@ -26,7 +26,7 @@
 
 Angular developers should not have to choose between WebViews and abandoning TypeScript. AngNative runs a custom Angular `Renderer2` over a Rust host engine: template mutations become `CommandBatch`es, a shadow tree is maintained in Rust, Taffy computes Flexbox/Grid layout, and platform shells render real native widgets via C-FFI/JNI — **no WebView, no DOM, no embedded browser in native mode**.
 
-> Honest note: mutations cross the FFI boundary as JSON batches. Zero-copy transport and a binary protocol are planned, not implemented. Angular component execution inside native shells needs the embedded JS runtime wiring (see [`docs/EVENT-BRIDGE.md`](docs/EVENT-BRIDGE.md)); the native showcases therefore use the verified Rust-driven `na-*` pipeline, and third-party DOM libraries are represented by clearly labelled **native reimplementations** (see [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)).
+> Honest note: mutations cross the FFI boundary as JSON batches. Zero-copy transport and a binary protocol are planned, not implemented. A real Angular AOT bundle now boots inside the embedded QuickJS runtime and a native event reaches the Angular listener (see [`docs/CODE-REVIEW-2026-11-22.md`](docs/CODE-REVIEW-2026-11-22.md)); the *shipping* native shells still render Rust/Kotlin-driven trees, so on-device bundle loading is the remaining integration step (see [`docs/EVENT-BRIDGE.md`](docs/EVENT-BRIDGE.md)). Third-party DOM libraries are represented by clearly labelled **native reimplementations** (see [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)).
 
 ---
 
@@ -36,7 +36,7 @@ Full evidence: [`docs/VERIFICATION-REPORT.md`](docs/VERIFICATION-REPORT.md) · [
 
 | Component | Status | Proof |
 |---|---|---|
-| Rust host crates + engine | ✅ | `cargo test --workspace` → **108 passed** |
+| Rust host crates + engine | ✅ | `cargo test --workspace` → **124 passed**; the 6 ignored Angular-in-QuickJS acceptance tests pass when `dist/aot` bundles are generated |
 | Angular renderer / contract / testing | ✅ | `pnpm test` → **208 passed** (16 files) |
 | Production AOT (`ngc` + esbuild) | ✅ | `pnpm run compile:aot`, `angnative build`; Ivy `ɵɵdefineComponent` verified in `dist/aot/` |
 | Android shell (10 APKs) | ✅ | built, installed and launched on emulator **and OnePlus Open (Android 16)**; `WebViews: 0` on every app |
@@ -142,10 +142,15 @@ pnpm install
 pnpm run compile:aot            # real Angular ngc, Ivy verified
 node packages/cli/dist/cli.js build
 cargo build --workspace
-cargo test --workspace          # 108 tests
+cargo test --workspace          # 124 tests (+ 6 --ignored acceptance tests)
 pnpm test                       # 208 tests
 node scripts/check-size-budget.mjs
 ```
+
+`Cargo.lock` is committed for reproducible Rust builds. Prebuilt Android `.a`
+libraries in `jniLibs/` are **not** tracked — regenerate them with
+`pwsh -File scripts/build-android-native.ps1` (or `./scripts/build-android-native.sh all`)
+before building any Android project.
 
 Run Android demo: `pwsh -File scripts/build-android-stack.ps1 -Stack latest` then `./gradlew assembleDebug` in `platforms/android/` — or install a prebuilt APK from [`dist/device-testing/`](dist/device-testing/).
 
