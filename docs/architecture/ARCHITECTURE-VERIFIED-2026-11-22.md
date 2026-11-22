@@ -198,6 +198,12 @@ but is relevant when reasoning about event handling.
    `Element.animate()` driver are verified, not the real engine.
 4. **DI-based `HttpClient.get()`**: bundle and fetch surface verified; full DI
    request is blocked by `FetchBackend` platform-provider requirements (NG0201).
+   Investigation so far: `createEnvironmentInjector(providers, parent)` requires
+   an explicit parent (a bare call was the original mistake), and `FetchBackend`
+   also needs `NgZone`, `DestroyRef` and `HTTP_FETCH_MAX_RESPONSE_SIZE`. Supplying
+   a parent from `Injector.create` plus `provideZonelessChangeDetection()` and a
+   `DestroyRef` value still yields NG0201, so the exact missing provider remains
+   unidentified. The stock FetchBackend path is not claimed as working.
 5. **iOS parity**: Swift bindings still wrap the legacy host; nothing here
    claims iOS execution.
 6. Template-driven `ngModel` bindings and AOT i18n markers in real templates

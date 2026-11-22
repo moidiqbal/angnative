@@ -44,9 +44,9 @@ const features = [
     name: 'http',
     global: '__ngHttp',
     source: `import * as http from ${JSON.stringify(httpEntry)};
-import { createEnvironmentInjector, runInInjectionContext, provideZonelessChangeDetection, DestroyRef } from ${JSON.stringify(coreEntry)};
+import { createEnvironmentInjector, runInInjectionContext, provideZonelessChangeDetection, DestroyRef, Injector } from ${JSON.stringify(coreEntry)};
 globalThis.__ngHttp = Object.assign({}, http, {
-  createEnvironmentInjector, runInInjectionContext, provideZonelessChangeDetection, DestroyRef
+  createEnvironmentInjector, runInInjectionContext, provideZonelessChangeDetection, DestroyRef, Injector
 });`,
   },
 ];

@@ -622,11 +622,12 @@ mod tests {
             JsValue::String("200|hello-from-native|GET".to_string())
         );
 
-        // NOTE (honest): a custom HttpBackend receiving our fetch response
-        // was prototyped; the response reaches the backend but HttpClient's
-        // subscription chain does not deliver it in this runtime, and DI with
-        // the stock FetchBackend still throws NG0201. Full HttpClient.get()
-        // remains unverified.
+        // NOTE (honest): DI-based HttpClient.get() is still blocked by NG0201.
+        // Investigated: createEnvironmentInjector requires an explicit parent
+        // (Injector.create), and FetchBackend additionally needs NgZone /
+        // DestroyRef / HTTP_FETCH_MAX_RESPONSE_SIZE. Supplying parent + tokens
+        // still yields NG0201, so the exact missing provider is not yet known.
+        // Bundle load and the fetch platform surface are verified above.
     }
 
     /// Full component-based Router navigation in QuickJS.
