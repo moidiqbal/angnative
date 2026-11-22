@@ -11,19 +11,28 @@
  *
  * The C++ side owns a heap-allocated ViewFactoryContext containing a JNI global
  * ref to this instance. Rust-emitted PlatformOps are delivered to the `onNative*`
- * methods below, which delegate to the installed NativeViewFactory.
+ * methods below, which delegate to the installed NativeViewSink.
+ *
+ * Threading: every native entry point is marshalled to Android's main looper.
+ * Rust→Kotlin view callbacks fire synchronously inside those calls, so they
+ * inherit the main-thread guarantee without per-callback latches.
  */
 
 package com.angnative.app
 
 import android.content.Context
 import android.graphics.Color
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 class JniBridge(private val context: Context) {
 
@@ -33,6 +42,8 @@ class JniBridge(private val context: Context) {
     private const val OUTPUT_NODE_ID = 6L
     /** Node bound to the demo's Reset button. */
     private const val RESET_NODE_ID = 7L
+    /** Upper bound for a posted native call; failures are propagated, not ignored. */
+    private const val NATIVE_CALL_TIMEOUT_MS = 10_000L
 
     init {
       System.loadLibrary("angnative")
@@ -62,18 +73,57 @@ class JniBridge(private val context: Context) {
   private var isInitialized: Boolean = false
   private var pressCount: Int = 0
 
-  /** Installed by the platform view; receives the Rust ViewFactory callbacks. */
-  var viewFactory: NativeViewFactory? = null
+  private val mainLooper: Looper = Looper.getMainLooper()
+  private val mainHandler = Handler(mainLooper)
 
-  fun initHost() {
-    if (isInitialized) return
-    
-    // Create unified runtime bridge (host + QuickJS runtime)
+  /** Installed by the platform view; receives the Rust ViewFactory callbacks. */
+  var viewFactory: NativeViewSink? = null
+
+  /**
+   * Run a native call on Android's main looper.
+   *
+   * The inline fast path preserves synchronous shell code such as
+   * `findButtonIdByText("+")` immediately after `loadScript`. Off-main callers
+   * post once and wait; a timeout or captured exception becomes an
+   * [IllegalStateException] so the caller never observes a false success.
+   */
+  private fun <T> runOnMainForNative(operation: () -> T): T {
+    if (Looper.myLooper() === mainLooper) return operation()
+
+    val result = AtomicReference<Any?>()
+    val error = AtomicReference<Throwable>()
+    val done = CountDownLatch(1)
+    val posted = mainHandler.post {
+      try {
+        result.set(operation())
+      } catch (t: Throwable) {
+        error.set(t)
+        Log.e(TAG, "Native bridge call failed on main thread", t)
+      } finally {
+        done.countDown()
+      }
+    }
+    if (!posted) {
+      throw IllegalStateException("Could not post native bridge call to main looper")
+    }
+    if (!done.await(NATIVE_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+      throw IllegalStateException("Native bridge call timed out after ${NATIVE_CALL_TIMEOUT_MS}ms")
+    }
+    error.get()?.let { throw IllegalStateException("Native bridge call failed on main thread", it) }
+    @Suppress("UNCHECKED_CAST")
+    return result.get() as T
+  }
+
+  fun initHost() = runOnMainForNative {
+    if (isInitialized) return@runOnMainForNative
+
+    // Create unified runtime bridge (host + QuickJS runtime). Running on main
+    // keeps Rust's owner_thread aligned with later UI taps.
     runtimeBridgeHandle = nativeRuntimeBridgeCreate()
     if (runtimeBridgeHandle == 0L) {
       throw RuntimeException("Failed to create AngNative runtime bridge")
     }
-    
+
     // Get the underlying host for ViewFactory registration
     hostHandle = nativeRuntimeBridgeGetHost(runtimeBridgeHandle)
     if (hostHandle == 0L) {
@@ -90,42 +140,50 @@ class JniBridge(private val context: Context) {
   }
 
   /** Load a self-contained JS bundle (e.g. compiled Angular AOT output). */
-  fun loadScript(source: String): Int {
+  fun loadScript(source: String): Int = runOnMainForNative {
     check(isInitialized) { "AngNative host not initialized" }
-    return nativeRuntimeBridgeLoadScript(runtimeBridgeHandle, source)
+    nativeRuntimeBridgeLoadScript(runtimeBridgeHandle, source)
   }
 
   /** Process a JSON command batch through the Rust host. */
   fun processBatch(batchJson: String): String {
-    check(isInitialized) { "AngNative host not initialized" }
-    return nativeHostProcessBatch(hostHandle, batchJson) ?: "{\"error\":\"null result\"}"
+    val result = runOnMainForNative<String?> {
+      check(isInitialized) { "AngNative host not initialized" }
+      nativeHostProcessBatch(hostHandle, batchJson)
+    }
+    return result ?: "{\"error\":\"null result\"}"
   }
 
   /** Run layout on the current shadow tree. */
   fun runLayout(width: Float, height: Float): String {
-    check(isInitialized) { "AngNative host not initialized" }
-    return nativeHostRunLayout(hostHandle, width, height) ?: "{\"error\":\"layout failed\"}"
+    val result = runOnMainForNative<String?> {
+      check(isInitialized) { "AngNative host not initialized" }
+      nativeHostRunLayout(hostHandle, width, height)
+    }
+    return result ?: "{\"error\":\"layout failed\"}"
   }
 
   /** Get the last error from the Rust host. */
   fun lastError(): String {
-    return nativeHostLastError(hostHandle) ?: "{\"ok\":true}"
+    return runOnMainForNative<String?> { nativeHostLastError(hostHandle) } ?: "{\"ok\":true}"
   }
 
   /** Get the total node count in the shadow tree. */
-  fun nodeCount(): Int {
-    if (!isInitialized) return 0
-    return nativeHostNodeCount(hostHandle)
+  fun nodeCount(): Int = runOnMainForNative {
+    if (!isInitialized) 0 else nativeHostNodeCount(hostHandle)
   }
 
   /** Take a snapshot of the current shadow tree as parsed objects. */
-  fun snapshot(): SnapshotResult {
+  fun snapshot(): SnapshotResult = runOnMainForNative {
     check(isInitialized) { "AngNative host not initialized" }
     val json = nativeHostSnapshot(hostHandle) ?: "{\"error\":\"snapshot failed\"}"
-    return SnapshotResult.parse(json)
+    SnapshotResult.parse(json)
   }
 
-  fun destroyHost() {
+  fun destroyHost() = runOnMainForNative {
+    // Drop queued native work before releasing the bridge so stale posts cannot
+    // touch a released view factory or a destroyed host.
+    mainHandler.removeCallbacksAndMessages(null)
     if (runtimeBridgeHandle != 0L) {
       // Pass hostHandle so C++ releases the ViewFactory JNI global ref and
       // g_contexts entry as well — otherwise it leaks on every recreation.
@@ -239,12 +297,12 @@ class JniBridge(private val context: Context) {
   }
 
   /** Dispatch any native event name (Angular templates use "click"). */
-  fun dispatchNativeEvent(nodeId: Long, eventName: String): Int {
-    if (!isInitialized) return 0
+  fun dispatchNativeEvent(nodeId: Long, eventName: String): Int = runOnMainForNative {
+    if (!isInitialized) return@runOnMainForNative 0
     val payload = """{"source":"native","nodeId":$nodeId,"event":"$eventName"}"""
     val invoked = nativeRuntimeBridgeDispatchEvent(runtimeBridgeHandle, nodeId, eventName, payload)
     Log.i(TAG, "dispatchNativeEvent($nodeId, $eventName) -> listeners invoked: $invoked")
-    return invoked
+    invoked
   }
 
   /* =======================================================================

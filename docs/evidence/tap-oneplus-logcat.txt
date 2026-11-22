@@ -1,0 +1,5 @@
+--------- beginning of main
+11-23 00:23:27.267 30998 30998 I AngNative: dispatchNativeEvent(18, click) -> listeners invoked: 0
+11-23 00:23:27.267 30998 30998 I AngNative: Angular tap node=18 -> 0 listener(s)
+11-23 00:23:27.268 30998 30998 I AngNative: dispatchNativeEvent(17, click) -> listeners invoked: 1
+11-23 00:23:27.268 30998 30998 I AngNative: Angular tap node=17 -> 1 listener(s)

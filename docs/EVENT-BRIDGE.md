@@ -1,13 +1,15 @@
 # Native Event Bridge — Angular `(click)` round trip
 
-**Status (2026-11-22):** Implemented and verified in-process. `angnative-runtime-bridge`
-owns Host + QuickJS + `AngNativeRuntime`, a real Angular AOT bundle boots, and a native
-event reaches the Angular listener (10 ignored tests pass — 9 Angular acceptance tests
-plus 1 RxJS spot-check — via `cargo test -p angnative-runtime-bridge -- --ignored`).
-The cross-thread C ABI fix is now verified on an Android 14 emulator and on the physical
-OnePlus Open (Android 16, arm64-v8a) with real wrong-thread JNI calls. Loading that bundle inside a
-shipping native shell on-device is the remaining integration step. See
-`docs/CODE-REVIEW-2026-11-22.md` for the full evidence and honest gaps.
+**Status (2026-11-23):** Implemented and verified in-process and on-device.
+`angnative-runtime-bridge` owns Host + QuickJS + `AngNativeRuntime`, a real Angular AOT
+bundle boots, and native events reach live Angular listeners (10 ignored tests pass —
+9 Angular acceptance tests plus 1 RxJS spot-check — via
+`cargo test -p angnative-runtime-bridge -- --ignored`). The cross-thread C ABI fix,
+UI-thread marshalling of Rust→Kotlin ViewFactory callbacks, and a real native tap →
+live Angular listener are verified on the Android 14 emulator and on the physical
+OnePlus Open (Android 16, arm64-v8a). See `docs/CODE-REVIEW-2026-11-22.md` and
+`docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md` for the full evidence. iOS has
+static bindings only; no Swift compile or simulator/device run was performed.
 
 ## What was added
 
@@ -43,11 +45,12 @@ which calls the JS global `na_onEvent(listenerId, payloadJson)` for each
 registered listener. `rustfmt --check` passes; a full `cargo test` of this
 crate is blocked on Windows because `rquickjs-sys` needs elevated `patch.exe`.
 
-## How the full round trip will work
+## How the full round trip works
 
 ```
 native button click (Kotlin / Swift / winit)
-  → angnative_host_dispatch_event(nodeId, "click", payload)
+  → JniBridge.dispatchNativeEvent (posted to main if needed)
+  → angnative_runtime_bridge_dispatch_event(nodeId, "click", payload)
   → Host event callback (installed by the runtime bridge)
   → AngNativeRuntime::dispatch_event(...)
   → JS global na_onEvent(listenerId, payload)
@@ -100,11 +103,23 @@ selected `CPH2551 - 16` and reported 2 tests, 0 failures. Evidence:
 `docs/evidence/ANDROID-THREAD-AFFINITY-ONEPLUS.md` and
 `docs/evidence/android-thread-affinity-oneplus.html`.
 
-Separately, no Android UI-thread marshalling is implemented in the JNI callbacks
-(which only `AttachCurrentThread` for Rust→Kotlin view callbacks), and
-`EcosystemCoreActivity` still loads the AOT bundle and immediately destroys the
-bridge, leaving no live listener for a native tap. Those remain concrete open
-tasks, not claims.
+**UI-thread marshalling verified.** `JniBridge` now marshals every native entry
+point (`initHost`, `loadScript`, `processBatch`, `runLayout`, dispatch, queries,
+`destroyHost`) to `Looper.getMainLooper()`. Rust→Kotlin ViewFactory callbacks fire
+synchronously inside those calls, so they inherit the main-thread guarantee without
+per-callback latches. `NativeViewSink` lets instrumentation record
+`Looper.myLooper()` inside each callback. The suite reported 4 tests / 0 failures
+on both devices; evidence is in `docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`.
+`buildLayoutRequest` is pure JSON and is called from the wrapped `runLayout` entry
+point; no separate UI work is done there.
+
+**Real tap verified on-device.** `EcosystemCoreActivity` keeps the bridge alive
+after `loadScript`, walks the native ancestor chain, and dispatches `click` until a
+listener responds. On both devices logcat showed
+`Angular tap node=17 -> 1 listener(s)` and the UI changed from `Count: 0` to
+`Count: 1`. A test failure or timeout now propagates as `IllegalStateException`
+instead of reporting a false success. The property is **one delivery per event
+(canonical JS thread-local path + legacy FFI fallback)**, not a single code path.
 
 ## Remaining work
 
@@ -122,15 +137,12 @@ Done since the original note:
    asserts exactly one listener fires and produces a new batch.
 
 Still open (honest):
-- **On-device / shipping-shell integration.** `showcases/ecosystem-core` does load
-  the real AOT bundle (`EcosystemCoreActivity.kt:170-179`) and reports
-  `nodes=... (load rc=0)`, but it destroys the bridge immediately afterwards, so
-  no live Angular listener survives for a tap. The other 9 showcases and
-  `platforms/android` still use the legacy host + imperative batches. iOS has
-  static runtime-bridge bindings only (no Swift compile or simulator/device run
-  on this host). Until a shell keeps the bridge alive and a tap reaches
-  Angular, the framework-level claim is "verified in the embedded runtime," not
-  "runs natively." See the cross-thread section above for the remaining UI-thread / live-tap gap.
+- **Other shells / platforms.** `showcases/ecosystem-core` keeps the bridge alive,
+  loads the real AOT bundle, and now has a verified native tap. The other 9
+  showcases and `platforms/android` still use the legacy host + imperative
+  batches; they were not part of this tap proof. iOS has static runtime-bridge
+  bindings only — no Swift compile or simulator/device run was performed on this
+  host, so no iOS runtime claim is made.
 - **Animation-engine integration** is now verified with deterministic three-sample
   interpolation (`angular_animation_engine_interpolates_native_styles`); real-time
   easing fidelity is still unverified. DI-based `HttpClient.get()` is verified by

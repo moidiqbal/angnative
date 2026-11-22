@@ -1,6 +1,6 @@
 # Android wrong-thread JNI verification (physical OnePlus Open)
 
-**Date:** 2026-11-22
+**Date:** 2026-11-22; updated 2026-11-23
 
 ## Device
 
@@ -53,7 +53,7 @@ Retained report: `docs/evidence/android-thread-affinity-oneplus.html`
 
 ## Scope
 
-This verifies the C ABI owner-thread guard on the physical device. It does **not**
-claim that the JNI callbacks marshal Rust→Kotlin view callbacks onto the Android
-UI thread, nor that a native UI tap reaches a live Angular listener; those remain
-separate open items documented in `docs/EVENT-BRIDGE.md`.
+This verifies the C ABI owner-thread guard on the physical device. UI-thread
+marshalling of Rust→Kotlin ViewFactory callbacks and the real native tap → live
+Angular listener were verified later on 2026-11-23; see
+`docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md` and `docs/EVENT-BRIDGE.md`.

@@ -30,7 +30,7 @@ class NativeViewFactory(
   private val context: Context,
   private val rootContainer: ViewGroup,
   private val onPress: (Long) -> Unit = {}
-) {
+) : NativeViewSink {
   private val views = mutableMapOf<Long, View>()
   private val rootIds = mutableSetOf<Long>()
   private val childParents = mutableMapOf<Long, Long>()
@@ -50,7 +50,7 @@ class NativeViewFactory(
   }
 
   /** PlatformOp::Create */
-  fun onNativeCreateView(nodeId: Long, viewType: String) {
+  override fun onNativeCreateView(nodeId: Long, viewType: String) {
     if (views.containsKey(nodeId)) return
     val view = createViewForType(nodeId, viewType)
     view.layoutParams = frameParams()
@@ -66,7 +66,7 @@ class NativeViewFactory(
   }
 
   /** PlatformOp::SetFrame — geometry from LayoutResponseJson (dp -> px). */
-  fun onNativeSetFrame(nodeId: Long, x: Float, y: Float, width: Float, height: Float) {
+  override fun onNativeSetFrame(nodeId: Long, x: Float, y: Float, width: Float, height: Float) {
     val view = views[nodeId] ?: return
     val lp = view.layoutParams as? FrameLayout.LayoutParams ?: frameParams()
     // Keep WRAP_CONTENT when layout reports no usable dimension (e.g. text).
@@ -78,7 +78,7 @@ class NativeViewFactory(
   }
 
   /** PlatformOp::SetProps — ViewProps JSON { text, styles, properties }. */
-  fun onNativeSetProps(nodeId: Long, propsJson: String) {
+  override fun onNativeSetProps(nodeId: Long, propsJson: String) {
     val view = views[nodeId] ?: return
     try {
       val props = JSONObject(propsJson)
@@ -102,30 +102,30 @@ class NativeViewFactory(
   }
 
   /** PlatformOp::SetText */
-  fun onNativeSetText(nodeId: Long, text: String) {
+  override fun onNativeSetText(nodeId: Long, text: String) {
     val view = views[nodeId] ?: return
     if (view is TextView) view.text = text
   }
 
   /** PlatformOp::Append */
-  fun onNativeAppendChild(parentId: Long, childId: Long) {
+  override fun onNativeAppendChild(parentId: Long, childId: Long) {
     attachChild(parentId, childId, -1)
   }
 
   /** PlatformOp::Insert */
-  fun onNativeInsertChild(parentId: Long, childId: Long, index: Int) {
+  override fun onNativeInsertChild(parentId: Long, childId: Long, index: Int) {
     attachChild(parentId, childId, index)
   }
 
   /** PlatformOp::Remove */
-  fun onNativeRemoveChild(parentId: Long, childId: Long) {
+  override fun onNativeRemoveChild(parentId: Long, childId: Long) {
     val parent = views[parentId] as? ViewGroup ?: return
     val child = views[childId] ?: return
     parent.removeView(child)
   }
 
   /** PlatformOp::Destroy */
-  fun onNativeDestroyView(nodeId: Long) {
+  override fun onNativeDestroyView(nodeId: Long) {
     val view = views.remove(nodeId) ?: return
     (view.parent as? ViewGroup)?.removeView(view)
   }

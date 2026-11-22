@@ -65,8 +65,12 @@ actually prove — not aspirations. Where something is not verified, it says so.
 **Evidence:** `angular_bootstrap_runs_in_quickjs` asserts
 `typeof __angnativeDispatchBatch === 'function'`, `host.engine().size() > 0`,
 and native ops emitted before and after a click. On-device (ecosystem-core,
-API 34 emulator) the status label read `Angular in Rust: nodes=20 (load rc=0)`;
-the retained screenshot is `docs/assets/ecosystem-core-angular-in-rust-nodes20.png`.
+API 34 emulator) the status label read
+`Angular in Rust: nodes=20 rc=0 plusNode=18`; the retained screenshot is
+`docs/assets/ecosystem-core-angular-in-rust-nodes20.png`. The current shell keeps
+the bridge alive, and `JniBridge` marshals each native entry point to
+`Looper.getMainLooper()` before Rust synchronously emits `PlatformOp`s, so the
+ViewFactory callbacks are main-thread by construction (verified in §7).
 
 ### 3.2 Event pipeline (exactly one delivery per event)
 
@@ -145,7 +149,7 @@ fires per event and a new native batch follows.
 
 | Shell | Bridge | Bundle load | Verified |
 |---|---|---|---|
-| ecosystem-core | unified | **yes** (flagship) | on-device: `nodes=20`, `rc=0` (screenshot retained: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png`) |
+| ecosystem-core | unified | **yes** (flagship) | on-device: `nodes=20 rc=0 plusNode=18` (screenshot retained: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png`); bridge stays alive, main-thread ViewFactory callbacks and real tap verified on emulator + OnePlus |
 | other 9 showcases | unified | asset present, opt-in API; **not auto-loaded** | all 10 `assembleDebug` observed during development (no CI Android job); material launched on emulator and logged `runtime bridge created`, 8 nodes, layout response, no crash (log excerpt not retained as a repo artifact) |
 | platforms/android | unified static library staged; Kotlin JNI still calls legacy `nativeHostCreate` | legacy imperative UI | `assembleDebug` OK |
 | iOS | legacy host Swift bindings | none | build not possible here (no macOS/Xcode) |
@@ -176,7 +180,9 @@ for opt-in use only.
 | All 10 Android `assembleDebug` | SUCCESS observed during development; no CI Android job and no retained build log |
 | On-device (API 34 emulator) | Angular bootstrap in QuickJS, 20 native nodes, `rc=0`; screenshot: `docs/assets/ecosystem-core-angular-in-rust-nodes20.png` |
 | Wrong-thread JNI instrumentation (API 34 emulator + physical OnePlus Open) | `connectedDebugAndroidTest`: 2 tests, 0 failures on `emulator-5554` (Android 14, x86_64) and on `b6640c8f` (`CPH2551`, Android 16, arm64-v8a); sentinels `-1` / `2` / NULL, bridge survives. Evidence: `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md`, `docs/evidence/ANDROID-THREAD-AFFINITY-ONEPLUS.md`, and retained HTML reports. |
-| CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts the on-device node count. No build log artifact is uploaded/retained |
+| UI-thread ViewFactory marshalling (emulator + OnePlus) | Full `connectedDebugAndroidTest` suite: 4 tests, 0 failures on both devices. `ViewFactoryMainThreadTest.kt` records `Looper.myLooper()` inside each `NativeViewSink` callback from worker-thread native entries; all recorded loopers were `Looper.getMainLooper()`. Evidence: `docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md` and retained HTML reports. |
+| Real tap → live Angular listener (emulator + OnePlus) | `Angular tap node=17 -> 1 listener(s)` in `AngNative:I` logcat and UI `Count: 0 → Count: 1` in before/after `uiautomator` XML on both devices. Emulator screenshot retained; OnePlus image not retained (device disconnected during capture), logcat/XML retained. |
+| CI | `angular-runtime` job regenerates bundles and runs the ignored tests + FFI check; `android-e2e` job builds ecosystem-core and asserts `Angular in Rust: nodes=[0-9]+ rc=0 plusNode=[0-9]+` plus the real tap (`Count: 1`). No build log artifact is uploaded/retained |
 
 The ten ignored tests require regenerated `dist/aot/*` bundles, which are
 gitignored. Reproduce locally with:
@@ -225,10 +231,13 @@ but is relevant when reasoning about event handling.
     2 tests / 0 failures) and on the physical OnePlus Open `b6640c8f` (`CPH2551`,
     Android 16, arm64-v8a), also 2 tests / 0 failures. The first emulator run
     failed because the staged `jniLibs` archive predated `fe8f08a`; rebuilding via
-    `scripts/build-android-native.ps1` and rerunning produced the pass. Separately,
-    JNI callbacks only `AttachCurrentThread` (no UI-thread marshalling), and
-    `EcosystemCoreActivity` destroys the bridge immediately after loading the
-    bundle. See `docs/EVENT-BRIDGE.md`,
+    `scripts/build-android-native.ps1` and rerunning produced the pass. UI-thread
+    marshalling was subsequently added at every `JniBridge` native entry point
+    (inline on main, one post + latch off-main, errors propagated as
+    `IllegalStateException`, queued posts cleared on destroy). The full 4-test
+    suite passed on both devices, and the real tap reached a live Angular
+    listener. See `docs/EVENT-BRIDGE.md`,
+    `docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`,
     `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md`, and
     `docs/evidence/ANDROID-THREAD-AFFINITY-ONEPLUS.md`.
 3. **Angular animation engine integration — RESOLVED (deterministic samples)**:
