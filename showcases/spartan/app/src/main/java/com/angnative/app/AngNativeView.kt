@@ -1,5 +1,5 @@
 /**
- * AngNativeView.kt — Native container for AngNative on Android.
+ * AngNativeView.kt ΓÇö Native container for AngNative on Android.
  *
  * The demo still dispatches a command batch to the Rust host, but the visible
  * UI is built exclusively from the PlatformOps Rust emits through the
@@ -97,7 +97,7 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
     viewFactory = factory
     jniBridge.viewFactory = factory
 
-    // Demo command batch — the content of the UI lives here, not in Kotlin View code.
+    // Demo command batch ΓÇö the content of the UI lives here, not in Kotlin View code.
     // Explicit heights are required because intrinsic text measurement is still a
     // stub in the Rust layout engine (it reports 0 for text nodes).
     val initialBatch = buildBatch {
@@ -111,7 +111,7 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
 
       // Badge (id=2)
       createNode(2, "Text")
-      setText(2, "ANGNATIVE • SPARTAN UI SHOWCASE (NATIVE REIMPLEMENTATION)")
+      setText(2, "ANGNATIVE ΓÇó SPARTAN UI SHOWCASE (NATIVE REIMPLEMENTATION)")
       setStyle(2, "fontSize", "11px")
       setStyle(2, "fontWeight", "bold")
       setStyle(2, "color", "#4338CA")
@@ -120,7 +120,7 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
 
       // Title (id=3)
       createNode(3, "Text")
-      setText(3, "Spartan UI — Native Showcase")
+      setText(3, "Spartan UI ΓÇö Native Showcase")
       setStyle(3, "fontSize", "26px")
       setStyle(3, "fontWeight", "bold")
       setStyle(3, "color", "#0F172A")
@@ -155,9 +155,9 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
       setStyle(7, "height", "44px")
       insertChild(1, 7, 5)
 
-      // Footer (id=8) — neutral wording, no stale layout-engine claim.
+      // Footer (id=8) ΓÇö neutral wording, no stale layout-engine claim.
       createNode(8, "Text")
-      setText(8, "AngNative Runtime v0.1.0 • Rust FFI • Android shell")
+      setText(8, "AngNative Runtime v0.1.0 ΓÇó Rust FFI ΓÇó Android shell")
       setStyle(8, "fontSize", "12px")
       setStyle(8, "color", "#94A3B8")
       setStyle(8, "height", "30px")
@@ -219,4 +219,3 @@ class BatchBuilder {
     return """{"protocolVersion":1,"frameId":0,"timestampMs":${System.currentTimeMillis()},"commands":[${commands.joinToString(",")}]}"""
   }
 }
-

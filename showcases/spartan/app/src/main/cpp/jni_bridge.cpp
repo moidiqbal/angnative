@@ -2,12 +2,16 @@
  * jni_bridge.cpp — JNI bridge between Android Kotlin and the Rust host.
  *
  * Implements the native methods declared in JniBridge.kt:
- *   - nativeHostCreate / nativeHostDestroy
+ *   - nativeRuntimeBridgeCreate / nativeRuntimeBridgeDestroy / ...GetHost
+ *   - nativeRuntimeBridgeDispatchEvent
  *   - nativeHostRegisterViewFactory
  *   - nativeHostProcessBatch
  *   - nativeHostRunLayout
  *   - nativeHostLastError
- *   - nativeHostNodeCount / nativeHostSnapshot
+ *   - nativeHostNodeCount / nativeHostSnapshot / nativeHostDispatchEvent
+ *
+ * NOTE: nativeHostCreate / nativeHostDestroy remain as LEGACY C exports but are
+ * no longer declared by Kotlin — the runtime bridge owns the Host.
  *
  * The 8 ViewFactory callbacks are real C function pointers that call back into
  * the JniBridge instance (held as a JNI global ref inside ViewFactoryContext).
@@ -43,7 +47,8 @@ struct ViewFactoryContext {
   jmethodID destroyView = nullptr;
 };
 
-// Keyed by host handle so nativeHostDestroy can release the context + global ref.
+// Keyed by host handle so nativeRuntimeBridgeDestroy can release the context +
+// JNI global ref (nativeHostDestroy only does this for the legacy path).
 std::unordered_map<jlong, ViewFactoryContext*> g_contexts;
 
 void destroyContext(JNIEnv* env, ViewFactoryContext* ctx) {
@@ -229,6 +234,9 @@ Java_com_angnative_app_JniBridge_nativeHostCreate(JNIEnv* /*env*/, jobject /*thi
   return reinterpret_cast<jlong>(host);
 }
 
+// LEGACY — only valid for hosts created by nativeHostCreate(). NEVER call this
+// with a bridge-owned host handle: the runtime bridge owns the Host and will
+// free it again (double-free). Kotlin no longer declares this entry point.
 extern "C" JNIEXPORT void JNICALL
 Java_com_angnative_app_JniBridge_nativeHostDestroy(JNIEnv* env, jobject /*thiz*/, jlong handle) {
   // Release the JNI global ref + context before destroying the Rust host.
@@ -381,4 +389,106 @@ Java_com_angnative_app_JniBridge_nativeHostSnapshot(JNIEnv* env, jobject /*thiz*
     return env->NewStringUTF("{\"error\":\"snapshot failed\"}");
   }
   return rustStringToJString(env, snapshot);  // frees the Rust string
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeHostDispatchEvent(JNIEnv* env, jobject /*thiz*/,
+                                                         jlong handle, jlong nodeId,
+                                                         jstring eventName, jstring payloadJson) {
+  AngNativeHost* h = reinterpret_cast<AngNativeHost*>(handle);
+  if (h == nullptr) return 0;
+  
+  const char* event_name = env->GetStringUTFChars(eventName, nullptr);
+  if (event_name == nullptr) return 0;
+  
+  const char* payload = payloadJson != nullptr 
+      ? env->GetStringUTFChars(payloadJson, nullptr) 
+      : nullptr;
+  
+  unsigned int invoked = angnative_host_dispatch_event(h, static_cast<uint64_t>(nodeId), event_name, payload);
+  
+  env->ReleaseStringUTFChars(eventName, event_name);
+  if (payload != nullptr) {
+    env->ReleaseStringUTFChars(payloadJson, payload);
+  }
+  
+  return static_cast<jint>(invoked);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeCreate(JNIEnv* /*env*/, jobject /*thiz*/) {
+  AngNativeRuntimeBridge* bridge = angnative_runtime_bridge_create();
+  if (bridge == nullptr) {
+    LOGE("Failed to create AngNative runtime bridge");
+    return 0;
+  }
+  LOGI("AngNative runtime bridge created: %p", bridge);
+  return reinterpret_cast<jlong>(bridge);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDestroy(JNIEnv* env, jobject /*thiz*/,
+                                                            jlong handle, jlong hostHandle) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  // The bridge owns the Host. Destroy it first so no ViewFactory callback can
+  // fire with a dangling ViewFactoryContext, then release the JNI global ref.
+  // This also fixes the leak where the old Kotlin destroyHost() dropped the
+  // bridge but never cleared g_contexts / the global ref (review P1-08).
+  angnative_runtime_bridge_destroy(b);
+  if (hostHandle != 0) {
+    auto it = g_contexts.find(hostHandle);
+    if (it != g_contexts.end()) {
+      destroyContext(env, it->second);
+      g_contexts.erase(it);
+    }
+  }
+  LOGI("AngNative runtime bridge destroyed: %p", b);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeDispatchEvent(JNIEnv* env, jobject /*thiz*/,
+                                                                  jlong handle, jlong nodeId,
+                                                                  jstring eventName, jstring payloadJson) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  if (b == nullptr) return 0;
+  
+  const char* event_name = env->GetStringUTFChars(eventName, nullptr);
+  if (event_name == nullptr) return 0;
+  
+  const char* payload = payloadJson != nullptr 
+      ? env->GetStringUTFChars(payloadJson, nullptr) 
+      : nullptr;
+  
+  unsigned int invoked = angnative_runtime_bridge_dispatch_event(b, static_cast<uint64_t>(nodeId), event_name, payload);
+  
+  env->ReleaseStringUTFChars(eventName, event_name);
+  if (payload != nullptr) {
+    env->ReleaseStringUTFChars(payloadJson, payload);
+  }
+  
+  return static_cast<jint>(invoked);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLoadScript(JNIEnv* env, jobject /*thiz*/,
+                                                              jlong handle, jstring source) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  if (b == nullptr || source == nullptr) return 1;
+  const char* script = env->GetStringUTFChars(source, nullptr);
+  if (script == nullptr) return 1;
+  int rc = angnative_runtime_bridge_load_script(b, script);
+  env->ReleaseStringUTFChars(source, script);
+  if (rc != 0) LOGE("Failed to load JS bundle into runtime bridge (rc=%d)", rc);
+  return static_cast<jint>(rc);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeGetHost(JNIEnv* /*env*/, jobject /*thiz*/, jlong handle) {
+  AngNativeRuntimeBridge* b = reinterpret_cast<AngNativeRuntimeBridge*>(handle);
+  if (b == nullptr) return 0;
+  
+  AngNativeHost* h = angnative_runtime_bridge_get_host(b);
+  if (h == nullptr) return 0;
+  
+  return reinterpret_cast<jlong>(h);
 }
