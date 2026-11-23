@@ -3,7 +3,7 @@
 #
 # The runtime-bridge staticlib bundles host-ffi + host-engine + QuickJS + the
 # runtime bridge into one archive, so platform shells link a single library.
-# rquickjs-sys 0.5.1 ships no Android bindings, so bindgen is enabled with the
+# rquickjs-sys 0.14 ships no Android bindings, so bindgen is enabled with the
 # NDK sysroot and a libclang installation (LIBCLANG_PATH).
 #
 # Prerequisites: Rust Android targets, Android NDK, libclang (for bindgen).

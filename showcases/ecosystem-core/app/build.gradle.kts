@@ -39,9 +39,11 @@ android {
 
   buildTypes {
     release {
-      isMinifyEnabled = false
-      isShrinkResources = false
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      // R8 + resource shrinking are required to fit the universal 3-ABI APK
+      // under the 20 MB cap. JNI entry points are kept by proguard-rules.pro.
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "src/main/proguard-rules.pro")
       signingConfig = signingConfigs.getByName("debug")
     }
     debug {

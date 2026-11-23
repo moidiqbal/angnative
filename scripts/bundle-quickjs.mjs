@@ -52,7 +52,10 @@ await build({
   format: 'iife',
   platform: 'browser',
   target: 'es2018',
-  minify: false,
+  // Minify the shipped bundle: it is embedded as an Android asset and its
+  // bytes count directly against the APK size cap. esbuild's ES2018 output
+  // remains parseable by QuickJS-ng.
+  minify: true,
   define: { ngDevMode: 'false' },
   logLevel: 'info',
 });

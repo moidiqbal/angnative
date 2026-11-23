@@ -40,10 +40,19 @@ natively, with **zero WebView**. Requirements:
   (`emulator-5554`) and physical OnePlus (`b6640c8f`).
 - Router, forms, i18n, animations engine, HttpClient platform surface, and RxJS
   7.8.2 all execute in the runtime (15 ignored acceptance tests pass).
-- **Measured locally:** shipped `libangnative_runtime_bridge.so` = **1.56 MB**;
-  flagship APK = **27.02 MB**; feature bundles = **2.0–2.6 MB each, unminified**.
+- **Measured locally (post-change):** flagship universal 3-ABI release APK =
+  **17,539,306 bytes (17.539 MB / 16.727 MiB)**; shipped asset
+  `angnative-bundle.js` = 1,098,643 bytes (minified). Feature bundles remain
+  2.0–2.6 MB test artifacts and are not shipped. Full breakdown:
+  `docs/evidence/QUICKJS-NG-UPGRADE-AND-APK-SIZE.md`.
+- Pre-change baseline APK = 23,312,447 bytes; baseline asset = 2,684,827 bytes.
 - **Correction to earlier docs:** `rquickjs 0.5.1` vendors QuickJS with
   `VERSION = 2021-03-27` — it is NOT QuickJS-NG 2024 as previously claimed.
+- **Implemented engine:** `rquickjs 0.14.0` vendors QuickJS-ng **0.16.2**
+  (`QJS_VERSION_MAJOR 0 / MINOR 16 / PATCH 2`). QuickJS-ng v0.18.0 exists
+  upstream but no published Rust binding vendors it; no v0.18 claim is made.
+- No retained AngNative performance artifact (cold start, jank, peak memory) and
+  no head-to-head measurements against V8/Hermes/RN/Flutter.
 
 ### Upstream state (authoritative GitHub release data)
 | Engine | Latest / cadence | Binary |
@@ -62,14 +71,18 @@ or Hermes for the current product goals. Concretely:
 1. **Keep rquickjs/QuickJS as the embedded engine.** Its 1.2–2.4 MB footprint is
    4–10× smaller than V8, it has no iOS JIT problem, and Angular compatibility is
    already proven with our shim layer — which neutralizes V8's main advantage.
-2. **Upgrade the vendored engine.** Move from the 2021 snapshot to QuickJS-ng
-   v0.18 (or a maintained binding that vendors it). This is a security and
-   performance upgrade, not an architecture change.
-3. **Ship bytecode / minified bundles.** Current bundles are 2.0–2.6 MB
-   unminified; `minify: true` plus `qjsbc` bytecode are the largest available
-   size wins without changing engines.
-4. **Lazy-load feature bundles** (forms, router, animations, http) instead of
-   bundling all into the boot path.
+2. **Upgrade the vendored engine — implemented.** Moved from the 2021 snapshot
+   to `rquickjs 0.14.0`, which vendors QuickJS-ng **0.16.2**. Android builds
+   enable `bindgen` because `rquickjs-sys 0.14` ships no Android bindings. Moving
+   to a binding that vendors QuickJS-ng v0.18+ is deferred until one is published.
+   This is a security/correctness upgrade, not an architecture change.
+3. **Minify the shipped bundle — implemented.** `minify: true` for
+   `quickjs-bundle.js` only: 2,684,827 → 1,098,643 bytes. Feature bundles remain
+   unminified test artifacts. Bytecode (`qjsc -b`) is NOT shipped: it needs a
+   toolchain matched to the vendored engine plus a runtime loader.
+4. **Enable Android R8 + resource shrinking — implemented** on the flagship
+   release build, with explicit JNI keep rules. Lazy-load is NOT part of this
+   round: feature bundles are not APK assets, so it has no APK-size effect.
 5. **Re-benchmark on a physical device** (startup ms, APK delta, jank, peak
    memory) before any future engine migration.
 
@@ -96,8 +109,9 @@ then.
   investment retained, clear upgrade path to a maintained engine.
 - Negative: shim layer must be maintained as Angular evolves; no DevTools;
   interpreter-only throughput; GC pauses scale with heap.
-- Risk: the current 2021 engine is a security liability until the upgrade in
-  action #2 lands — treat that upgrade as high priority.
+- Risk: action #2 has landed for the shipped engine (QuickJS-ng 0.16.2), but the
+  v0.18 security hardening is not yet reachable through a published Rust binding;
+  revisit when one is published.
 
 ## Revisit criteria
 
@@ -110,7 +124,8 @@ Reconsider V8/JSC only when at least one is true:
 
 ## References
 
-- QuickJS-ng releases: https://github.com/quickjs-ng/quickjs/releases (v0.18.0)
+- QuickJS-ng releases: https://github.com/quickjs-ng/quickjs/releases (v0.18.0 is
+  upstream-only for this repo; the vendored engine is 0.16.2)
 - QuickJS-ng security policy: SECURITY.md in the same repo
 - rquickjs: https://github.com/DelSkayn/rquickjs
 - Hermes: https://github.com/facebook/hermes

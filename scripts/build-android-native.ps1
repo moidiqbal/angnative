@@ -2,7 +2,7 @@
 # library for Android ABIs via cargo + NDK.
 #
 # The runtime-bridge staticlib bundles host-ffi + host-engine + QuickJS + the
-# runtime bridge into one archive. rquickjs-sys 0.5.1 has no Android bindings,
+# runtime bridge into one archive. rquickjs-sys 0.14 has no Android bindings,
 # so bindgen is enabled for Android with the NDK sysroot and VS LLVM libclang.
 $ErrorActionPreference = 'Stop'
 
