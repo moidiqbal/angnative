@@ -26,6 +26,7 @@ export const ELEMENT_TAGS = {
   pressable: 'na-pressable',
   switch: 'na-switch',
   activityIndicator: 'na-activity-indicator',
+  candlestick: 'na-candlestick',
   slot: 'na-slot',
 } as const;
 
@@ -110,6 +111,11 @@ const SWITCH_DEFAULTS: StyleMap = {
 const ACTIVITY_DEFAULTS: StyleMap = {
   width: '36px',
   height: '36px',
+};
+
+const CANDLESTICK_DEFAULTS: StyleMap = {
+  width: '320px',
+  height: '220px',
 };
 
 const SLOT_DEFAULTS: StyleMap = {
@@ -236,6 +242,19 @@ export const ELEMENT_CONTRACTS: ReadonlyMap<ElementTag, ElementContract> = new M
       defaultStyles: ACTIVITY_DEFAULTS,
       allowedChildren: [],
       capabilities: [],
+      recyclesView: false,
+      hostsText: false,
+    },
+  ],
+  [
+    ELEMENT_TAGS.candlestick,
+    {
+      tag: ELEMENT_TAGS.candlestick,
+      kind: 'custom',
+      nodeType: 'Custom:na-candlestick', // tagged custom: native shells draw an OHLC canvas
+      defaultStyles: CANDLESTICK_DEFAULTS,
+      allowedChildren: [],
+      capabilities: ['chart'],
       recyclesView: false,
       hostsText: false,
     },

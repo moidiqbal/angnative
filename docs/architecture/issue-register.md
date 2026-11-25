@@ -12,9 +12,9 @@
 |----------|-------|
 | **P0 - Critical** | 8 |
 | **P1 - High** | 12 |
-| **P2 - Medium** | 15 |
+| **P2 - Medium** | 16 |
 | **P3 - Low** | 8 |
-| **Total** | **43** |
+| **Total** | **44** |
 
 ---
 
@@ -140,19 +140,19 @@
 **Files**: `crates/angnative-host-engine/src/errors.rs`, `crates/angnative-runtime-bridge/src/lib.rs`
 **Remediation**: None for accessor-level metrics; no periodic-collection claim is made.
 
-### P1-12: Android ViewFactory Incomplete — implemented (tagged custom conformance fixture)
-**Evidence**: Tagged custom primitives (`na-list`, `na-switch`, `na-activity-indicator`) are covered by the `native-primitives-tagged-custom` conformance fixture and Android JNI `NativeViewFactory` tests being added in this round; `@angnative/contract` element coverage is exercised through that fixture. Emulator instrumentation may be re-run separately.
-**Files**: `showcases/ecosystem-core/app/src/main/java/com/angnative/app/NativeViewFactory.kt`, conformance fixture
-**Remediation**: Retained in this round's closure; physical OnePlus ABI re-verification remains not verified (device offline).
+### P1-12: Android ViewFactory Incomplete — implemented (tagged custom conformance fixture + MarketPulse candlestick)
+**Evidence**: Tagged custom primitives (`na-list`, `na-switch`, `na-activity-indicator`) are covered by the `native-primitives-tagged-custom` conformance fixture. The MarketPulse round adds `na-candlestick` → `Custom:na-candlestick`, a shared `attr:bars` JSON-string fixture, the Rust op-emitter assertion, and `CandlestickViewFactoryTest` (`OK (1 test)` on `emulator-5554`). The UI dump shows `content-desc="Custom:na-candlestick"`; full instrumentation after the two-asset split is `OK (9 tests)` (`docs/evidence/ANDROID-MARKETPULSE.md`).
+**Files**: `platforms/android/app/src/main/java/com/angnative/app/NativeViewFactory.kt`, `CandlestickView.kt`, `packages/testing/fixtures/candlestick-bars-property.json`, conformance fixture
+**Remediation**: Retained; physical OnePlus MarketPulse re-verification remains not verified (device offline).
 
 ---
 
 ## P2 - Medium Issues (Architectural Debt)
 
-### P2-01: QuickJS Shim Maintenance — implemented (tagged custom conformance fixture)
-**Evidence**: The `native-primitives-tagged-custom` conformance fixture added in this round provides automated coverage for tagged custom primitives on the native path; no expansion of the shim surface is claimed.
-**Files**: `crates/angnative-host-engine/src/quickjs_shims.rs`, conformance fixture
-**Remediation**: Fixture retained; further shim reduction remains out of scope.
+### P2-01: QuickJS Shim Maintenance — implemented (tagged custom conformance fixture + MarketPulse fixture)
+**Evidence**: The `native-primitives-tagged-custom` conformance fixture provides automated coverage for tagged custom primitives on the native path. The MarketPulse round adds a shared OHLC bars-string fixture used by TS, Rust and Android; the ignored `market_pulse_bundle_drives_candlestick_and_animation` test loads the real AOT bundle and asserts the `attr:bars` mutation, 200-row window and deterministic animation samples. No expansion of the fetch shim itself is claimed.
+**Files**: `crates/angnative-host-engine/src/quickjs_shims.rs`, `crates/angnative-runtime-bridge/src/lib.rs`, conformance fixture, `packages/testing/fixtures/candlestick-bars-property.json`
+**Remediation**: Fixtures retained; true async `HttpClient → host network` remains deferred (see P2-16).
 
 ### P2-02: No QuickJS Bytecode Loading — DEFERRED (feasibility spike only)
 **Evidence**: `rquickjs` 0.5.1 exposes dump-bytecode and module-bytecode traits behind feature flags, but no runtime bytecode loader exists in this repo. The supported path remains self-contained IIFE bundles loaded as text. Outcome: **deferred, not verified**; see `docs/evidence/BYTECODE-FEASIBILITY-SPIKE.md`. Do not claim bytecode loading works.
@@ -215,14 +215,19 @@
 **Remediation**: Gate F passed for the abstraction; no third-party engine claim is made.
 
 ### P2-14: Benchmark Infrastructure Missing — CLOSED (partial scope)
-**Evidence**: Collector scripts and retained artifacts now exist: `scripts/measure-showcase.ps1`, `scripts/measure-frames.ps1`, `scripts/measure-multisample.ps1`; `docs/benchmarks/frame-pacing.json`, `docs/benchmarks/emulator-multisample.json`, `docs/benchmarks/physical/results.json` and `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md`.
-**Files**: `scripts/`, `docs/benchmarks/`, `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md`.
-**Remediation**: Physical-device multi-sample/CPU/warm-start automation remains pending (`b6640c8f` was offline for the 2026-11-23 run); no physical multi-sample claim is made.
+**Evidence**: Collector scripts and retained artifacts now exist: `scripts/measure-showcase.ps1`, `scripts/measure-frames.ps1`, `scripts/measure-multisample.ps1`, `scripts/measure-sustained.ps1`; `docs/benchmarks/frame-pacing.json`, `docs/benchmarks/emulator-multisample.json`, `docs/benchmarks/sustained/emulator-20261125-143058.json`, `docs/benchmarks/physical/results.json`, `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md` and `docs/evidence/ANDROID-SUSTAINED-LOAD.md`. The sustained run covers all 10 apps with 5 cold + 5 warm starts and 3 × 30 s samples (`status=ok`, 30/30 valid, 0 errors).
+**Files**: `scripts/`, `docs/benchmarks/`, `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md`, `docs/evidence/ANDROID-SUSTAINED-LOAD.md`.
+**Remediation**: Physical-device multi-sample/CPU/warm-start automation remains pending (`b6640c8f` was offline for the 2026-11-23 and 2026-11-25 runs); no physical multi-sample claim is made.
 
 ### P2-15: Documentation Gaps
 **Evidence**: Architecture docs created but not linked from code.
 **Files**: `docs/architecture/`
 **Remediation**: In-code references. `// See: docs/architecture/...`
+
+### P2-16: Async JS fetch to host network — deferred (MarketPulse uses synchronous prefetch)
+**Evidence**: The QuickJS fetch shim invokes registered handlers synchronously. MarketPulse therefore prefetches in Kotlin on a worker thread and registers a synchronous handler before AOT bundle boot; refresh re-fetches in Kotlin and pushes `__marketPulseApplyQuote(json)`. No new JNI async method was added. The live endpoint returned HTTP 429 on the emulator and the app logged the failure rather than fabricating bars. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md`, `docs/UNSUPPORTED-FEATURES.md`.
+**Files**: `platforms/android/app/src/main/java/com/angnative/app/MarketPulseFeed.kt`, `AngNativeView.kt`, `crates/angnative-host-engine/src/quickjs_shims.rs`
+**Remediation**: Deferred, not a defect in the shipped path. Lift only with a real JS→host async fetch callback plus tests proving `HttpClient` awaits host network I/O.
 
 ---
 
@@ -293,8 +298,8 @@
 | P1-09 | ⚠️ Implemented (unified errors + Angular ErrorHandler provider tests) | - | C |
 | P1-10 | ⚠️ Gate B implemented (`RuntimeController`, deterministic lifecycle) | - | B |
 | P1-11 | ⚠️ Implemented (`RuntimeMetrics` accessors; no periodic-collection claim) | - | E |
-| P1-12 | ⚠️ Implemented (tagged native primitives + conformance fixture) | - | D |
-| P2-01 | ⚠️ Implemented (native-primitives-tagged-custom conformance fixture) | - | C |
+| P1-12 | ✅ Implemented and device-verified (`na-candlestick`, 9/9 Android tests) | - | D |
+| P2-01 | ⚠️ Implemented (tagged custom + MarketPulse shared bars-string fixtures) | - | C |
 | P2-02 | ⬜ Deferred (feasibility spike only; bytecode loading not implemented or verified) | - | C |
 | P2-03 | ⚠️ Implemented (JNI RAII/failure cleanup/onDestroy tests; emulator re-run may follow) | - | D |
 | P2-04 | ✅ Closed (UI-thread marshalling verified on emulator + OnePlus) | - | D |
@@ -309,6 +314,7 @@
 | P2-13 | ⚠️ Gate F proof via in-repo `ReferenceEngine`; Hermes/V8 not integrated | - | F |
 | P2-14 | ✅ Closed (benchmark scripts + artifacts retained; physical multi-sample pending) | - | G |
 | P2-15 | ✅ Done | - | A |
+| P2-16 | ⬜ Deferred (MarketPulse uses synchronous Kotlin prefetch, no async JS fetch callback) | - | C |
 | P3-01 | ✅ Closed (warning cleanup reconciled; no local count claimed) | - | - |
 | P3-02 | ✅ Closed (unused import removed in unified bridge) | - | - |
 | P3-03 | ✅ Closed (not dead — intentional concept UI) | - | D |

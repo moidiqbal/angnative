@@ -18,11 +18,12 @@ describe('element contracts (§8 / D9 na- prefix)', () => {
     expect(ELEMENT_TAGS.pressable).toBe('na-pressable');
     expect(ELEMENT_TAGS.switch).toBe('na-switch');
     expect(ELEMENT_TAGS.activityIndicator).toBe('na-activity-indicator');
+    expect(ELEMENT_TAGS.candlestick).toBe('na-candlestick');
     expect(ELEMENT_TAGS.slot).toBe('na-slot');
   });
 
-  it('has 10 element contracts', () => {
-    expect(ELEMENT_CONTRACTS.size).toBe(10);
+  it('has 11 element contracts', () => {
+    expect(ELEMENT_CONTRACTS.size).toBe(11);
   });
 
   it('recognizes known elements', () => {
@@ -46,14 +47,20 @@ describe('element contracts (§8 / D9 na- prefix)', () => {
     const list = getContract('na-list')!;
     expect(list.recyclesView).toBe(true);
     expect(list.capabilities).toContain('recycle');
+
+    const chart = getContract('na-candlestick')!;
+    expect(chart.defaultStyles.height).toBe('220px');
+    expect(chart.allowedChildren).toEqual([]);
+    expect(chart.capabilities).toContain('chart');
   });
 
-  it('uses tagged custom node types on the wire for the three custom primitives', () => {
+  it('uses tagged custom node types on the wire for the custom primitives', () => {
     expect(getContract('na-list')!.nodeType).toBe('Custom:na-list');
     expect(getContract('na-switch')!.nodeType).toBe('Custom:na-switch');
     expect(getContract('na-activity-indicator')!.nodeType).toBe(
       'Custom:na-activity-indicator',
     );
+    expect(getContract('na-candlestick')!.nodeType).toBe('Custom:na-candlestick');
     // Generic component hosts stay untagged.
     expect(getContract('na-view')!.nodeType).toBe('View');
     expect(getContract('na-pressable')!.nodeType).toBe('Button');

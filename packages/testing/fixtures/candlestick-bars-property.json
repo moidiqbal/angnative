@@ -1,0 +1,31 @@
+{
+  "name": "candlestick-bars-property",
+  "description": "na-candlestick is a tagged custom primitive (Custom:na-candlestick). Angular binds the normalized OHLC payload as a JSON string under attr:bars so Android JSONObject.optString can read it; the string must survive the shared TS/Rust command pipeline unchanged.",
+  "commands": [
+    { "kind": "CreateNode", "id": 1, "nodeType": "View" },
+    { "kind": "CreateNode", "id": 2, "nodeType": "Custom:na-candlestick" },
+    { "kind": "InsertChild", "parentId": 1, "childId": 2, "index": 0 },
+    { "kind": "SetStyle", "id": 2, "key": "width", "value": "320px" },
+    { "kind": "SetProperty", "id": 2, "key": "attr:bars", "value": "{\"symbol\":\"AAPL\",\"bars\":[{\"t\":1,\"o\":10,\"h\":12,\"l\":9,\"c\":11,\"v\":100}]}" }
+  ],
+  "expect": {
+    "mutationKinds": [
+      "CreateNode",
+      "CreateNode",
+      "InsertChild",
+      "SetStyle",
+      "SetProperty"
+    ],
+    "nodes": {
+      "1": { "children": [2] },
+      "2": {
+        "nodeType": "Custom:na-candlestick",
+        "parentId": 1,
+        "styles": { "width": "320px" },
+        "properties": {
+          "attr:bars": "{\"symbol\":\"AAPL\",\"bars\":[{\"t\":1,\"o\":10,\"h\":12,\"l\":9,\"c\":11,\"v\":100}]}"
+        }
+      }
+    }
+  }
+}

@@ -30,8 +30,17 @@ class MainActivity : AppCompatActivity() {
     angNativeView = AngNativeView(this)
     setContentView(angNativeView)
 
-    // Load the Hello World interactive app (bridges to Rust host)
-    angNativeView.loadHelloWorldApp()
+    // MarketPulse fetches the public BTC/USD OHLC payload on a worker thread first.
+    // The QuickJS fetch shim is synchronous, so the host caches the normalized
+    // payload and registers it before the Angular AOT bundle boots. Builds
+    // without the MarketPulse asset keep the original counter boot path.
+    if (angNativeView.hasMarketPulseBundle()) {
+      MarketPulseFeed.fetch { quote ->
+        runOnUiThread { angNativeView.loadAngularApp(quote) }
+      }
+    } else {
+      angNativeView.loadAngularApp()
+    }
   }
 
   override fun onResume() {

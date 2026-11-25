@@ -11,9 +11,9 @@ No SDK/Xcode/device required. Checks:
 
 This is STATIC verification only; it does not replace Android/iOS builds or
 prove that `swift build` / Simulator tests pass on macOS. The Kotlin/JNI side
-covers the flagship `ecosystem-core` shell only; other shells call Rust host
-APIs directly and are outside this checker's scope. Signature checks compare
-names/arity for Kotlin and exact patterns for the Swift runtime bridge.
+covers the AOT-capable `ecosystem-core` showcase and the generic Android shell.
+Signature checks compare names/arity for Kotlin and exact patterns for the
+Swift runtime bridge.
 
 Usage: python scripts/check-ffi-declarations.py
 """
@@ -22,8 +22,16 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-KT = ROOT / "showcases/ecosystem-core/app/src/main/java/com/angnative/app/JniBridge.kt"
-CPP = ROOT / "showcases/ecosystem-core/app/src/main/cpp/jni_bridge.cpp"
+ANDROID_BRIDGES = [
+    (
+        ROOT / "showcases/ecosystem-core/app/src/main/java/com/angnative/app/JniBridge.kt",
+        ROOT / "showcases/ecosystem-core/app/src/main/cpp/jni_bridge.cpp",
+    ),
+    (
+        ROOT / "platforms/android/app/src/main/java/com/angnative/app/JniBridge.kt",
+        ROOT / "platforms/android/app/src/main/cpp/jni_bridge.cpp",
+    ),
+]
 SWIFT = ROOT / "platforms/ios/Sources/AngNativeHost/SwiftFFI.swift"
 HEADER = ROOT / "crates/angnative-host-ffi/include/angnative_host_ffi.h"
 IOS_PACKAGE = ROOT / "platforms/ios/Package.swift"
@@ -156,9 +164,6 @@ def swift_symbols(text: str) -> set[str]:
 
 
 def main() -> int:
-    kt = kotlin_methods(KT.read_text(encoding="utf-8"))
-    jni = cpp_jni_methods(CPP.read_text(encoding="utf-8"))
-    cpp_text = CPP.read_text(encoding="utf-8")
     header_text = HEADER.read_text(encoding="utf-8")
     header = header_declarations(header_text)
     swift_text = SWIFT.read_text(encoding="utf-8")
@@ -166,22 +171,30 @@ def main() -> int:
     package_text = IOS_PACKAGE.read_text(encoding="utf-8")
     ios_build_text = IOS_BUILD_SCRIPT.read_text(encoding="utf-8")
     errors = []
+    jni_method_count = 0
 
-    # 1. Kotlin <-> C++ JNI
-    for name, count in sorted(kt.items()):
-        if name not in jni:
-            errors.append(f"JNI implementation missing in C++: {name}")
-        elif jni[name] != count:
-            errors.append(
-                f"JNI arity mismatch for {name}: Kotlin={count}, C++={jni[name]}"
-            )
-    for name in sorted(jni):
-        if name not in kt and name not in LEGACY_CPP_ONLY:
-            errors.append(f"C++ JNI export has no Kotlin declaration: {name}")
+    # 1. Kotlin <-> C++ JNI and C++ calls, for every AOT-capable Android shell
+    for kt_path, cpp_path in ANDROID_BRIDGES:
+        kt = kotlin_methods(kt_path.read_text(encoding="utf-8"))
+        cpp_text = cpp_path.read_text(encoding="utf-8")
+        jni = cpp_jni_methods(cpp_text)
+        jni_method_count += len(kt)
+        label = kt_path.relative_to(ROOT)
 
-    # 2. C++ calls must exist in the C header
-    for name in sorted(angnative_calls(cpp_text) - header):
-        errors.append(f"C++ calls undeclared C ABI symbol: {name}")
+        for name, count in sorted(kt.items()):
+            if name not in jni:
+                errors.append(f"{label}: JNI implementation missing in C++: {name}")
+            elif jni[name] != count:
+                errors.append(
+                    f"{label}: JNI arity mismatch for {name}: "
+                    f"Kotlin={count}, C++={jni[name]}"
+                )
+        for name in sorted(jni):
+            if name not in kt and name not in LEGACY_CPP_ONLY:
+                errors.append(f"{label}: C++ JNI export has no Kotlin declaration: {name}")
+
+        for name in sorted(angnative_calls(cpp_text) - header):
+            errors.append(f"{label}: C++ calls undeclared C ABI symbol: {name}")
 
     # 3. Swift @_silgen_name symbols must exist in the C header
     for name in sorted(swift - header):
@@ -216,7 +229,8 @@ def main() -> int:
         return 1
 
     print(
-        f"FFI declaration check OK: {len(kt)} JNI methods, "
+        f"FFI declaration check OK: {jni_method_count} JNI methods across "
+        f"{len(ANDROID_BRIDGES)} Android shells, "
         f"{len(swift)} Swift bindings "
         f"({len(REQUIRED_RUNTIME_BRIDGE_SYMBOLS)} runtime bridge), "
         f"{len(header)} header declarations; iOS unified staticlib wiring OK"

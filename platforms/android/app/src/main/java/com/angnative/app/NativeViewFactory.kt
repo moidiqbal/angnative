@@ -30,10 +30,21 @@ class NativeViewFactory(
   private val context: Context,
   private val rootContainer: ViewGroup,
   private val onPress: (Long) -> Unit = {}
-) {
+) : NativeViewSink {
   private val views = mutableMapOf<Long, View>()
   private val rootIds = mutableSetOf<Long>()
+  private val childParents = mutableMapOf<Long, Long>()
+  /** Angular-declared actions, recorded from `attr:data-action` properties. */
+  private val actionByNode = mutableMapOf<Long, String>()
   private val density = context.resources.displayMetrics.density
+
+  companion object {
+    /** Canonical tags emitted by the Angular native renderer for custom primitives. */
+    const val CUSTOM_LIST_TAG = "Custom:na-list"
+    const val CUSTOM_SWITCH_TAG = "Custom:na-switch"
+    const val CUSTOM_ACTIVITY_INDICATOR_TAG = "Custom:na-activity-indicator"
+    const val CUSTOM_CANDLESTICK_TAG = "Custom:na-candlestick"
+  }
 
   /** Mark a node as a root: it will be attached directly to [rootContainer]. */
   fun setRootNode(nodeId: Long) {
@@ -49,18 +60,23 @@ class NativeViewFactory(
   }
 
   /** PlatformOp::Create */
-  fun onNativeCreateView(nodeId: Long, viewType: String) {
+  override fun onNativeCreateView(nodeId: Long, viewType: String) {
     if (views.containsKey(nodeId)) return
     val view = createViewForType(nodeId, viewType)
     view.layoutParams = frameParams()
     views[nodeId] = view
+    // Angular registers (click) listeners on component host nodes, which may
+    // be ancestors of the tappable text view. Make every node clickable so a
+    // real tap can be dispatched up the ancestor chain.
+    view.isClickable = true
+    view.setOnClickListener { onPress(nodeId) }
     if (nodeId in rootIds && view.parent == null) {
       rootContainer.addView(view, frameParams())
     }
   }
 
   /** PlatformOp::SetFrame — geometry from LayoutResponseJson (dp -> px). */
-  fun onNativeSetFrame(nodeId: Long, x: Float, y: Float, width: Float, height: Float) {
+  override fun onNativeSetFrame(nodeId: Long, x: Float, y: Float, width: Float, height: Float) {
     val view = views[nodeId] ?: return
     val lp = view.layoutParams as? FrameLayout.LayoutParams ?: frameParams()
     // Keep WRAP_CONTENT when layout reports no usable dimension (e.g. text).
@@ -72,17 +88,17 @@ class NativeViewFactory(
   }
 
   /** PlatformOp::SetProps — ViewProps JSON { text, styles, properties }. */
-  fun onNativeSetProps(nodeId: Long, propsJson: String) {
+  override fun onNativeSetProps(nodeId: Long, propsJson: String) {
     val view = views[nodeId] ?: return
     try {
       val props = JSONObject(propsJson)
       val styles = props.optJSONObject("styles")
       if (styles != null) {
-        for (key in styles.keys()) applyStyle(view, key, styles.optString(key))
+        for (key in styles.keys()) applyProp(nodeId, view, key, styles.optString(key))
       }
       val properties = props.optJSONObject("properties")
       if (properties != null) {
-        for (key in properties.keys()) applyStyle(view, key, properties.optString(key))
+        for (key in properties.keys()) applyProp(nodeId, view, key, properties.optString(key))
       }
       // `optString` returns the literal "null" for JSON null. Only a real
       // string value may overwrite text set by a SetText op.
@@ -96,39 +112,41 @@ class NativeViewFactory(
   }
 
   /** PlatformOp::SetText */
-  fun onNativeSetText(nodeId: Long, text: String) {
+  override fun onNativeSetText(nodeId: Long, text: String) {
     val view = views[nodeId] ?: return
     if (view is TextView) view.text = text
   }
 
   /** PlatformOp::Append */
-  fun onNativeAppendChild(parentId: Long, childId: Long) {
+  override fun onNativeAppendChild(parentId: Long, childId: Long) {
     attachChild(parentId, childId, -1)
   }
 
   /** PlatformOp::Insert */
-  fun onNativeInsertChild(parentId: Long, childId: Long, index: Int) {
+  override fun onNativeInsertChild(parentId: Long, childId: Long, index: Int) {
     attachChild(parentId, childId, index)
   }
 
   /** PlatformOp::Remove */
-  fun onNativeRemoveChild(parentId: Long, childId: Long) {
+  override fun onNativeRemoveChild(parentId: Long, childId: Long) {
     val parent = views[parentId] as? ViewGroup ?: return
     val child = views[childId] ?: return
     parent.removeView(child)
   }
 
   /** PlatformOp::Destroy */
-  fun onNativeDestroyView(nodeId: Long) {
+  override fun onNativeDestroyView(nodeId: Long) {
     val view = views.remove(nodeId) ?: return
     (view.parent as? ViewGroup)?.removeView(view)
   }
 
   /** Apply a LayoutResponseJson to the registry: { "nodes": [rects] }. */
-  fun applyLayoutResult(layoutJson: String) {
+  fun applyLayoutResult(layoutJson: String): Boolean {
     try {
       val response = JSONObject(layoutJson)
-      val rects = response.optJSONArray("nodes") ?: return
+      if (response.has("error")) return false
+      val rects = response.optJSONArray("nodes") ?: return false
+      if (rects.length() == 0) return false
       for (i in 0 until rects.length()) {
         val rect = rects.getJSONObject(i)
         onNativeSetFrame(
@@ -139,18 +157,38 @@ class NativeViewFactory(
           rect.optDouble("height").toFloat()
         )
       }
+      return true
     } catch (e: Exception) {
-      // Layout error surfaced in the host's last_error; nothing to apply.
+      // Caller logs bridge.lastError(); report the failed apply explicitly.
+      return false
     }
   }
+
+  /** Node id of the first Button whose text matches (used by E2E tap proofs). */
+  fun findButtonIdByText(text: String): Long? =
+    views.entries.firstOrNull { (_, v) -> v is TextView && v.text.toString() == text }?.key
+
+  /** Current text of a native TextView node (used by E2E assertions). */
+  fun textOf(nodeId: Long): String? = (views[nodeId] as? TextView)?.text?.toString()
 
   fun clear() {
     views.clear()
     rootIds.clear()
+    childParents.clear()
+    actionByNode.clear()
     rootContainer.removeAllViews()
   }
 
+  fun parentOf(nodeId: Long): Long? = childParents[nodeId]
+
+  /** Angular-declared action for a node (e.g. `refresh` on a pressable). */
+  fun actionOf(nodeId: Long): String? = actionByNode[nodeId]
+
+  /** Live view for a node id (used by instrumentation tag/type assertions). */
+  fun viewFor(nodeId: Long): View? = views[nodeId]
+
   private fun attachChild(parentId: Long, childId: Long, index: Int) {
+    childParents[childId] = parentId
     val parent = views[parentId] as? ViewGroup ?: return
     val child = views[childId] ?: return
     (child.parent as? ViewGroup)?.removeView(child)
@@ -170,6 +208,16 @@ class NativeViewFactory(
 
   private fun createViewForType(nodeId: Long, viewType: String): View {
     return when (viewType) {
+      CUSTOM_LIST_TAG -> FrameLayout(context).apply { markCanonicalTag(CUSTOM_LIST_TAG) }
+      CUSTOM_SWITCH_TAG, "Switch" ->
+        Switch(context).apply { markCanonicalTag(CUSTOM_SWITCH_TAG) }
+      CUSTOM_ACTIVITY_INDICATOR_TAG, "ActivityIndicator" ->
+        ProgressBar(context).apply {
+          isIndeterminate = true
+          markCanonicalTag(CUSTOM_ACTIVITY_INDICATOR_TAG)
+        }
+      CUSTOM_CANDLESTICK_TAG ->
+        CandlestickView(context).apply { markCanonicalTag(CUSTOM_CANDLESTICK_TAG) }
       "View", "Custom", "ScrollView" -> FrameLayout(context)
       "Text" -> TextView(context).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -190,9 +238,22 @@ class NativeViewFactory(
         setOnClickListener { onPress(nodeId) }
       }
       "Image" -> ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
-      "Switch" -> Switch(context)
-      "ActivityIndicator" -> ProgressBar(context).apply { isIndeterminate = true }
       else -> View(context)
+    }
+  }
+
+  /** Tag the view (and its accessibility label) with the canonical primitive id. */
+  private fun View.markCanonicalTag(canonicalTag: String) {
+    tag = canonicalTag
+    contentDescription = canonicalTag
+  }
+
+  /** Route element-specific properties before the generic style mapping. */
+  private fun applyProp(nodeId: Long, view: View, key: String, value: String) {
+    when {
+      (key == "bars" || key == "attr:bars") && view is CandlestickView -> view.setBars(value)
+      key == "data-action" || key == "attr:data-action" -> actionByNode[nodeId] = value
+      else -> applyStyle(view, key, value)
     }
   }
 

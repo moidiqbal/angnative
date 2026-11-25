@@ -23,6 +23,7 @@ describe('tagToNodeType (mirrors Rust NodeType::from_tag)', () => {
     expect(tagToNodeType('na-list')).toBe('Custom:na-list');
     expect(tagToNodeType('na-switch')).toBe('Custom:na-switch');
     expect(tagToNodeType('na-activity-indicator')).toBe('Custom:na-activity-indicator');
+    expect(tagToNodeType('na-candlestick')).toBe('Custom:na-candlestick');
   });
 
   it('accepts legacy aliases', () => {
@@ -47,6 +48,7 @@ describe('canonicalElementTag', () => {
     expect(canonicalElementTag('na-list')).toBe('na-list');
     expect(canonicalElementTag('na-switch')).toBe('na-switch');
     expect(canonicalElementTag('NA-ACTIVITY-INDICATOR')).toBe('na-activity-indicator');
+    expect(canonicalElementTag('NA-CANDLESTICK')).toBe('na-candlestick');
     expect(canonicalElementTag('na-pressable')).toBe('na-pressable');
   });
 });
@@ -87,6 +89,7 @@ describe('AngNativeRenderer mutation batching', () => {
       ['na-list', 'Custom:na-list'],
       ['na-switch', 'Custom:na-switch'],
       ['na-activity-indicator', 'Custom:na-activity-indicator'],
+      ['na-candlestick', 'Custom:na-candlestick'],
     ] as const) {
       const el = renderer.createElement(null, tag);
       expect(el.nativeNodeType).toBe(nodeType);

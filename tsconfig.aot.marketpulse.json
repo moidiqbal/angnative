@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.aot.json",
+  "compilerOptions": {
+    "outDir": "dist/aot-marketpulse"
+  },
+  "files": [
+    "apps/demo-app/src/marketpulse/main.marketpulse.ts"
+  ],
+  "include": [
+    "apps/demo-app/src/marketpulse/**/*.ts"
+  ]
+}

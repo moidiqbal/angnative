@@ -40,6 +40,31 @@ frames / 48.96% jank / 42.7 ms p50 / 93 ms p95; charts 7 frames, richtext 1 fram
 calendar 8 frames — those low counts make percentiles unstable. CPU samples are
 frequently `0.0` and are not sustained utilization.
 
+### Emulator sustained load (2026-11-25) — DONE
+`docs/benchmarks/sustained/emulator-20261125-143058.json` +
+`docs/evidence/ANDROID-SUSTAINED-LOAD.md`: all 10 showcases, 5 cold + 5 warm
+starts each, then 3 × 30 s alternating swipes. `status=ok`, 30/30 samples valid.
+CPU is `/proc/<pid>/stat` interval CPU as percent of one core (`nproc=4`), not
+instantaneous `top`.
+
+| Showcase | Cold mean (ms) | Warm mean (ms) | Frames | Janky % | p50 | p95 | proc CPU % | ΔPSS (KB) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| material | 2100.8 | 537.2 | 0 | — | — | — | 4.61 | -37.0 |
+| primeng | 2533.6 | 759.6 | 0 | — | — | — | 5.29 | -31.3 |
+| ngzorro | 2486.0 | 847.0 | 0 | — | — | — | 5.33 | -37.3 |
+| taiga | 2398.8 | 817.0 | 0 | — | — | — | 4.98 | -28.7 |
+| spartan | 1877.2 | 569.4 | 0 | — | — | — | 5.12 | -45.7 |
+| ecosystem-grid | 2282.2 | 662.0 | 539.0 | 48.40 | 44.0 | 71.7 | 31.02 | 1309.7 |
+| ecosystem-charts | 2503.8 | 713.2 | 25.7 | 96.29 | 36.0 | 63.7 | 7.07 | 130.7 |
+| ecosystem-core | 2801.0 | 527.4 | 0 | — | — | — | 3.87 | -134.7 |
+| ecosystem-richtext | 2069.4 | 633.0 | 56.3 | 35.30 | 21.7 | 36.3 | 5.29 | -408.3 |
+| ecosystem-calendar | 1585.4 | 459.4 | 0 | — | — | — | 3.15 | -118.7 |
+
+Seven apps produced zero new rendered frames after the post-settle `gfxinfo`
+reset; their frame metrics are null, not fake `4950 ms` percentiles. All figures
+above are **emulator SwiftShader**, not production GPU and not a framework
+comparison.
+
 ### Physical-device run (OnePlus Open, Android 16) — single burst DONE
 `docs/benchmarks/physical/README.md` + `results.json`: all 10 APKs installed/launched,
 WebViews=0 on every app. Real-GPU headline: **ecosystem-grid 170 frames, 1.76% jank,
@@ -47,8 +72,7 @@ WebViews=0 on every app. Real-GPU headline: **ecosystem-grid 170 frames, 1.76% j
 (status bar + navbar cropped, strict foreground guard so notification shades are
 never captured). Physical multi-sample, CPU and warm-start are still pending:
 `b6640c8f` was not connected on 2026-11-23, so no new physical claim is made.
-- Sustained CPU utilization during scroll (physical)
-- Warm start and multi-sample averages on the physical device
+- Sustained CPU, warm-start and multi-sample averages on the physical device (emulator results now retained; OnePlus offline)
 - WebView comparison builds (deliberately not built for native showcases)
 
 Do not present these numbers as a NativeScript/Flutter comparison — no equivalent builds exist in this repo.

@@ -17,24 +17,38 @@ ONGOING / IMPORTANT — kya abhi karna hai (priority order)
      Blocker : Mac needed — sponsors being collected (README + docs/SPONSORS.md)
      Note    : user said "iOS/Mac abhi chor dain" — keep parked, do not claim done
 
-[P0/P1] Native JS runtime wiring — DONE in-process, integration still open
-     Status  : runtime bridge implemented; real AOT bundle boots in QuickJS and a
-               native event reaches the Angular listener (6 --ignored acceptance
-               tests pass when dist/aot bundles are generated)
+[P0/P1] Native JS runtime wiring — flagship device-verified; generic shell device-verified
+     Status  : runtime bridge implemented; real AOT bundles boot in QuickJS and
+               native events reach Angular listeners (16 ignored tests present;
+               MarketPulse acceptance test passed explicitly). Flagship
+               showcases/ecosystem-core has a verified on-device tap.
+               2026-11-25: generic platforms/android shell boots two staged AOT
+               assets, and the full Android instrumentation suite passes 9/9 on
+               emulator-5554; a real emulator Refresh tap reached 1 live Angular
+               listener. No physical-device tap claim is made.
      Have    : angnative-runtime-bridge (single Host+QuickJS+runtime owner, single
-               event path, thread affinity), raw load_script C ABI + JNI, DOM shims,
-               forms/router/animations/http bundles, na_addEventListener / na_onEvent
-     Missing : load the bundle in a SHIPPING shell on-device; migrate the 9 legacy
-               showcases + platforms/android off imperative batches; iOS bindings
-     Ref     : docs/EVENT-BRIDGE.md, docs/CODE-REVIEW-2026-11-22.md
-     Proof   : cargo test -p angnative-runtime-bridge -- --ignored (6 passed)
+               event path, thread affinity), raw load_script C ABI + JNI in both
+               ecosystem-core and platforms/android, DOM shims, forms/router/
+               animations/http bundles, na_addEventListener / na_onEvent,
+               tagged na-candlestick + MarketPulse host fetch adapter
+     Missing : migrate the other 9 legacy showcases off imperative batches
+               (scope decision, not a defect); iOS Swift compile/simulator
+               (needs Mac); physical-device MarketPulse run (device offline)
+     Ref     : docs/EVENT-BRIDGE.md, docs/evidence/ANDROID-MARKETPULSE.md
+     Proof   : pnpm test 251 pass; cargo test --workspace 151 pass / 16 ignored;
+               gradlew assembleDebug assembleDebugAndroidTest BUILD SUCCESSFUL;
+               adb instrument OK (9 tests); python scripts/check-ffi-declarations.py
+               OK across 2 Android shells
 
 [P1] Sustained-load benchmark (community asked for this)
-     Status  : single-burst data only
-     Have    : emulator + OnePlus Open gfxinfo (docs/benchmarks/, physical/README.md)
-     Missing : 30-60s continuous scroll, memory growth over time, cold/warm start
-               distribution, CPU, multi-sample averages, physical device repeats
-     Proof   : docs/BENCHMARKS.md with sample counts + methodology
+     Status  : emulator DONE; physical device still pending
+     Have    : scripts/measure-sustained.ps1 + all 10 apps, 5 cold + 5 warm starts,
+               3 x 30s samples, /proc CPU deltas, meminfo time series, gfxinfo
+     Proof   : docs/benchmarks/sustained/emulator-20261125-143058.json
+               (status=ok, 30/30 valid, 0 errors);
+               docs/evidence/ANDROID-SUSTAINED-LOAD.md;
+               docs/BENCHMARKS.md with sample counts + methodology
+     Missing : physical-device repeats (OnePlus b6640c8f offline)
 
 [P1] Ship social posts for v0.2.0
      Status  : drafts only — see SOCIAL-v0.2.0.txt in repo root
@@ -108,25 +122,11 @@ ALREADY COMPLETE (do not redo — just maintain)
 ================================================================================
 
 
-Ab sahi roadmap de sakta hoon. Ye wo features hain jo abhi genuinely missing hain (already-done nahi):
-🔴 Tier 1 — sabse zyada impact
-1. JS runtime ko native shells me wire karna (sabse bada gap)
-Abhi native shells hand-built demo batches chalate hain — compiled Angular component andar nahi chalta. Event bridge scaffolding ban gayi hai (dispatch_event, na.addEventListener), par usse connect karne wala runtime bridge crate nahi hai. Ye ho jaye to "Angular component → native UI" asli ban jayega, button press (click) listener tak pahuchega.
-2. Multi-sample sustained-load benchmark
-Community reviewer ne yahi maanga tha ("Rust host under load"). Abhi 1 burst per app hai. 30–60s continuous scroll, memory growth tracking, cold/warm start distribution, CPU — ye numbers release me daale to credibility bahut badhegi.
-3. Shared virtualization primitive (na-data-grid)
-Grid showcase me real RecyclerView virtualization hai, par showcase-local hai. Usse native-ui-core me reusable component bana kar apps/demo-app me bhi use karna — to 10k rows har app me milenge.
-🟡 Tier 2 — middling
-4. Binary/zero-copy mutation protocol — abhi JSON hai. Length-prefixed binary codec (opcodes already spec me hain) se FFI overhead kam hoga.
-5. na-chart, na-calendar, na-rich-text primitives — abhi showcase me hain; package me promote karke Angular API dena.
-6. Runtime theming / dark mode toggle — DesignTokens presets hain, par runtime switch nahi.
-7. Foldable-aware layout (Jetpack WindowManager) — OnePlus Open par test hua, par hinge/posture-aware API nahi.
-8. Accessibility — TalkBack/VoiceOver labels, keyboard navigation (mission me tha, abhi nahi).
-🟢 Tier 3 — chhote par zaroori
-9. angnative test command — abhi sirf message print karta hai; actually pnpm test + cargo test spawn kare.
-10. HMR placeholder — dev.ts:175 me setTimeout placeholder hai; real incremental ngc.
-11. validate-build-tools.mjs ko CI me add karna — script hai, gate nahi.
-12. docs/CONTRIBUTORS.md — SPONSORS.md me promise kiya tha, file abhi nahi hai.
-13. Web demo ko AOT bundle par migrate — AOT ab real hai, par web adapter abhi JIT use karta hai.
-Meri recommendation: Tier 1 me se #1 (runtime wiring) sabse bada value hai — wo AngNative ko "demo" se "real framework" banata hai. #2 (benchmarks) cheapest aur credibility ke liye best.
-Bataiye kya start karoon? Ya aap kisi specificfeature par focus karna chahte hain?
+Current status — 2026-11-25 (supersedes the stale roadmap question that was here):
+[x] JS runtime wired into the native shells: real Angular AOT bundles run in Rust-owned QuickJS; on-device tap reaches a live Angular listener. Evidence: docs/EVENT-BRIDGE.md and docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md.
+[x] Multi-sample sustained-load benchmark: 10 apps, 5 cold + 5 warm starts, 3 x 30 s samples, status=ok, 30/30 valid. Evidence: docs/benchmarks/sustained/emulator-20261125-143058.json and docs/evidence/ANDROID-SUSTAINED-LOAD.md.
+[x] Contract-level candlestick chart: na-candlestick / Custom:na-candlestick with attr:bars JSON string, native Android Canvas view, MarketPulse AOT demo, emulator evidence and staged showcase. Evidence: docs/evidence/ANDROID-MARKETPULSE.md and dist/showcases/market-pulse/.
+[ ] Shared virtualization primitive (na-data-grid) is still showcase-local; no reusable native-ui-core component exists.
+[ ] Binary/zero-copy mutation protocol, runtime theming, foldable-aware layout and accessibility work remain deferred; see docs/UNSUPPORTED-FEATURES.md.
+[ ] angnative test command, HMR, validate-build-tools CI gate, CONTRIBUTORS.md and web-demo AOT migration remain unimplemented/deferred.
+See STATUS.md for the single source of truth; do not re-add stale "not created" claims.

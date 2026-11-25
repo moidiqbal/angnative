@@ -137,12 +137,26 @@ Done since the original note:
    asserts exactly one listener fires and produces a new batch.
 
 Still open (honest):
-- **Other shells / platforms.** `showcases/ecosystem-core` keeps the bridge alive,
-  loads the real AOT bundle, and now has a verified native tap. The other 9
-  showcases and `platforms/android` still use the legacy host + imperative
-  batches; they were not part of this tap proof. iOS has static runtime-bridge
-  bindings only — no Swift compile or simulator/device run was performed on this
-  host, so no iOS runtime claim is made.
+- **Other shells / platforms.** `showcases/ecosystem-core` keeps the bridge
+  alive, loads the real AOT bundle, and has a verified native tap. The generic
+  `platforms/android` shell now uses the same runtime bridge, stages two AOT
+  assets (`assets/angnative-bundle.js` for the counter and
+  `assets/market-pulse-bundle.js` for MarketPulse, selected at runtime), and
+  dispatches native events up the native ancestor chain. Verified on this host:
+  `.\gradlew.bat assembleDebug assembleDebugAndroidTest --no-daemon` builds both
+  APKs, and `adb shell am instrument -w -r ...AndroidJUnitRunner` on
+  `emulator-5554` reports `OK (9 tests)`. After the MarketPulse white-screen
+  layout fix, a real emulator tap on `Refresh` produced a live Angular listener
+  and the Kotlin refetch path (HTTP 429 on that historical stock-feed run). In
+  the final crypto run, the dispatcher sends both `click` and `press` while
+  walking native ancestors; a real `Demo bars` tap produced
+  `dispatchNativeEvent(11, press) -> listeners invoked: 2` and updated the
+  existing price text box in place. This is an emulator tap, not a
+  physical-device tap claim. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 7.
+  The other 9 showcases still use the
+  legacy host + imperative batches. iOS has static runtime-bridge bindings only
+  — no Swift compile or simulator/device run was performed on this host, so no
+  iOS runtime claim is made.
 - **Animation-engine integration** is now verified with deterministic three-sample
   interpolation (`angular_animation_engine_interpolates_native_styles`); real-time
   easing fidelity is still unverified. DI-based `HttpClient.get()` is verified by

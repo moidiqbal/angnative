@@ -19,8 +19,9 @@ use angnative_host_core::NodeId;
 use angnative_host_layout::LayoutResult;
 
 /// Only the untagged generic `Custom` node is flattenable. Tagged customs
-/// (`Custom:na-list`, `Custom:na-switch`, `Custom:na-activity-indicator`) name
-/// real native primitives and must emit a `Create` op for the shell.
+/// (`Custom:na-list`, `Custom:na-switch`, `Custom:na-activity-indicator`,
+/// `Custom:na-candlestick`) name real native primitives and must emit a
+/// `Create` op for the shell.
 fn is_untagged_custom(node_type: &str) -> bool {
     node_type == "Custom"
 }
@@ -640,6 +641,7 @@ mod tests {
             "Custom:na-list",
             "Custom:na-switch",
             "Custom:na-activity-indicator",
+            "Custom:na-candlestick",
         ];
 
         for (index, wire) in wires.iter().enumerate() {
@@ -1048,5 +1050,54 @@ mod tests {
 
         assert!(!emitter.tree().is_flattened(1));
         assert!(emitter.tree().has_view(1));
+    }
+
+    #[test]
+    fn candlestick_bars_string_is_emitted_as_set_props() {
+        let mut emitter = OpEmitter::new();
+        emitter
+            .process_command(&Command::CreateNode {
+                id: 1,
+                node_type: "Custom:na-candlestick".to_string(),
+            })
+            .unwrap();
+
+        // Angular binds [attr.bars] as a JSON string: JSONObject.optString on
+        // the Android side can only read a string, never a JSON array.
+        let bars = r#"{"symbol":"AAPL","bars":[{"t":1,"o":10,"h":12,"l":9,"c":11,"v":100}]}"#;
+        emitter
+            .process_command(&Command::SetProperty {
+                id: 1,
+                key: "attr:bars".to_string(),
+                value: serde_json::json!(bars),
+            })
+            .unwrap();
+
+        let create = emitter
+            .ops()
+            .iter()
+            .find(|op| matches!(op, PlatformOp::Create { .. }))
+            .expect("tagged candlestick must create a native view");
+        match create {
+            PlatformOp::Create { node_id, view_type } => {
+                assert_eq!(*node_id, 1);
+                assert_eq!(view_type, "Custom:na-candlestick");
+            }
+            other => panic!("Expected Create op, got {other:?}"),
+        }
+
+        let props_ops: Vec<&crate::ops::ViewProps> = emitter
+            .ops()
+            .iter()
+            .filter_map(|op| match op {
+                PlatformOp::SetProps { props, .. } => Some(props),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(props_ops.len(), 1);
+        assert_eq!(
+            props_ops[0].properties.get("attr:bars"),
+            Some(&serde_json::json!(bars))
+        );
     }
 }

@@ -1,6 +1,6 @@
 # Unsupported / Not-Yet-Tested Feature Register
 
-**Date:** 2026-11-21, updated 2026-11-23. Maintained as part of Phase 7 deliverables.
+**Date:** 2026-11-21, updated 2026-11-25. Maintained as part of Phase 7 deliverables.
 **Rule:** "not yet tested" is never written as "works".
 
 ## Native renderer (all shells)
@@ -28,7 +28,11 @@
 | Hermes / V8 engine adapters | Not integrated | The Gate F engine proof is the in-repo `ReferenceEngine` over the `JsEngine` abstraction, explicitly not Hermes or V8. No Hermes/V8 adapter, build or runtime claim is made. Evidence: `docs/evidence/RUNTIME-BRIDGE-GATE-F.md`. |
 | Desktop real window / GPU rendering | Not verified | `crates/angnative-desktop/tests/gpu_free_bridge_view_tree_integration.rs` covers the GPU-free bridge/view-tree path only. No real window or GPU rendering was run or verified. Evidence: `docs/evidence/DESKTOP-GPU-FREE-INTEGRATION.md`. |
 | Physical OnePlus `b6640c8f` ABI re-verification | Not verified (device offline) | Previously retained ABI/tap/thread-affinity results stand as historical evidence only. A re-verification this round was not performed because the physical device is offline; no new physical-device ABI claim is made. |
-| Frame pacing / CPU benchmark | Emulator multi-sample + physical single-burst captured | `docs/benchmarks/emulator-multisample.json` (3 bursts per app, instantaneous `top` CPU) and `docs/benchmarks/physical/results.json` (grid on `b6640c8f`); physical multi-sample, sustained CPU and warm-start still not verified. Evidence: `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md`. |
+| Frame pacing / CPU benchmark | Emulator multi-sample + sustained load + physical single-burst captured | `docs/benchmarks/emulator-multisample.json` (3 bursts per app, instantaneous `top` CPU), `docs/benchmarks/sustained/emulator-20261125-143058.json` (10 apps, 5+5 starts, 3 × 30 s, `status=ok`) and `docs/benchmarks/physical/results.json` (grid on `b6640c8f`); physical multi-sample, sustained CPU and warm-start still not verified. Evidence: `docs/evidence/ANDROID-BENCHMARKS-MULTISAMPLE.md` and `docs/evidence/ANDROID-SUSTAINED-LOAD.md`. |
+| `na-candlestick` native chart | Implemented & verified (contract + QuickJS + Android factory + painted pixels) | `na-candlestick` maps to `Custom:na-candlestick`, carries a JSON-string `attr:bars`, and is created by `NativeViewFactory`/`CandlestickView`. The Android UI dump on `emulator-5554` shows `content-desc="Custom:na-candlestick"`; `CandlestickViewFactoryTest` parses the shared OHLC string on-device. A 2-pixel sample of the chart region counted green/red candle pixels, so the chart is painted, not just present. No unchanged ECharts compatibility is claimed. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 7. |
+| MarketPulse live crypto feed on device | Verified for CoinGecko BTC/USD OHLC | The active endpoint returned 48 real 30-minute OHLC bars on `emulator-5554`; the UI showed `BTC/USD · 48 bars · CoinGecko public OHLC · 30m bars`. It is a delayed public endpoint, not a real-time guarantee, and has no volume column (`v` is explicitly 0). The earlier Yahoo stock feed returned HTTP 429 and is no longer active. |
+| MarketPulse async `HttpClient → host network` | Deferred (synchronous prefetch adapter) | Kotlin prefetches on a worker thread and registers a synchronous JS fetch handler before bundle boot; refresh re-fetches in Kotlin and pushes `__marketPulseApplyQuote(json)`. No new JNI async fetch callback was added, so a true JS-async network claim is not made. |
+| MarketPulse real-time easing fidelity | Not verified (deterministic samples only) | The AOT demo uses `provideNativeAnimations()` and the native player applies `0 → 0.5 → 1` opacity samples with `start,done` events. No wall-clock tween/easing driver or 60 FPS claim exists. |
 
 ## Web adapter (`@angnative/web`)
 
@@ -46,7 +50,7 @@
 | Native adapter packages (`material-adapter`, `primeng-adapter`, etc.) | Deliberately not created — no empty placeholders rule; each needs real code first |
 | Zero-copy transport | Deferred — current wire format is JSON; see § Deferred feature decisions |
 | Binary mutation protocol | Deferred — current uses named string kinds; see § Deferred feature decisions |
-| Physical-device Android verification | Retained historical results: wrong-thread JNI, UI-thread ViewFactory marshalling, real tap → live Angular listener, and a single-burst grid frame-pacing sample were verified on OnePlus Open (`b6640c8f`). ABI re-verification this round is **not verified** — the device is offline. Physical multi-sample frame pacing, sustained CPU and warm-start are still not done. OnePlus tap screenshot was not retained because the device disconnected during capture; logcat and before/after XML are retained. |
+| Physical-device Android verification | Retained historical results: wrong-thread JNI, UI-thread ViewFactory marshalling, real tap → live Angular listener, and a single-burst grid frame-pacing sample were verified on OnePlus Open (`b6640c8f`). ABI re-verification this round is **not verified** — the device is offline. Physical multi-sample frame pacing, sustained CPU and warm-start are still not done (emulator sustained results are retained separately in `docs/evidence/ANDROID-SUSTAINED-LOAD.md`). OnePlus tap screenshot was not retained because the device disconnected during capture; logcat and before/after XML are retained. |
 
 ## Deferred feature decisions (2026-11-23)
 

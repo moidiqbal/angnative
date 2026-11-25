@@ -9,5 +9,6 @@
   "reparent",
   "multiple-listeners-per-event",
   "angular-bootstrap-native",
-  "native-primitives-tagged-custom"
+  "native-primitives-tagged-custom",
+  "candlestick-bars-property"
 ]

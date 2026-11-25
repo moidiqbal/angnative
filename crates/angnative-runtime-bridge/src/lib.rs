@@ -1540,6 +1540,183 @@ mod tests {
         );
     }
 
+    /// MarketPulse AOT bundle: heavy windowed rows, real Angular animation
+    /// samples and the `na-candlestick` JSON-string OHLC property. Requires:
+    ///   pnpm compile:aot:marketpulse && pnpm bundle:marketpulse
+    #[test]
+    #[ignore = "requires generated dist/aot/market-pulse-bundle.js"]
+    fn market_pulse_bundle_drives_candlestick_and_animation() {
+        let handle = std::thread::Builder::new()
+            .name("market-pulse-test-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_market_pulse_bundle_drives_candlestick_and_animation)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_market_pulse_bundle_drives_candlestick_and_animation() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/market-pulse-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm compile:aot:marketpulse && pnpm bundle:marketpulse` first");
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        // The Android host registers an equivalent synchronous handler with the
+        // prefetched quote. Here we inject a deterministic fixture payload.
+        bridge
+            .load_script(
+                r#"
+                __angnativeRegisterFetchHandler(function (req) {
+                    if (req.url.indexOf('/marketpulse/quote') >= 0) {
+                        return { status: 200, body: {
+                            symbol: 'BTC/USD', feed: 'deterministic BTC/USD fixture (not live)',
+                            fetchedAt: '2026-11-25T00:00:00Z',
+                            bars: [
+                                {t:1,o:10,h:12,l:9,c:11,v:100},
+                                {t:2,o:11,h:13,l:10,c:12,v:120},
+                                {t:3,o:12,h:14,l:11,c:13,v:140}
+                            ]
+                        }};
+                    }
+                    return { status: 502, body: { error: 'unhandled url' } };
+                });
+                0;
+                "#,
+            )
+            .expect("fetch handler registration must run");
+        bridge
+            .load_script(&source)
+            .expect("MarketPulse AOT bundle must load");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __marketPulseError === 'undefined' ? null : __marketPulseError")
+                .unwrap(),
+            JsValue::Null,
+            "MarketPulse AOT bootstrap rejected"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("__marketPulseRowCount()").unwrap(),
+            JsValue::Number(200.0),
+            "windowed native row count must be the measured 200 rows, not 10,000"
+        );
+
+        let quote = match bridge.runtime_mut().eval("__marketPulseQuote()").unwrap() {
+            JsValue::String(value) => value,
+            other => panic!("expected a JSON-string quote payload, got {:?}", other),
+        };
+        assert!(quote.contains("\"symbol\":\"BTC/USD\""));
+        assert!(quote.contains("\"bars\":["));
+
+        let bars_mutations = bridge
+            .runtime_mut()
+            .eval(
+                r#"(function () {
+                    var n = 0;
+                    for (var i = 0; i < __angnativeBatches.length; i++) {
+                        var batch = JSON.parse(__angnativeBatches[i]);
+                        for (var j = 0; j < batch.commands.length; j++) {
+                            var c = batch.commands[j];
+                            if (c.kind === 'SetProperty' && c.key === 'attr:bars' &&
+                                typeof c.value === 'string' && c.value.indexOf('BTC/USD') >= 0) n++;
+                        }
+                    }
+                    return n;
+                })()"#,
+            )
+            .unwrap();
+        assert_eq!(bars_mutations, JsValue::Number(1.0));
+
+        let snapshot = bridge.host_mut().engine().snapshot();
+        let chart = snapshot
+            .nodes
+            .iter()
+            .find(|node| node.node_type == "Custom:na-candlestick")
+            .expect("Custom:na-candlestick must exist in the native tree");
+        assert!(
+            chart
+                .properties
+                .get("attr:bars")
+                .and_then(|value| value.as_str())
+                .map(|value| value.contains("BTC/USD"))
+                .unwrap_or(false),
+            "native candlestick node must carry the JSON-string bars payload"
+        );
+
+        // A new quote must update the existing price text node in place; it must
+        // not append another textbox on every refresh/push.
+        let price_before = snapshot
+            .nodes
+            .iter()
+            .find(|node| node.text_content.as_deref() == Some("BTC/USD 13"))
+            .expect("price text node must show the fetched last close");
+        let price_id = price_before.id;
+        let node_count_before = snapshot.nodes.len();
+
+        bridge
+            .load_script(
+                r#"__marketPulseApplyQuote('{"symbol":"BTC/USD","feed":"deterministic BTC/USD fixture (not live)","fetchedAt":"2026-11-25T00:00:01Z","bars":[{"t":9,"o":9,"h":10,"l":8,"c":99.5,"v":1}]}'); 0;"#,
+            )
+            .expect("second quote must apply");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+
+        let after = bridge.host_mut().engine().snapshot();
+        assert_eq!(
+            after.nodes.len(),
+            node_count_before,
+            "quote update must not create native nodes"
+        );
+        let price_after = after
+            .nodes
+            .iter()
+            .find(|node| node.id == price_id)
+            .expect("price node id must be stable after quote update");
+        assert_eq!(price_after.text_content.as_deref(), Some("BTC/USD 99.5"));
+
+        // Drive the real Angular animation trigger once more and verify the
+        // same deterministic samples used by the standalone fixture. This is
+        // not a wall-clock easing/FPS claim.
+        bridge
+            .load_script("__setMarketPulseAnimationState('idle'); __setMarketPulseAnimationState('flash'); 0;")
+            .expect("animation state transition must run");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+        let opacity = match bridge
+            .runtime_mut()
+            .eval(
+                r#"(function () {
+                    var values = [];
+                    for (var i = 0; i < __angnativeBatches.length; i++) {
+                        var batch = JSON.parse(__angnativeBatches[i]);
+                        for (var j = 0; j < batch.commands.length; j++) {
+                            var c = batch.commands[j];
+                            if (c.kind === 'SetStyle' && c.key === 'opacity') values.push(c.value);
+                        }
+                    }
+                    return values.join(',');
+                })()"#,
+            )
+            .unwrap()
+        {
+            JsValue::String(value) => value,
+            other => panic!("expected opacity history, got {:?}", other),
+        };
+        let midpoint = opacity
+            .find("0.5")
+            .unwrap_or_else(|| panic!("no midpoint sample in {opacity}"));
+        assert!(
+            opacity[..midpoint].contains('1'),
+            "start sample must precede midpoint in {opacity}"
+        );
+        assert!(
+            opacity[midpoint..].contains("0.55"),
+            "end sample must follow midpoint in {opacity}"
+        );
+    }
+
     /// Router API compatibility. Requires: pnpm bundle:framework
     #[test]
     #[ignore = "requires generated dist/aot/router-bundle.js"]

@@ -5,6 +5,7 @@ import { NaButtonComponent } from './na-button.component';
 import { NaTextInputComponent } from './na-text-input.component';
 import { NaImageComponent } from './na-image.component';
 import { NaScrollViewComponent } from './na-scroll-view.component';
+import { NaCandlestickComponent } from './na-candlestick.component';
 
 export {
   NaViewComponent,
@@ -14,6 +15,7 @@ export {
   NaTextInputComponent,
   NaImageComponent,
   NaScrollViewComponent,
+  NaCandlestickComponent,
 };
 
 export const NATIVE_COMPONENTS = [
@@ -24,4 +26,5 @@ export const NATIVE_COMPONENTS = [
   NaTextInputComponent,
   NaImageComponent,
   NaScrollViewComponent,
+  NaCandlestickComponent,
 ] as const;
