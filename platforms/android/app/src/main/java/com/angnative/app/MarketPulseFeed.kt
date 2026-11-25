@@ -3,12 +3,14 @@
  *
  * Angular's QuickJS fetch shim is synchronous, so the network work happens
  * here on a background executor and the normalized payload is registered as
- * a host-cached response before the AOT bundle boots. Refresh uses the same
- * adapter and pushes fresh JSON into Angular through __marketPulseApplyQuote.
+ * a host-cached response before the AOT bundle boots. Refresh and the 30s poll
+ * use the same adapter and push fresh JSON into the Angular RxJS stream through
+ * __marketPulseApplyQuote.
  *
  * The source is CoinGecko's public BTC/USD OHLC endpoint (30-minute bars for
  * `days=1`). It does not return volume, so `v` is explicitly 0. Delays, rate
- * limits and failures are expected; no data is fabricated on failure.
+ * limits and failures are expected; no data is fabricated on failure. Polling
+ * is delayed, not real-time streaming.
  */
 package com.angnative.app
 
@@ -20,6 +22,8 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 object MarketPulseFeed {
   private const val TAG = "AngNative"
@@ -29,10 +33,13 @@ object MarketPulseFeed {
   private const val FEED = "CoinGecko public OHLC · 30m bars"
   private const val TIMEOUT_MS = 8000
   private const val MAX_BARS = 60
+  const val DEFAULT_POLL_INTERVAL_MS = 30_000L
 
   private val executor = Executors.newSingleThreadExecutor { runnable ->
     Thread(runnable, "market-pulse-feed").apply { isDaemon = true }
   }
+  @Volatile
+  private var pollExecutor: ScheduledExecutorService? = null
 
   @Volatile
   private var lastGood: String? = null
@@ -51,6 +58,36 @@ object MarketPulseFeed {
       }
       onResult(payload)
     }
+  }
+
+  /**
+   * Host-side polling. QuickJS `setInterval` is deliberately one-shot in the
+   * shim, so recurring JS timers would starve the bounded host job loop. The
+   * schedule lives here and each result is pushed through the existing JS hook.
+   */
+  @Synchronized
+  fun startPolling(
+    intervalMs: Long = DEFAULT_POLL_INTERVAL_MS,
+    onQuote: (String) -> Unit,
+  ) {
+    stopPolling()
+    val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
+      Thread(runnable, "market-pulse-poll").apply { isDaemon = true }
+    }
+    pollExecutor = scheduler
+    scheduler.scheduleWithFixedDelay(
+      { fetch(onQuote) },
+      intervalMs,
+      intervalMs,
+      TimeUnit.MILLISECONDS,
+    )
+    Log.i(TAG, "MarketPulse polling scheduled every ${intervalMs}ms")
+  }
+
+  @Synchronized
+  fun stopPolling() {
+    pollExecutor?.shutdownNow()
+    pollExecutor = null
   }
 
   private fun loadBars(): JSONArray {

@@ -33,6 +33,7 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
   private val mainHandler = Handler(Looper.getMainLooper())
   private var destroyed = false
   private var latestQuote: String? = null
+  private var marketPulsePolling = false
   private var layoutWidthDp = 0f
   private var layoutHeightDp = 600f
 
@@ -132,6 +133,7 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
       card.tag = "angular-native-ui"
       plusId?.let { card.setTag(0x7F000001, it) }
       Log.i(tag, "Angular boot complete. nodes=${jniBridge.nodeCount()} plusNode=$plusId")
+      if (bundleAsset == MARKET_PULSE_ASSET) startMarketPulsePolling()
     } catch (e: Exception) {
       statusView.text = "Angular bundle unavailable: ${e.message}"
       Log.e(tag, "Angular boot failed", e)
@@ -179,6 +181,21 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
     if (rc != 0) throw IllegalStateException("host fetch handler registration failed (rc=$rc)")
   }
 
+  /**
+   * Delayed host-side polling. The QuickJS `setInterval` shim is deliberately
+   * one-shot, so a recurring JS timer would starve the bounded host job loop;
+   * Kotlin owns the schedule and pushes into the Angular RxJS stream here.
+   */
+  private fun startMarketPulsePolling() {
+    if (marketPulsePolling) return
+    marketPulsePolling = true
+    val intervalMs = System.getProperty("angnative.marketpulse.poll.ms")?.toLongOrNull()
+      ?: MarketPulseFeed.DEFAULT_POLL_INTERVAL_MS
+    MarketPulseFeed.startPolling(intervalMs) { quote ->
+      mainHandler.post { applyHostQuote(quote, fromPoll = true) }
+    }
+  }
+
   /** Async host refetch; the result is pushed into Angular on the main looper. */
   private fun refreshQuote() {
     statusView.text = "refreshing BTC/USD OHLC..."
@@ -187,10 +204,15 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
     }
   }
 
-  private fun applyHostQuote(quoteJson: String) {
+  private fun applyHostQuote(quoteJson: String, fromPoll: Boolean = false) {
     if (destroyed) return
     latestQuote = quoteJson
-    val script = "__marketPulseApplyQuote(${JSONObject.quote(quoteJson)}); 0;"
+    val quoted = JSONObject.quote(quoteJson)
+    val script = """
+      globalThis.__marketPulseCachedQuote = JSON.parse($quoted);
+      if (typeof __marketPulseApplyQuote === 'function') __marketPulseApplyQuote($quoted);
+      0;
+    """.trimIndent()
     val rc = jniBridge.loadScript(script)
     if (rc != 0) {
       Log.e(tag, "MarketPulse quote push failed (rc=$rc): ${jniBridge.lastError()}")
@@ -200,6 +222,11 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
     val layoutJson = jniBridge.runLayout(layoutWidthDp, layoutHeightDp)
     viewFactory?.applyLayoutResult(layoutJson)
     statusView.text = "Angular in Rust: nodes=${jniBridge.nodeCount()} · BTC/USD OHLC"
+    if (fromPoll) {
+      val bars = runCatching { JSONObject(quoteJson).optJSONArray("bars")?.length() ?: 0 }
+        .getOrDefault(0)
+      Log.i(tag, "MarketPulse poll pushed fresh quote: bars=$bars")
+    }
   }
 
   /** True when the MarketPulse demo bundle was staged into app assets. */
@@ -233,6 +260,8 @@ class AngNativeView(context: Context, attrs: AttributeSet? = null) :
 
   fun destroy() {
     destroyed = true
+    MarketPulseFeed.stopPolling()
+    marketPulsePolling = false
     jniBridge.destroyHost()
     viewFactory?.clear()
     viewFactory = null

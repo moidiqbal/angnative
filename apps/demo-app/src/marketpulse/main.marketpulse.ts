@@ -1,11 +1,12 @@
 /**
- * MarketPulse AOT crypto demo — heavy windowed OHLC rows + real Angular
- * animations + the `na-candlestick` contract element.
+ * MarketPulse AOT crypto demo — heavy windowed OHLC rows + Angular Signals +
+ * an RxJS quote stream + the `na-candlestick` contract element.
  *
  * BTC/USD OHLC data is fetched by the Android host from CoinGecko's public
- * endpoint and delivered through the synchronous fetch handler /
- * __marketPulseApplyQuote hook. Bars are 30-minute delayed OHLC; no
- * real-time claim or fabricated data is made here.
+ * endpoint and delivered through the synchronous fetch handler / stream hook.
+ * Bars are 30-minute delayed OHLC; no real-time claim or fabricated data is
+ * made here. Polling lives in Kotlin because the QuickJS `setInterval` shim is
+ * one-shot and an RxJS `interval` would starve the bounded host job loop.
  */
 import {
   animate,
@@ -19,9 +20,12 @@ import { HttpClient, provideHttpClient } from '@angular/common/http';
 import {
   ChangeDetectorRef,
   Component,
+  computed,
+  OnDestroy,
+  OnInit,
   provideZonelessChangeDetection,
+  signal,
   type ApplicationRef,
-  type OnInit,
 } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import {
@@ -31,6 +35,7 @@ import {
   NaViewComponent,
 } from '@angnative/common';
 import { provideNativeAngular, provideNativeAnimations } from '@angnative/platform';
+import { Subject, type Subscription } from 'rxjs';
 
 interface QuoteBar {
   t: number;
@@ -53,6 +58,9 @@ interface DatasetRow {
   i: number;
   label: string;
 }
+
+const EMPTY_QUOTE_JSON =
+  '{"symbol":"","feed":"CoinGecko public OHLC · 30m bars","fetchedAt":"","bars":[]}';
 
 @Component({
   selector: 'market-pulse-app',
@@ -93,10 +101,10 @@ interface DatasetRow {
         [style.width]="'340px'"
         [style.height]="'36px'"
         [style.fontSize]="'13px'"
-        [text]="status"
+        [text]="status()"
       ></na-text>
       <div
-        [@flash]="flashState"
+        [@flash]="flashState()"
         (@flash.done)="onFlashDone()"
         [style.width]="'340px'"
         [style.height]="'30px'"
@@ -105,11 +113,11 @@ interface DatasetRow {
           [style.width]="'330px'"
           [style.height]="'30px'"
           [style.fontSize]="'18px'"
-          [text]="symbol + ' ' + lastPrice"
+          [text]="symbol() + ' ' + lastPrice()"
         ></na-text>
       </div>
       <na-candlestick
-        [attr.bars]="quoteJson"
+        [attr.bars]="quoteJson()"
         [style.width]="'340px'"
         [style.height]="'240px'"
       ></na-candlestick>
@@ -157,7 +165,7 @@ interface DatasetRow {
     </na-view>
   `,
 })
-export class MarketPulseAppComponent implements OnInit {
+export class MarketPulseAppComponent implements OnInit, OnDestroy {
   /** Deterministic 10,000-row dataset; only the window below reaches native views. */
   readonly datasetSize = 10000;
   readonly windowSize = 200;
@@ -167,55 +175,88 @@ export class MarketPulseAppComponent implements OnInit {
   }));
 
   visibleRows: DatasetRow[] = this.rows.slice(0, this.windowSize);
-  symbol = '—';
-  lastPrice = '';
-  status = 'waiting for BTC/USD OHLC quote';
-  quoteJson =
-    '{"symbol":"","feed":"CoinGecko public OHLC · 30m bars","fetchedAt":"","bars":[]}';
-  barCount = 0;
-  flashState = 'idle';
+
+  private readonly quote = signal<QuotePayload | null>(null);
+  readonly status = signal('waiting for BTC/USD OHLC quote');
+  readonly flashState = signal('idle');
+  readonly streamEvents = signal(0);
+
+  readonly symbol = computed(() => this.quote()?.symbol || '—');
+  readonly barCount = computed(() => this.quote()?.bars.length ?? 0);
+  readonly lastPrice = computed(() => {
+    const quote = this.quote();
+    return quote && quote.bars.length > 0 ? String(quote.bars[quote.bars.length - 1]!.c) : '';
+  });
+  readonly quoteJson = computed(() => {
+    const quote = this.quote();
+    return quote ? JSON.stringify(quote) : EMPTY_QUOTE_JSON;
+  });
+
   events: string[] = [];
+
+  /** RxJS stream: every quote source (initial HTTP, host poll, fixture) lands here. */
+  private readonly quoteInput$ = new Subject<string>();
+  private readonly streamSubscription: Subscription;
 
   constructor(
     private readonly http: HttpClient,
     private readonly cdr: ChangeDetectorRef,
-  ) {}
+  ) {
+    // Keep the RxJS surface v6/v7-compatible: operators are intentionally not
+    // imported, so the stream stays a plain Subject in this constrained bundle.
+    this.streamSubscription = this.quoteInput$.subscribe({
+      next: (json) => {
+        try {
+          const quote = JSON.parse(json) as QuotePayload;
+          if (!quote || !Array.isArray(quote.bars)) throw new Error('invalid quote payload');
+          this.streamEvents.update((count) => count + 1);
+          this.applyQuote(quote);
+        } catch (err) {
+          this.fail(String((err as { message?: string })?.message ?? err));
+        }
+      },
+      error: (err: unknown) => this.fail(String((err as { message?: string })?.message ?? err)),
+    });
+  }
 
   ngOnInit(): void {
     this.http.get<QuotePayload>('/marketpulse/quote').subscribe({
-      next: (body) => this.applyQuote(JSON.stringify(body)),
+      next: (body) => this.quoteInput$.next(JSON.stringify(body)),
       error: (err: unknown) => this.fail(String((err as { message?: string })?.message ?? err)),
     });
     this.flush();
   }
 
-  applyQuote(json: string): void {
-    try {
-      const quote = JSON.parse(json) as QuotePayload;
-      if (!Array.isArray(quote.bars)) throw new Error('missing bars array');
-      this.symbol = quote.symbol || '—';
-      this.barCount = quote.bars.length;
-      this.lastPrice = this.barCount > 0 ? String(quote.bars[this.barCount - 1]!.c) : '';
-      this.quoteJson = json;
-      const feed = quote.feed || 'public OHLC feed';
-      this.status = quote.error
-        ? `feed unavailable: ${quote.error} · ${this.barCount} last-good bars`
-        : `${this.symbol} · ${this.barCount} bars · ${feed}`;
-      this.flashState = 'flash';
-    } catch (err) {
-      this.fail(String((err as { message?: string })?.message ?? err));
-    }
+  ngOnDestroy(): void {
+    this.streamSubscription.unsubscribe();
+  }
+
+  /** Push a normalized JSON payload into the RxJS stream. */
+  pushQuote(json: string): void {
+    this.quoteInput$.next(json);
+  }
+
+  applyQuote(quote: QuotePayload): void {
+    this.quote.set(quote);
+    const count = quote.bars.length;
+    const feed = quote.feed || 'public OHLC feed';
+    this.status.set(
+      quote.error
+        ? `feed unavailable: ${quote.error} · ${count} last-good bars`
+        : `${quote.symbol} · ${count} bars · ${feed}`,
+    );
+    this.flashState.set('flash');
     this.flush();
   }
 
   fail(reason: string): void {
     // Keep the last good payload visible; never fabricate market data.
-    this.status = `feed unavailable: ${reason}`;
+    this.status.set(`feed unavailable: ${reason}`);
     this.flush();
   }
 
   onRefreshClick(): void {
-    this.status = 'refresh requested from BTC/USD OHLC feed';
+    this.status.set('refresh requested from BTC/USD OHLC feed');
     this.flush();
   }
 
@@ -229,7 +270,7 @@ export class MarketPulseAppComponent implements OnInit {
       c: 60_075 + i * 25 + (i % 4) * 15,
       v: 0,
     }));
-    this.applyQuote(
+    this.pushQuote(
       JSON.stringify({
         symbol: 'BTC/USD',
         feed: 'deterministic BTC/USD fixture (not live)',
@@ -244,7 +285,7 @@ export class MarketPulseAppComponent implements OnInit {
   }
 
   setState(value: string): void {
-    this.flashState = value;
+    this.flashState.set(value);
     this.flush();
   }
 
@@ -265,6 +306,8 @@ declare global {
   // eslint-disable-next-line no-var
   var __marketPulseRowCount: (() => number) | undefined;
   // eslint-disable-next-line no-var
+  var __marketPulseStreamEvents: (() => number) | undefined;
+  // eslint-disable-next-line no-var
   var __setMarketPulseAnimationState: ((state: string) => void) | undefined;
   // eslint-disable-next-line no-var
   var __marketPulseAnimationEvents: (() => string[]) | undefined;
@@ -280,10 +323,11 @@ bootstrapApplication(MarketPulseAppComponent, {
 })
   .then((ref: ApplicationRef) => {
     const app = ref.components[0]!.instance as MarketPulseAppComponent;
-    globalThis.__marketPulseApplyQuote = (json: string) => app.applyQuote(json);
-    globalThis.__marketPulseQuote = () => app.quoteJson;
-    globalThis.__marketPulseStatus = () => app.status;
+    globalThis.__marketPulseApplyQuote = (json: string) => app.pushQuote(json);
+    globalThis.__marketPulseQuote = () => app.quoteJson();
+    globalThis.__marketPulseStatus = () => app.status();
     globalThis.__marketPulseRowCount = () => app.visibleRows.length;
+    globalThis.__marketPulseStreamEvents = () => app.streamEvents();
     globalThis.__setMarketPulseAnimationState = (value: string) => app.setState(value);
     globalThis.__marketPulseAnimationEvents = () => app.events.slice();
   })

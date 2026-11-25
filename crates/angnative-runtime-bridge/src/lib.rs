@@ -1611,6 +1611,18 @@ mod tests {
         };
         assert!(quote.contains("\"symbol\":\"BTC/USD\""));
         assert!(quote.contains("\"bars\":["));
+        assert_eq!(
+            bridge.runtime_mut().eval("__marketPulseStreamEvents()").unwrap(),
+            JsValue::Number(1.0),
+            "initial HttpClient response must reach the RxJS Subject once"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("__marketPulseStatus()").unwrap(),
+            JsValue::String(
+                "BTC/USD · 3 bars · deterministic BTC/USD fixture (not live)".to_string()
+            ),
+            "signal-backed status must be driven by the stream"
+        );
 
         let bars_mutations = bridge
             .runtime_mut()
@@ -1676,6 +1688,11 @@ mod tests {
             .find(|node| node.id == price_id)
             .expect("price node id must be stable after quote update");
         assert_eq!(price_after.text_content.as_deref(), Some("BTC/USD 99.5"));
+        assert_eq!(
+            bridge.runtime_mut().eval("__marketPulseStreamEvents()").unwrap(),
+            JsValue::Number(2.0),
+            "host poll push must be a second RxJS stream event"
+        );
 
         // Drive the real Angular animation trigger once more and verify the
         // same deterministic samples used by the standalone fixture. This is

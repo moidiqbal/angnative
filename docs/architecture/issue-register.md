@@ -224,9 +224,9 @@
 **Files**: `docs/architecture/`
 **Remediation**: In-code references. `// See: docs/architecture/...`
 
-### P2-16: Async JS fetch to host network — deferred (MarketPulse uses synchronous prefetch)
-**Evidence**: The QuickJS fetch shim invokes registered handlers synchronously. MarketPulse therefore prefetches in Kotlin on a worker thread and registers a synchronous handler before AOT bundle boot; refresh re-fetches in Kotlin and pushes `__marketPulseApplyQuote(json)`. No new JNI async method was added. The live endpoint returned HTTP 429 on the emulator and the app logged the failure rather than fabricating bars. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md`, `docs/UNSUPPORTED-FEATURES.md`.
-**Files**: `platforms/android/app/src/main/java/com/angnative/app/MarketPulseFeed.kt`, `AngNativeView.kt`, `crates/angnative-host-engine/src/quickjs_shims.rs`
+### P2-16: Async JS fetch to host network — deferred (MarketPulse uses synchronous prefetch + host polling)
+**Evidence**: The QuickJS fetch shim invokes registered handlers synchronously. MarketPulse therefore prefetches in Kotlin on a worker thread and registers a synchronous handler before AOT bundle boot; refresh and the 30 s Kotlin scheduler re-fetch and push `__marketPulseApplyQuote(json)` into an RxJS `Subject` consumed by Angular Signals. No new JNI async method or browser WebSocket was added. The QuickJS `setInterval` shim is one-shot, so RxJS `interval` was intentionally avoided. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 8, `docs/UNSUPPORTED-FEATURES.md`.
+**Files**: `platforms/android/app/src/main/java/com/angnative/app/MarketPulseFeed.kt`, `AngNativeView.kt`, `apps/demo-app/src/marketpulse/main.marketpulse.ts`, `crates/angnative-host-engine/src/quickjs_shims.rs`
 **Remediation**: Deferred, not a defect in the shipped path. Lift only with a real JS→host async fetch callback plus tests proving `HttpClient` awaits host network I/O.
 
 ---
@@ -314,7 +314,7 @@
 | P2-13 | ⚠️ Gate F proof via in-repo `ReferenceEngine`; Hermes/V8 not integrated | - | F |
 | P2-14 | ✅ Closed (benchmark scripts + artifacts retained; physical multi-sample pending) | - | G |
 | P2-15 | ✅ Done | - | A |
-| P2-16 | ⬜ Deferred (MarketPulse uses synchronous Kotlin prefetch, no async JS fetch callback) | - | C |
+| P2-16 | ⬜ Deferred (MarketPulse uses synchronous Kotlin prefetch + 30 s host polling; no async JS fetch callback) | - | C |
 | P3-01 | ✅ Closed (warning cleanup reconciled; no local count claimed) | - | - |
 | P3-02 | ✅ Closed (unused import removed in unified bridge) | - | - |
 | P3-03 | ✅ Closed (not dead — intentional concept UI) | - | D |

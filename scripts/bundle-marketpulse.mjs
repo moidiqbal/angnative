@@ -47,6 +47,9 @@ await build({
   platform: 'browser',
   target: 'es2018',
   minify: true,
+  // RxJS 6's tslib banner contains blank lines with trailing spaces; dropping
+  // legal comments keeps the generated asset clean for `git diff --check`.
+  legalComments: 'none',
   alias: { '@angular/common/http': httpEntry },
   define: { ngDevMode: 'false' },
   logLevel: 'info',

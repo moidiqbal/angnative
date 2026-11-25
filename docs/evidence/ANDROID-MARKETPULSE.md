@@ -476,7 +476,71 @@ OK; `git diff --check` no whitespace errors.
 
 ---
 
-## 8. Boundaries of this evidence
+## 8. Signals + RxJS stream + delayed host polling (2026-11-25, second round)
 
-- **Claimed:** APK builds/installs/launches; Angular AOT bundle boots in the Rust-owned QuickJS runtime; 213 native nodes on the final crypto boot; no WebView node in the UI dumps; `Custom:na-candlestick` in the UI hierarchy; native CandlestickView paints live BTC/USD bars (confirmed by green/red pixel samples); CoinGecko returned 48 real 30-minute OHLC bars on-device; a real `Demo bars` tap reaches two live Angular `press` listeners and updates the existing price text box in place; tagged factory parses the OHLC bars string on-device; deterministic animation samples `0 / 0.5 / 1` in-process.
-- **Not claimed:** real-time or guaranteed feed delivery, CoinGecko volume data (`v` is explicitly 0), smooth/eased 60 FPS animation, 10,000 native rows (only the dataset has 10,000 rows), `RecyclerView` recycling, unchanged AG Grid/ECharts/GSAP compatibility, the earlier Yahoo stock feed working on-device (it returned HTTP 429), physical-device results, iOS/Mac verification, or any NativeScript/Flutter head-to-head result.
+Scope: add Angular Signals and an RxJS `Subject` stream to MarketPulse, plus
+delayed host-side polling. No WebSocket/SSE or real-time claim. Design:
+`docs/plans/2026-11-25-marketpulse-signals-rxjs-design.md`.
+
+Commands run:
+
+```powershell
+pnpm compile:aot:marketpulse
+pnpm bundle:marketpulse
+cargo test -p angnative-runtime-bridge market_pulse_bundle_drives_candlestick_and_animation -- --ignored --nocapture
+.\gradlew assembleDebug assembleDebugAndroidTest --no-daemon
+& $adb install -r 'platforms\android\app\build\outputs\apk\debug\app-debug.apk'
+& $adb logcat -c
+& $adb shell am start -n com.angnative.app/.MainActivity
+& $adb shell uiautomator dump /data/local/tmp/marketpulse-signals-poll.xml
+& $adb exec-out screencap -p > docs\assets\market-pulse-signals-poll.png
+& $adb shell am instrument -w -r -e package com.angnative.app com.angnative.app.test/androidx.test.runner.AndroidJUnitRunner
+python scripts/check-ffi-declarations.py
+git diff --check
+```
+
+Observed:
+
+- AOT compile completed and the bundle was written (`dist\aot\market-pulse-bundle.js`, 1.1 mb).
+  `legalComments: 'none'` was added to `scripts/bundle-marketpulse.mjs` after the
+  RxJS 6 tslib banner introduced trailing whitespace; the final `git diff --check`
+  is clean.
+- The ignored Rust MarketPulse acceptance test passed (`1 passed; 0 failed`). It
+  now asserts `__marketPulseStreamEvents()` is `1` after the initial HttpClient
+  response and `2` after a host push, checks the signal-backed status string, and
+  keeps the stable price-node-id / unchanged-node-count assertions.
+- `pnpm test`: 251 passed. `cargo test --workspace`: 151 passed / 0 failed /
+  16 ignored. Android instrumentation: `OK (9 tests)`. FFI declaration check: OK.
+- Emulator logcat with the default 30 s poll interval:
+
+```text
+11-25 20:00:50.747  4181  4181 I AngNative: Angular boot complete. nodes=213 plusNode=null
+11-25 20:00:50.748  4181  4181 I AngNative: MarketPulse polling scheduled every 30000ms
+11-25 20:01:20.911  4181  4181 I AngNative: MarketPulse poll pushed fresh quote: bars=48
+11-25 20:01:50.861  4181  4181 I AngNative: MarketPulse poll pushed fresh quote: bars=48
+11-25 20:02:20.909  4181  4181 I AngNative: MarketPulse poll pushed fresh quote: bars=48
+```
+
+- After three polls, `docs/assets/market-pulse-signals-poll.xml` showed
+  `BTC/USD · 48 bars · CoinGecko public OHLC · 30m bars`, price
+  `BTC/USD 58182`, `TextViewCount=36`, `Custom:na-candlestick=True`, and chart
+  bounds `[137,556][1029,805]`. A 2-pixel sample of that region in
+  `docs/assets/market-pulse-signals-poll.png` counted `green=793 red=1601 grid=2147`,
+  so the candles were still painted after reactive updates.
+- Final rebuild with the clean bundle was reinstalled and booted:
+  `Angular boot complete. nodes=213 plusNode=null` and
+  `MarketPulse polling scheduled every 30000ms` at `20:05:37`.
+
+Boundary: RxJS `interval` was deliberately not used because the QuickJS timer
+shim (`crates/angnative-host-engine/src/quickjs_shims.rs:691-728`) makes
+`setInterval` one-shot; an auto-repeating microtask chain would starve the
+bounded host job loop. Polling is therefore Kotlin-scheduled and delayed, with
+RxJS carrying the updates into Signals. No WebSocket/SSE exists in the source
+or generated assets.
+
+---
+
+## 9. Boundaries of this evidence
+
+- **Claimed:** APK builds/installs/launches; Angular AOT bundle boots in the Rust-owned QuickJS runtime; 213 native nodes on the final crypto boot; no WebView node in the UI dumps; `Custom:na-candlestick` in the UI hierarchy; native CandlestickView paints live BTC/USD bars (confirmed by green/red pixel samples); CoinGecko returned 48 real 30-minute OHLC bars on-device; a real `Demo bars` tap reaches two live Angular `press` listeners and updates the existing price text box in place; tagged factory parses the OHLC bars string on-device; deterministic animation samples `0 / 0.5 / 1` in-process; Angular Signals and an RxJS `Subject` drive the same native nodes; three delayed 30 s Kotlin polls delivered fresh 48-bar payloads without growing the 36 `TextView` nodes.
+- **Not claimed:** WebSocket/SSE, real-time or guaranteed feed delivery, RxJS `interval`/JS timers as the polling source, CoinGecko volume data (`v` is explicitly 0), smooth/eased 60 FPS animation, 10,000 native rows (only the dataset has 10,000 rows), `RecyclerView` recycling, unchanged AG Grid/ECharts/GSAP compatibility, the earlier Yahoo stock feed working on-device (it returned HTTP 429), physical-device results, iOS/Mac verification, or any NativeScript/Flutter head-to-head result.
