@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/moidiqbal/angnative/releases/tag/v0.2.0"><img src="https://img.shields.io/badge/release-v0.2.0-brightgreen?style=for-the-badge" alt="Release"/></a>
+  <a href="https://github.com/moidiqbal/angnative/releases/tag/v0.3.0"><img src="https://img.shields.io/badge/release-v0.3.0-brightgreen?style=for-the-badge" alt="Release"/></a>
   <a href="https://github.com/moidiqbal/angnative/actions/workflows/ci.yml"><img src="https://github.com/moidiqbal/angnative/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <a href="https://angular.dev"><img src="https://img.shields.io/badge/Angular-22%2B-DD0031?style=for-the-badge&logo=angular&logoColor=white" alt="Angular"/></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-nightly-orange?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"/></a>
@@ -18,7 +18,7 @@
   <a href="https://github.com/moidiqbal/angnative/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
-> **Latest release: [`v0.2.0`](https://github.com/moidiqbal/angnative/releases/tag/v0.2.0)** — Rust core, Angular renderer, Android + desktop + web adapters, production AOT, 10 native showcase APKs, and physical-device benchmarks. iOS shell is code-complete but Mac build verification is still pending.
+> **Latest release: [`v0.3.0`](docs/releases/v0.3.0.md)** — Rust core, Angular renderer, Android + desktop + web adapters, production AOT, 10 native showcase APKs, physical-device benchmarks, and a **socket-only MarketPulse** feed with host-backed async JS capabilities. iOS shell is code-complete but Mac build verification is still pending.
 
 ---
 
@@ -26,20 +26,21 @@
 
 Angular developers should not have to choose between WebViews and abandoning TypeScript. AngNative runs a custom Angular `Renderer2` over a Rust host engine: template mutations become `CommandBatch`es, a shadow tree is maintained in Rust, Taffy computes Flexbox/Grid layout, and platform shells render real native widgets via C-FFI/JNI — **no WebView, no DOM, no embedded browser in native mode**.
 
-> Honest note: mutations cross the FFI boundary as JSON batches. Zero-copy transport and a binary protocol are planned, not implemented. A real Angular AOT bundle now boots inside the embedded QuickJS runtime and a native event reaches the Angular listener (see [`docs/CODE-REVIEW-2026-11-22.md`](docs/CODE-REVIEW-2026-11-22.md)); the *shipping* native shells still render Rust/Kotlin-driven trees, so on-device bundle loading is the remaining integration step (see [`docs/EVENT-BRIDGE.md`](docs/EVENT-BRIDGE.md)). Third-party DOM libraries are represented by clearly labelled **native reimplementations** (see [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)).
+> Honest note: mutations cross the FFI boundary as JSON batches. Zero-copy transport and a binary protocol are planned, not implemented. Real Angular AOT bundles now boot inside the embedded QuickJS runtime on Android — the flagship `ecosystem-core` shell and the socket-only MarketPulse shell — and a native event reaches the Angular listener (see [`docs/CODE-REVIEW-2026-11-22.md`](docs/CODE-REVIEW-2026-11-22.md)); the other showcase shells still render Rust/Kotlin-driven trees (see [`docs/EVENT-BRIDGE.md`](docs/EVENT-BRIDGE.md)). Third-party DOM libraries are represented by clearly labelled **native reimplementations** (see [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)).
 
 ---
 
-## ✅ Verified status (v0.2.0)
+## ✅ Verified status (v0.3.0)
 
-Full evidence: [`docs/VERIFICATION-REPORT.md`](docs/VERIFICATION-REPORT.md) · [`docs/COMPATIBILITY-EVIDENCE.md`](docs/COMPATIBILITY-EVIDENCE.md)
+Full evidence: [`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md) · [`docs/VERIFICATION-REPORT.md`](docs/VERIFICATION-REPORT.md) · [`docs/COMPATIBILITY-EVIDENCE.md`](docs/COMPATIBILITY-EVIDENCE.md)
 
 | Component | Status | Proof |
 |---|---|---|
-| Rust host crates + engine | ✅ | `cargo test --workspace` → **135 passed**; the 9 ignored Angular-in-QuickJS acceptance tests plus 1 third-party RxJS spot-check pass when `dist/aot` bundles are generated |
-| Angular renderer / contract / testing | ✅ | `pnpm test` → **221 passed** (16 files) |
+| Rust host crates + engine | ✅ | `cargo test --workspace` → **154 passed / 17 ignored**; ignored runtime-bridge suite → **17 passed** |
+| Angular renderer / contract / testing | ✅ | `pnpm test` → **251 passed** (16 files) |
 | Production AOT (`ngc` + esbuild) | ✅ | `pnpm run compile:aot`, `angnative build`; Ivy `ɵɵdefineComponent` verified in `dist/aot/` |
 | Android shell (10 APKs) | ✅ | built, installed and launched on emulator **and OnePlus Open (Android 16)**; `WebViews: 0` on every app |
+| MarketPulse socket-only demo | ✅ | Coinbase `matches` → match-derived 30m OHLC + volume; physical `bars=0 → bars=1 state=live`, painted `Custom:na-candlestick`, ABI pass and 11-app sustained repeat 33/33 valid. No real-time guarantee; see [`docs/evidence/ANDROID-MARKETPULSE.md`](docs/evidence/ANDROID-MARKETPULSE.md) section 11 |
 | Desktop shell (winit + wgpu) | ✅ | 11 tests; window opens; interactive button; shader fix |
 | Web adapter (`@angnative/web`) | ✅ | DOM backend + Playwright verified render/click |
 | iOS shell | 🟡 bindings statically verified | Swift 6 package + UIKit + runtime bridge bindings; **Mac/Xcode build/test not run** |
