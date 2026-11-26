@@ -111,12 +111,12 @@ Live run opens a window titled **"AngNative Desktop"**. A WGSL validation panic
   keeps last-good data with `fresh:false`. Real RxJS `interval(30000)` drives
   bounded refresh through host-backed async fetch/timer capabilities; no
   real-time guarantee is made. Physical log/UI/screenshot evidence is in
-  `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. The earlier
-  CoinGecko stage and its `OK (9 tests)` instrumentation run are historical and
-  are not claimed for the final socket APK. Evidence:
-  `docs/evidence/ANDROID-MARKETPULSE.md` sections 1-10 (historical) and 11
-  (active). `python scripts/check-ffi-declarations.py` checks both Android JNI
-  bridges.
+  `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. The final socket APK
+  now has its own `OK (9 tests)` rerun on the API 34 x86_64 emulator
+  (`docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`); the physical OnePlus rerun
+  remains outstanding. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` sections
+  1-10 (historical) and 11 (active). `python scripts/check-ffi-declarations.py`
+  checks both Android JNI bridges.
 - Sustained-load benchmark: the historical emulator run
   (`docs/benchmarks/sustained/emulator-20261125-143058.json`, 10 apps,
   5 cold + 5 warm starts, 3 × 30 s, `status=ok`, 30/30 valid) is retained. The
@@ -152,8 +152,8 @@ cargo test --workspace   # 154 tests pass, 17 ignored; includes host-engine and 
 | Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **154 tests pass**, 17 ignored (with Git `patch.exe` on PATH — see note above); ignored runtime-bridge suite 17 passed / 0 failed |
 | JS/TS (17 spec files) | ✅ 260 tests pass |
 | Android JNI + emulator/physical run | ✅ verified: wrong-thread JNI instrumentation passed 2/2 and full Android suite passed 4/4 on Android 14 emulator and OnePlus Open (Android 16, arm64-v8a); real tap reached a live Angular listener on both |
-| Generic `platforms/android` AOT shell | ✅ build + device verified: two staged AOT assets (`market-pulse-bundle.js` 1,180,071 bytes), runtime-bridge JNI, UI from native ops, physical socket boot `nodes=213`, no WebView node in UI dumps, `Custom:na-candlestick` bounds `[168,826][1064,1134]` with painted red candle pixels, post-change ABI instrumentation passed on OnePlus, FFI checker covers both shells (36 JNI / 22 Swift / 29 headers). The historical `OK (9 tests)` suite belongs to the CoinGecko APK, not the final socket APK. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11. |
-| MarketPulse combined crypto demo | ✅ **socket-only active build** installed/launched on physical OnePlus `b6640c8f`; APK SHA-256 `EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`, length 33,149,157 bytes. Coinbase Exchange WebSocket `matches` only: no REST bootstrap/history/OHLC/volume; startup `bars=0 state=connecting`, first live match `bars=1 state=live`, price `BTC/USD 60700.26`, `fresh · live`, `Custom:na-candlestick` painted, deterministic animation samples `0 → 0.5 → 1`. Real RxJS `interval(30000)` + host-backed async fetch/timer capabilities; one refresh in flight. Historical CoinGecko/Signals evidence is retained separately. ⚠️ no real-time guarantee, no fabricated history/volume, no final-socket nine-test instrumentation rerun, no iOS/Mac claim. Artifacts: `dist/showcases/market-pulse/`, `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11. |
+| Generic `platforms/android` AOT shell | ✅ build + device verified: two staged AOT assets (`market-pulse-bundle.js` 1,180,071 bytes), runtime-bridge JNI, UI from native ops, physical socket boot `nodes=213`, no WebView node in UI dumps, `Custom:na-candlestick` bounds `[168,826][1064,1134]` with painted red candle pixels, post-change ABI instrumentation passed on OnePlus, FFI checker covers both shells (36 JNI / 22 Swift / 29 headers). The final socket APK passed the generic nine-test suite on the API 34 emulator (`OK (9 tests)`, 4.77 s); physical rerun not done. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11 and `docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`. |
+| MarketPulse combined crypto demo | ✅ **socket-only active build** installed/launched on physical OnePlus `b6640c8f`; APK SHA-256 `EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`, length 33,149,157 bytes. Coinbase Exchange WebSocket `matches` only: no REST bootstrap/history/OHLC/volume; startup `bars=0 state=connecting`, first live match `bars=1 state=live`, price `BTC/USD 60700.26`, `fresh · live`, `Custom:na-candlestick` painted, deterministic animation samples `0 → 0.5 → 1`. Real RxJS `interval(30000)` + host-backed async fetch/timer capabilities; one refresh in flight. Historical CoinGecko/Signals evidence is retained separately. ⚠️ no real-time guarantee, no fabricated history/volume, no physical-device final-socket nine-test rerun, no iOS/Mac claim; emulator rerun `OK (9 tests)` passed. Artifacts: `dist/showcases/market-pulse/`, `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11 and `docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`. |
 | Sustained-load benchmark | ✅ emulator `status=ok`, 30/30 valid samples across 10 apps (historical); ✅ physical OnePlus `b6640c8f` `status=ok`, 33/33 valid samples across 11 apps on the final socket APK. MarketPulse: 1699.3 frames, 2.2% janky, p50/p95 8/22 ms, 40.34% procstat CPU (one core), warm `process_ms` mean 336.0 ms. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md` and `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`. |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified — AOT/JIT-free bundle (`app.js` 353,854 bytes, SHA-256 `832465B703BDE83C563A5D1DFCE5FA29523AF006D8627C373851D9C42C2B245B`), Playwright click and request check; evidence `docs/evidence/WEB-AOT-MIGRATION.md` |
