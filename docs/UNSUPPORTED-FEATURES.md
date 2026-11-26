@@ -40,7 +40,7 @@
 | Feature | Status | Reason |
 |---|---|---|
 | AOT/ngc production build | Implemented and verified | `scripts/compile-aot.mjs` resolves the real Angular compiler-cli `ngc` (the workspace's `npx ngc` is a shadowing 0.1.0 plain-JS emitter). `pnpm run compile:aot` and `node packages/cli/dist/cli.js build` both succeed; `dist/aot/*.js` contains `ɵɵdefineComponent` / template functions. The browser demo now also uses real `ngc` output via `tsconfig.aot.web.json`; JIT compiler packages are absent from the bundle metafile and from `app.js`. Evidence: `docs/evidence/WEB-AOT-MIGRATION.md`. |
-| Web size-budget gate | Not implemented | JS gate covers fixtures only. |
+| Web size-budget gate | Implemented and verified (2026-11-27) | `pnpm check:web-size` gates `dist/web-demo/app.js` at 128,000 B gzip and rejects forbidden packages (`@angular/compiler`, `zone.js`) or unlinked `ɵɵngDeclare*` output. Real bundle: 111,977 B gzip, 16,023 B headroom, exit 0. CI `size` job runs the AOT web build then the gate. Evidence: `docs/evidence/WEB-SIZE-BUDGET.md`. |
 | SSR / hydration | Unsupported (deferred, out of scope) | No server-render/hydrate path exists; native shells have no server stage and `docs/REQUIREMENTS.md` explicitly excludes replacing Angular Web/SSR. Decision and rationale: § Deferred feature decisions. |
 | Hot Module Replacement (< 1 s save-to-screen) | Unsupported (deferred, not implemented) | No HMR pipeline exists in the native QuickJS runtime or the web adapter; `packages/cli/src/dev.ts` remains a placeholder (`docs/COMPARISON.md`, `docs/REQUIREMENTS.md` G4). Decision and rationale: § Deferred feature decisions. |
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-26
 **Priority:** #2 after the local `v0.3.0` release and the web AOT migration.
-**Status:** validated with the user; not yet implemented.
+**Status:** implemented and verified. Evidence: `docs/evidence/WEB-SIZE-BUDGET.md`.
 
 ## Objective
 
@@ -105,6 +105,13 @@ After implementation, record exact commands and observed outputs in
 Only after that evidence, update `STATUS.md`,
 `docs/UNSUPPORTED-FEATURES.md`, and
 `docs/architecture/issue-register.md`. Commit locally; do not push.
+
+## Observed result
+
+`pnpm check:web-size` measured 111,977 B gzip for `app.js` against the
+128,000 B budget (16,023 B headroom), exit 0. The gate spec passed 9/9 and the
+root suite passed 17 files / 260 tests. Exact outputs are in
+`docs/evidence/WEB-SIZE-BUDGET.md`.
 
 ## Scope limits
 

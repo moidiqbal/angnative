@@ -200,9 +200,9 @@
 **Remediation**: None for AOT output verification; the browser-demo deferral is lifted. Web size-budget gate remains a separate follow-up.
 
 ### P2-11: Size Budget Enforcement — implemented (CI wiring)
-**Evidence**: The `size` job in `.github/workflows/ci.yml` installs the pinned Rust toolchain (`nightly-2026-11-14`) and runs `node scripts/check-rust-size.mjs --host` alongside the JS size gate. `scripts/check-rust-size.mjs` now reads `rustCoreMaxBytesPerPlatform` from `packages/cli/src/budgets.json` instead of a hardcoded default. Apple/Windows targets remain explicit skips where the toolchain targets are unavailable (`docs/evidence/RUST-SIZE-GATE.md`). No local size measurement is claimed by this round.
-**Files**: `.github/workflows/ci.yml`, `scripts/check-rust-size.mjs`, `packages/cli/src/budgets.json`, `docs/evidence/RUST-SIZE-GATE.md`
-**Remediation**: Retained CI wiring; per-target expansion requires available toolchains.
+**Evidence**: The `size` job in `.github/workflows/ci.yml` installs the pinned Rust toolchain (`nightly-2026-11-14`) and runs `node scripts/check-rust-size.mjs --host` alongside the JS fixture gate. `scripts/check-rust-size.mjs` reads `rustCoreMaxBytesPerPlatform` from `packages/cli/src/budgets.json`. Apple/Windows targets remain explicit skips (`docs/evidence/RUST-SIZE-GATE.md`); no local Rust measurement is claimed. The web demo now has its own gate: `pnpm check:web-size` measured 111,977 B gzip against `webDemoGzipBytes = 128000`, with 0 forbidden packages and 0 unlinked `ɵɵngDeclare*` markers; 9 tests cover pass and all four failure codes (`docs/evidence/WEB-SIZE-BUDGET.md`). CI builds the AOT web bundle before running the gate.
+**Files**: `.github/workflows/ci.yml`, `scripts/check-rust-size.mjs`, `scripts/check-web-size-budget.mjs`, `scripts/check-web-size-budget.spec.ts`, `packages/cli/src/budgets.json`, `docs/evidence/RUST-SIZE-GATE.md`, `docs/evidence/WEB-SIZE-BUDGET.md`
+**Remediation**: Retained CI wiring; per-target Rust expansion requires available toolchains. Web gate is implemented; GitHub Actions execution is not claimed locally.
 
 ### P2-12: No Cross-Engine Abstraction — Gate F implemented
 **Evidence**: `RuntimeBridge` is now generic over a `JsEngine` interface; `test_reference_engine_proves_bridge_engine_abstraction` proves the abstraction with the in-repo `ReferenceEngine` (`docs/evidence/RUNTIME-BRIDGE-GATE-F.md`).
@@ -309,7 +309,7 @@
 | P2-08 | 🔴 Blocked (iOS static-only; no runtime verification) | - | - |
 | P2-09 | ⚠️ Implemented (GPU-free bridge/view-tree integration; real GPU not verified) | - | - |
 | P2-10 | ✅ Closed (AOT output load verified in QuickJS; browser demo AOT/JIT-free verified) | - | C |
-| P2-11 | ⚠️ Implemented (CI size gate wired; budget from budgets.json; no measurement claimed) | - | E |
+| P2-11 | ✅ Implemented (Rust CI gate wired; web bundle gate measured 111,977 B / 128,000 B gzip, 9 tests) | - | E |
 | P2-12 | ⚠️ Gate F implemented (generic `RuntimeBridge` over `JsEngine`) | - | F |
 | P2-13 | ⚠️ Gate F proof via in-repo `ReferenceEngine`; Hermes/V8 not integrated | - | F |
 | P2-14 | ✅ Closed (emulator + physical 11-app sustained artifacts retained; 33/33 physical valid) | - | G |

@@ -59,6 +59,11 @@ export function angularLinkerVitePlugin() {
     name: 'angnative-angular-linker',
     enforce: 'pre',
     transform(code, id) {
+      // Angular partial declarations live in compiled JS, never in .ts specs.
+      // A spec may mention the marker as a literal string; transforming it
+      // with Babel's JS parser would fail on TypeScript syntax.
+      const filename = id.split('?')[0];
+      if (!/\.[cm]?js$/.test(filename)) return null;
       const linked = linkIfPartial(code, id);
       return linked === null ? null : { code: linked, map: null };
     },

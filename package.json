@@ -13,6 +13,7 @@
     "lint": "pnpm --recursive run lint",
     "check:toolchain": "node scripts/check-toolchain.mjs",
     "check:rust-size": "node scripts/check-rust-size.mjs",
+    "check:web-size": "node scripts/check-web-size-budget.mjs",
     "compile:fixtures": "node scripts/compile-fixtures.mjs",
     "compile:aot": "node scripts/compile-aot.mjs",
     "compile:aot:router": "node scripts/compile-aot.mjs tsconfig.aot.router.json",

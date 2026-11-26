@@ -25,7 +25,7 @@ Get-ChildItem packages\web\src -File          # shows all files above
 pnpm compile:aot:web                          # Ivy definitions verified
 pnpm bundle:aot:web                           # JIT packages absent from metafile
 pnpm --filter @angnative/web test             # 2 files / 6 tests passed
-pnpm test                                     # 16 files / 251 tests passed
+pnpm test                                     # 17 files / 260 tests passed
 ```
 
 Browser verification (Playwright/Chromium) — no console or page errors:
@@ -150,13 +150,14 @@ cargo test --workspace   # 154 tests pass, 17 ignored; includes host-engine and 
 | Item | Status |
 |---|---|
 | Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **154 tests pass**, 17 ignored (with Git `patch.exe` on PATH — see note above); ignored runtime-bridge suite 17 passed / 0 failed |
-| JS/TS (16 spec files) | ✅ 251 tests pass |
+| JS/TS (17 spec files) | ✅ 260 tests pass |
 | Android JNI + emulator/physical run | ✅ verified: wrong-thread JNI instrumentation passed 2/2 and full Android suite passed 4/4 on Android 14 emulator and OnePlus Open (Android 16, arm64-v8a); real tap reached a live Angular listener on both |
 | Generic `platforms/android` AOT shell | ✅ build + device verified: two staged AOT assets (`market-pulse-bundle.js` 1,180,071 bytes), runtime-bridge JNI, UI from native ops, physical socket boot `nodes=213`, no WebView node in UI dumps, `Custom:na-candlestick` bounds `[168,826][1064,1134]` with painted red candle pixels, post-change ABI instrumentation passed on OnePlus, FFI checker covers both shells (36 JNI / 22 Swift / 29 headers). The historical `OK (9 tests)` suite belongs to the CoinGecko APK, not the final socket APK. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11. |
 | MarketPulse combined crypto demo | ✅ **socket-only active build** installed/launched on physical OnePlus `b6640c8f`; APK SHA-256 `EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`, length 33,149,157 bytes. Coinbase Exchange WebSocket `matches` only: no REST bootstrap/history/OHLC/volume; startup `bars=0 state=connecting`, first live match `bars=1 state=live`, price `BTC/USD 60700.26`, `fresh · live`, `Custom:na-candlestick` painted, deterministic animation samples `0 → 0.5 → 1`. Real RxJS `interval(30000)` + host-backed async fetch/timer capabilities; one refresh in flight. Historical CoinGecko/Signals evidence is retained separately. ⚠️ no real-time guarantee, no fabricated history/volume, no final-socket nine-test instrumentation rerun, no iOS/Mac claim. Artifacts: `dist/showcases/market-pulse/`, `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11. |
 | Sustained-load benchmark | ✅ emulator `status=ok`, 30/30 valid samples across 10 apps (historical); ✅ physical OnePlus `b6640c8f` `status=ok`, 33/33 valid samples across 11 apps on the final socket APK. MarketPulse: 1699.3 frames, 2.2% janky, p50/p95 8/22 ms, 40.34% procstat CPU (one core), warm `process_ms` mean 336.0 ms. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md` and `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`. |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified — AOT/JIT-free bundle (`app.js` 353,854 bytes, SHA-256 `832465B703BDE83C563A5D1DFCE5FA29523AF006D8627C373851D9C42C2B245B`), Playwright click and request check; evidence `docs/evidence/WEB-AOT-MIGRATION.md` |
+| Web size-budget gate | ✅ `pnpm check:web-size`: 111,977 B gzip / 128,000 B budget, 16,023 B headroom, exit 0; 9 negative/positive tests; CI `size` job wired; evidence `docs/evidence/WEB-SIZE-BUDGET.md` |
 | iOS shell | ⚠️ Swift runtime-bridge bindings + unified staticlib wiring statically verified; Swift compile / Simulator / device run NOT verified (no Mac/Xcode here). Runbook in `docs/IOS-BUILD.md`. |
 | Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; one delivery per event (canonical JS thread-local path + legacy FFI fallback); 17 ignored tests are present; the Angular acceptance set (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n + MarketPulse) passes once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; shipping shell tap verified on emulator and OnePlus (`docs/EVENT-BRIDGE.md`) |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |

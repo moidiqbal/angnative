@@ -241,6 +241,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build web adapter and AOT browser bundle
+        run: |
+          pnpm --filter @angnative/web run build
+          pnpm run compile:aot:web
+          pnpm run bundle:aot:web
+
+      - name: Check web demo size budget (gate)
+        run: pnpm check:web-size
+
       - name: Generate fixture entry
         run: pnpm run compile:fixtures
 

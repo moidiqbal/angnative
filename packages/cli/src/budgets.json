@@ -1,6 +1,7 @@
 {
   "helloWorldGzipBytes": 61440,
   "typicalAppGzipBytes": 256000,
+  "webDemoGzipBytes": 128000,
   "rustCoreMaxBytesPerPlatform": 1048576,
   "forbiddenPackages": [
     "@angular/compiler",
