@@ -143,7 +143,7 @@
 ### P1-12: Android ViewFactory Incomplete — implemented (tagged custom conformance fixture + MarketPulse candlestick)
 **Evidence**: Tagged custom primitives (`na-list`, `na-switch`, `na-activity-indicator`) are covered by the `native-primitives-tagged-custom` conformance fixture. The MarketPulse round adds `na-candlestick` → `Custom:na-candlestick`, a shared `attr:bars` JSON-string fixture, the Rust op-emitter assertion, and `CandlestickViewFactoryTest` (`OK (1 test)` on `emulator-5554`). The UI dump shows `content-desc="Custom:na-candlestick"`; full instrumentation after the two-asset split is `OK (9 tests)` (`docs/evidence/ANDROID-MARKETPULSE.md`).
 **Files**: `platforms/android/app/src/main/java/com/angnative/app/NativeViewFactory.kt`, `CandlestickView.kt`, `packages/testing/fixtures/candlestick-bars-property.json`, conformance fixture
-**Remediation**: Retained; physical OnePlus MarketPulse re-verification remains not verified (device offline).
+**Remediation**: Retained; physical OnePlus MarketPulse re-verification is now recorded — `Custom:na-candlestick` in the UI dump, sampled green/red candle pixels and full instrumentation `OK (9 tests)` on `b6640c8f` (`docs/evidence/ANDROID-MARKETPULSE.md` section 9). A separate ABI re-verification is still not claimed.
 
 ---
 
@@ -162,7 +162,7 @@
 ### P2-03: Android JNI Global Ref Leaks — implemented (tests added this round)
 **Evidence**: RAII ownership, failure-path cleanup and `onDestroy` teardown are covered by the Android JNI/native-view-factory tests added in this round (including tagged `NativeViewFactory` cases); emulator instrumentation may be re-run separately.
 **Files**: `showcases/ecosystem-core/app/src/main/cpp/jni_bridge.cpp`, Android instrumentation tests
-**Remediation**: Retained in this round's closure; no physical-device re-verification claim (OnePlus `b6640c8f` offline).
+**Remediation**: Retained in this round's closure; no separate physical-device re-verification claim for this JNI cleanup item (the OnePlus is online, but only the MarketPulse runtime/instrumentation path was re-run).
 
 ### P2-04: No Android UI Thread Enforcement — CLOSED
 **Evidence**: Every `JniBridge` native entry point marshals to `Looper.getMainLooper()` with one post/latch per call; `NativeViewSink` records `Looper.myLooper()` inside callbacks and `ViewFactoryMainThreadTest.kt` asserts a main looper on emulator and OnePlus (4 tests / 0 failures each).
@@ -225,7 +225,7 @@
 **Remediation**: In-code references. `// See: docs/architecture/...`
 
 ### P2-16: Async JS fetch to host network — deferred (MarketPulse uses synchronous prefetch + host polling)
-**Evidence**: The QuickJS fetch shim invokes registered handlers synchronously. MarketPulse therefore prefetches in Kotlin on a worker thread and registers a synchronous handler before AOT bundle boot; refresh and the 30 s Kotlin scheduler re-fetch and push `__marketPulseApplyQuote(json)` into an RxJS `Subject` consumed by Angular Signals. No new JNI async method or browser WebSocket was added. The QuickJS `setInterval` shim is one-shot, so RxJS `interval` was intentionally avoided. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 8, `docs/UNSUPPORTED-FEATURES.md`.
+**Evidence**: The QuickJS fetch shim invokes registered handlers synchronously. MarketPulse therefore prefetches in Kotlin on a worker thread and registers a synchronous handler before AOT bundle boot; refresh and the 30 s Kotlin scheduler re-fetch and push `__marketPulseApplyQuote(json)` into an RxJS `Subject` consumed by Angular Signals. No new JNI async method or browser WebSocket was added. The QuickJS `setInterval` shim is one-shot, so RxJS `interval` was intentionally avoided. On physical OnePlus `b6640c8f`, the two 30 s pushes followed DNS failures and delivered last-good cached data, not fresh network data. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` sections 8-9, `docs/UNSUPPORTED-FEATURES.md`.
 **Files**: `platforms/android/app/src/main/java/com/angnative/app/MarketPulseFeed.kt`, `AngNativeView.kt`, `apps/demo-app/src/marketpulse/main.marketpulse.ts`, `crates/angnative-host-engine/src/quickjs_shims.rs`
 **Remediation**: Deferred, not a defect in the shipped path. Lift only with a real JS→host async fetch callback plus tests proving `HttpClient` awaits host network I/O.
 
@@ -298,7 +298,7 @@
 | P1-09 | ⚠️ Implemented (unified errors + Angular ErrorHandler provider tests) | - | C |
 | P1-10 | ⚠️ Gate B implemented (`RuntimeController`, deterministic lifecycle) | - | B |
 | P1-11 | ⚠️ Implemented (`RuntimeMetrics` accessors; no periodic-collection claim) | - | E |
-| P1-12 | ✅ Implemented and device-verified (`na-candlestick`, 9/9 Android tests) | - | D |
+| P1-12 | ✅ Implemented and device-verified (`na-candlestick`, 9/9 Android tests on emulator and physical OnePlus) | - | D |
 | P2-01 | ⚠️ Implemented (tagged custom + MarketPulse shared bars-string fixtures) | - | C |
 | P2-02 | ⬜ Deferred (feasibility spike only; bytecode loading not implemented or verified) | - | C |
 | P2-03 | ⚠️ Implemented (JNI RAII/failure cleanup/onDestroy tests; emulator re-run may follow) | - | D |
@@ -346,5 +346,5 @@
 - P0-06 and P0-07 are closed (see `docs/CODE-REVIEW-2026-11-22.md`); P0-08 is closed as a flagship-only scope decision — the flagship has a verified live Angular E2E, while other shells remain imperative concept demos by design (ADR 0003).
 - 2026-11-23 reconciliation: P1-01, P1-04, P1-05, P3-01, P3-02 and P3-07 closed with retained evidence/reasoning above; Gate B and Gate F passed (see `docs/evidence/RUNTIME-BRIDGE-GATE-B.md` and `docs/evidence/RUNTIME-BRIDGE-GATE-F.md`).
 - P1-08 stays deferred (self-contained IIFE bundles; no ES module loader). P2-02 is deferred after a bytecode feasibility spike (`docs/evidence/BYTECODE-FEASIBILITY-SPIKE.md`); bytecode loading is not implemented or verified.
-- iOS (P2-08) remains BLOCKED pending macOS/Xcode access; iOS runtime is static-only in this repo. Hermes/V8 are not integrated — the Gate F engine is the in-repo `ReferenceEngine` only. Physical OnePlus `b6640c8f` ABI re-verification is not verified while the device is offline; desktop real window/GPU is not verified (GPU-free integration only).
+- iOS (P2-08) remains BLOCKED pending macOS/Xcode access; iOS runtime is static-only in this repo. Hermes/V8 are not integrated — the Gate F engine is the in-repo `ReferenceEngine` only. Physical OnePlus `b6640c8f` is back online and MarketPulse runtime/polling/candlestick/instrumentation were re-verified (`docs/evidence/ANDROID-MARKETPULSE.md` section 9), but a separate ABI re-verification was not run and is not claimed; desktop real window/GPU is not verified (GPU-free integration only).
 - Documentation (P2-15) completed for research phase

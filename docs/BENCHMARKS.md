@@ -72,7 +72,7 @@ WebViews=0 on every app. Real-GPU headline: **ecosystem-grid 170 frames, 1.76% j
 (status bar + navbar cropped, strict foreground guard so notification shades are
 never captured). Physical multi-sample, CPU and warm-start are still pending:
 `b6640c8f` was not connected on 2026-11-23, so no new physical claim is made.
-- Sustained CPU, warm-start and multi-sample averages on the physical device (emulator results now retained; OnePlus offline)
+- Sustained CPU, warm-start and multi-sample averages on the physical device (emulator results now retained; OnePlus online but repeats not run)
 - WebView comparison builds (deliberately not built for native showcases)
 
 Do not present these numbers as a NativeScript/Flutter comparison — no equivalent builds exist in this repo.

@@ -34,8 +34,8 @@ thread-local path + legacy FFI fallback); no duplicate delivery claim is made.
 
 - This evidence covers the Rust bridge and in-repo engine paths only.
 - Physical OnePlus `b6640c8f` ABI re-verification is **not verified** — the
-  device is offline. Retained earlier device results are historical evidence
-  only.
+  device is online again, but no separate ABI re-verification was run in this
+  round. Retained earlier device results are historical evidence only.
 - No iOS/macOS runtime claim is made.
 - Ignored tests require their explicit test invocation; no local run result is
   asserted by this document beyond the named tests' presence and scope.

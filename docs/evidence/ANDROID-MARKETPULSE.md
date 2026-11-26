@@ -1,8 +1,8 @@
-# Android Evidence — MarketPulse combined demo (2026-11-25)
+# Android Evidence — MarketPulse combined demo (2026-11-25/26)
 
 **Scope:** generic `platforms/android` shell, not the `ecosystem-core` clone and not a WebView app.
-**Device:** `emulator-5554`, API 34 x86_64 (`sdk_gphone64_x86_64`), AVD `AngNative34`.
-**Physical device / iOS / Mac:** not verified in this round.
+**Devices:** `emulator-5554`, API 34 x86_64 (`sdk_gphone64_x86_64`), AVD `AngNative34`; physical OnePlus `b6640c8f` (`CPH2551`), Android 16 / SDK 36, `arm64-v8a` (section 9).
+**iOS / Mac:** not verified in this round.
 
 This document records only commands that were run and output that was observed.
 The demo is now a **crypto** demo: BTC/USD 30-minute OHLC from CoinGecko's public
@@ -540,7 +540,87 @@ or generated assets.
 
 ---
 
-## 9. Boundaries of this evidence
+## 9. Physical OnePlus verification (2026-11-26)
 
-- **Claimed:** APK builds/installs/launches; Angular AOT bundle boots in the Rust-owned QuickJS runtime; 213 native nodes on the final crypto boot; no WebView node in the UI dumps; `Custom:na-candlestick` in the UI hierarchy; native CandlestickView paints live BTC/USD bars (confirmed by green/red pixel samples); CoinGecko returned 48 real 30-minute OHLC bars on-device; a real `Demo bars` tap reaches two live Angular `press` listeners and updates the existing price text box in place; tagged factory parses the OHLC bars string on-device; deterministic animation samples `0 / 0.5 / 1` in-process; Angular Signals and an RxJS `Subject` drive the same native nodes; three delayed 30 s Kotlin polls delivered fresh 48-bar payloads without growing the 36 `TextView` nodes.
-- **Not claimed:** WebSocket/SSE, real-time or guaranteed feed delivery, RxJS `interval`/JS timers as the polling source, CoinGecko volume data (`v` is explicitly 0), smooth/eased 60 FPS animation, 10,000 native rows (only the dataset has 10,000 rows), `RecyclerView` recycling, unchanged AG Grid/ECharts/GSAP compatibility, the earlier Yahoo stock feed working on-device (it returned HTTP 429), physical-device results, iOS/Mac verification, or any NativeScript/Flutter head-to-head result.
+The committed APK was re-installed and re-launched on the connected physical
+device. Only the MarketPulse runtime, polling, candlestick painting and full
+Android suite were re-run here; no new ABI, sustained-load, iOS/Mac, WebSocket/SSE
+or source-change claim is made. No app source changed after commit
+`1ba37c1b7ca0aa8349573d81480f391599585101`.
+
+```powershell
+& 'C:\Android\Sdk\platform-tools\adb.exe' devices -l
+& 'C:\Android\Sdk\platform-tools\adb.exe' shell getprop | Select-String -Pattern 'ro.build.version.release|ro.build.version.sdk|ro.product.cpu.abi|ro.product.model'
+Get-FileHash -Algorithm SHA256 dist\showcases\market-pulse\app-debug.apk
+& 'C:\Android\Sdk\platform-tools\adb.exe' install -r dist\showcases\market-pulse\app-debug.apk
+```
+
+Observed: `b6640c8f device product:CPH2551 model:CPH2551 device:OP5973L1 transport_id:1`;
+`ro.build.version.release=16`, `ro.build.version.sdk=36`,
+`ro.product.cpu.abi=arm64-v8a`, `ro.product.model=CPH2551`. The APK hash was
+`3A648816480AFD6C7F040A95E27271D48E1E9956B0EB0093C8756A3B588D51ED`; install
+reported `Performing Streamed Install` then `Success`.
+
+Boot log recorded in `docs/assets/market-pulse-physical-boot.log`:
+
+```text
+11-26 14:24:15.504 31640 31640 I AngNative: AngNative runtime bridge created: 1
+11-26 14:24:15.504 31640 31640 I AngNative: View factory registered for host: 0xb4000077aedee000 (ctx=0xb40000776aa46560)
+11-26 14:24:16.415 31640 31640 I AngNative: Angular boot complete. nodes=213 plusNode=null
+11-26 14:24:16.416 31640 31640 I AngNative: MarketPulse polling scheduled every 30000ms
+```
+
+Poll log recorded in `docs/assets/market-pulse-physical-poll.log`:
+
+```text
+11-26 14:24:46.425 31640 31689 W AngNative: MarketPulse crypto feed unavailable: UnknownHostException: Unable to resolve host "api.coingecko.com": No address associated with hostname
+11-26 14:24:46.464 31640 31640 I AngNative: MarketPulse poll pushed fresh quote: bars=48
+11-26 14:25:16.424 31640 31689 W AngNative: MarketPulse crypto feed unavailable: UnknownHostException: Unable to resolve host "api.coingecko.com": No address associated with hostname
+11-26 14:25:16.474 31640 31640 I AngNative: MarketPulse poll pushed fresh quote: bars=48
+```
+
+The scheduler fired at the expected 30 s interval twice. Although the log line
+says `poll pushed fresh quote`, the immediately preceding lines show DNS failure;
+the honest claim is that the last-good cached payload was pushed into the RxJS
+stream with `bars=48`. No fresh CoinGecko response was observed on the physical
+device in this window, and no data was fabricated.
+
+UI dump (`docs/assets/market-pulse-physical.xml`) observed:
+`text="BTC/USD · 48 bars · CoinGecko public OHLC · 30m bars"`, price
+`BTC/USD 60838`, `TextViewCount=28`, `Custom:na-candlestick=True`, chart bounds
+`[168,652][1064,960]`.
+
+Screenshot capture required an explicit display ID. The default multi-display
+capture emitted a warning prefix and was not used; `dumpsys SurfaceFlinger
+--display-id` listed `4630946316123810436` (HWC display 3), which produced the
+valid app image in `docs/assets/market-pulse-physical.png`:
+
+```powershell
+& 'C:\Android\Sdk\platform-tools\adb.exe' shell screencap -p -d 4630946316123810436 /data/local/tmp/marketpulse-physical.png
+& 'C:\Android\Sdk\platform-tools\adb.exe' pull /data/local/tmp/marketpulse-physical.png docs\assets\market-pulse-physical.png
+```
+
+Observed: PNG `1116x2484`; a 2-pixel sample inside the chart bounds counted
+`green=1476 red=883 grid=2834`, so candles were actually painted on the physical
+screen. The status-text region counted `statusBright=2819`.
+
+The Android test APK was rebuilt from the committed sources and re-installed:
+
+```powershell
+.\gradlew assembleDebugAndroidTest --no-daemon
+& 'C:\Android\Sdk\platform-tools\adb.exe' install -r platforms\android\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+& 'C:\Android\Sdk\platform-tools\adb.exe' shell am instrument -w -r -e package com.angnative.app com.angnative.app.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Observed: `OK (9 tests)` on `b6640c8f`. During capture the screen was kept awake
+with `settings put system screen_off_timeout 2147483647` and `svc power stayon
+true`; after evidence capture both settings were restored to their observed
+defaults (`30000` and `false`). This was a device-setting change only, not an app
+change.
+
+---
+
+## 10. Boundaries of this evidence
+
+- **Claimed:** APK builds/installs/launches; Angular AOT bundle boots in the Rust-owned QuickJS runtime; 213 native nodes on the final crypto boot; no WebView node in the UI dumps; `Custom:na-candlestick` in the UI hierarchy; native CandlestickView paints live BTC/USD bars (confirmed by green/red pixel samples); CoinGecko returned 48 real 30-minute OHLC bars on the emulator; a real `Demo bars` tap reaches two live Angular `press` listeners and updates the existing price text box in place; tagged factory parses the OHLC bars string on-device; deterministic animation samples `0 / 0.5 / 1` in-process; Angular Signals and an RxJS `Subject` drive the same native nodes; three delayed 30 s Kotlin polls delivered fresh 48-bar payloads without growing the 36 `TextView` nodes; the committed APK also booted (`nodes=213`), painted green/red candles and ran two 30 s scheduler pushes on physical OnePlus `b6640c8f`, with full instrumentation `OK (9 tests)` there.
+- **Not claimed:** WebSocket/SSE, real-time or guaranteed feed delivery (the physical-device polls hit DNS failures and pushed last-good data), RxJS `interval`/JS timers as the polling source, CoinGecko volume data (`v` is explicitly 0), smooth/eased 60 FPS animation, 10,000 native rows (only the dataset has 10,000 rows), `RecyclerView` recycling, unchanged AG Grid/ECharts/GSAP compatibility, the earlier Yahoo stock feed working on-device (it returned HTTP 429), physical-device results beyond the OnePlus MarketPulse run in section 9 (ABI re-verification, sustained load, CPU/warm-start), iOS/Mac verification, or any NativeScript/Flutter head-to-head result.

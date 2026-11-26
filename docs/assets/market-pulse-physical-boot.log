@@ -1,0 +1,5 @@
+--------- beginning of main
+11-26 14:24:15.504 31640 31640 I AngNative: AngNative runtime bridge created: 1
+11-26 14:24:15.504 31640 31640 I AngNative: View factory registered for host: 0xb4000077aedee000 (ctx=0xb40000776aa46560)
+11-26 14:24:16.415 31640 31640 I AngNative: Angular boot complete. nodes=213 plusNode=null
+11-26 14:24:16.416 31640 31640 I AngNative: MarketPulse polling scheduled every 30000ms

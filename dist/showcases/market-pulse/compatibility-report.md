@@ -9,7 +9,7 @@
 | APK SHA-256 | `3A648816480AFD6C7F040A95E27271D48E1E9956B0EB0093C8756A3B588D51ED` |
 | Package ID | `com.angnative.app` (generic `platforms/android` shell, not a separate showcase package) |
 | Build profile | latest: Gradle 9.9.2 / AGP 9.5.2 / JDK 25 |
-| Evidence | `docs/evidence/ANDROID-MARKETPULSE.md` sections 7-8; designs `docs/plans/2026-11-25-marketpulse-design.md` and `docs/plans/2026-11-25-marketpulse-signals-rxjs-design.md` |
+| Evidence | `docs/evidence/ANDROID-MARKETPULSE.md` sections 7-9; designs `docs/plans/2026-11-25-marketpulse-design.md` and `docs/plans/2026-11-25-marketpulse-signals-rxjs-design.md` |
 
 ## What was actually built
 
@@ -64,6 +64,23 @@
 | FFI check | `FFI declaration check OK: 34 JNI methods across 2 Android shells, 22 Swift bindings (13 runtime bridge), 28 header declarations; iOS unified staticlib wiring OK` |
 | Whitespace check | `git diff --check`: no whitespace errors (LF→CRLF working-copy warnings only) |
 
+## Verification on physical OnePlus `b6640c8f` (2026-11-26)
+
+The committed APK (`3A648816480AFD6C7F040A95E27271D48E1E9956B0EB0093C8756A3B588D51ED`)
+was re-installed on `CPH2551`, Android 16 / SDK 36, `arm64-v8a`. No app source
+changed after commit `1ba37c1b7ca0aa8349573d81480f391599585101`.
+
+| Check | Observed result |
+|---|---|
+| Install + launch | `Performing Streamed Install` / `Success`; `Angular boot complete. nodes=213 plusNode=null` |
+| Polling schedule | `MarketPulse polling scheduled every 30000ms`; two scheduler pushes at `14:24:46` and `14:25:16`, both `bars=48` |
+| Feed honesty | Both pushes were preceded by `UnknownHostException` for `api.coingecko.com`; the pushed payload was last-good cached data, not a fresh CoinGecko response and not fabricated |
+| UI status | `BTC/USD · 48 bars · CoinGecko public OHLC · 30m bars`; price `BTC/USD 60838` |
+| Candle visibility | `Custom:na-candlestick=True`, `TextViewCount=28`, bounds `[168,652][1064,960]`; screenshot `1116x2484` sampled `green=1476 red=883 grid=2834` |
+| Full Android instrumentation | `OK (9 tests)` after rebuilding `assembleDebugAndroidTest` from committed sources |
+| Capture detail | Screenshot used display ID `4630946316123810436`; the default multi-display capture was warning-prefixed and not used |
+| Device setting | Screen timeout was temporarily set to `2147483647` with `svc power stayon true` for capture, then restored to `30000` / `false` |
+
 ## Honest limitations
 
 - CoinGecko is a public, unofficial, delayed endpoint. The 48 bars observed on
@@ -75,8 +92,10 @@
   market data.
 - The earlier Yahoo stock feed returned HTTP 429 on-device and is no longer the
   active feed. No stock live-bar claim is made.
-- No physical-device MarketPulse run (OnePlus `b6640c8f` was offline), no iOS/Mac
-  build or run, and no NativeScript/Flutter head-to-head comparison was performed.
+- The physical OnePlus run above covers MarketPulse install/launch, reactive
+  polling, candlestick painting and instrumentation. It does **not** add an ABI
+  re-verification, sustained-load, CPU/warm-start, iOS/Mac build/run, or
+  NativeScript/Flutter head-to-head claim.
 - This is a native reimplementation/adapter of charting concepts, not unchanged
   AG Grid/ECharts/GSAP compatibility.
 - `10,000` is the generated dataset size; the rendered window is bounded. The
@@ -92,5 +111,9 @@
   `docs/assets/market-pulse-crypto-demo.png`,
   `docs/assets/market-pulse-crypto-demo.xml`,
   `docs/assets/market-pulse-signals-poll.png`,
-  `docs/assets/market-pulse-signals-poll.xml`; full command/output record in
-  `docs/evidence/ANDROID-MARKETPULSE.md` sections 7-8.
+  `docs/assets/market-pulse-signals-poll.xml`; physical OnePlus evidence:
+  `docs/assets/market-pulse-physical-boot.log`,
+  `docs/assets/market-pulse-physical-poll.log`,
+  `docs/assets/market-pulse-physical.xml`,
+  `docs/assets/market-pulse-physical.png`; full command/output record in
+  `docs/evidence/ANDROID-MARKETPULSE.md` sections 7-9.

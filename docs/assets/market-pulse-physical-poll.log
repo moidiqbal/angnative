@@ -1,0 +1,5 @@
+--------- beginning of main
+11-26 14:24:46.425 31640 31689 W AngNative: MarketPulse crypto feed unavailable: UnknownHostException: Unable to resolve host "api.coingecko.com": No address associated with hostname
+11-26 14:24:46.464 31640 31640 I AngNative: MarketPulse poll pushed fresh quote: bars=48
+11-26 14:25:16.424 31640 31689 W AngNative: MarketPulse crypto feed unavailable: UnknownHostException: Unable to resolve host "api.coingecko.com": No address associated with hostname
+11-26 14:25:16.474 31640 31640 I AngNative: MarketPulse poll pushed fresh quote: bars=48
