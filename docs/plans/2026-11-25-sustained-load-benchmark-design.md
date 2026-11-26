@@ -1,6 +1,6 @@
 # Sustained-Load Android Benchmark — Design (2026-11-25)
 
-Status: **Implemented on emulator (2026-11-25)** — `status=ok`, 30/30 valid samples; physical device remains pending. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md`.
+Status: **Implemented on emulator (2026-11-25) and physical OnePlus `b6640c8f` (2026-11-26)** — emulator `status=ok`, 30/30 valid samples; physical `status=ok`, 33/33 valid samples across 11 apps including the final socket-only MarketPulse APK. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md`.
 
 ## Section 1 — Scope & data flow
 

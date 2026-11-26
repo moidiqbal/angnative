@@ -623,3 +623,15 @@ Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLastErrorJson(JNIEnv* env, j
   const char* json = angnative_runtime_bridge_last_error_json(b);
   return runtimeStringToJString(env, json);
 }
+
+/** Drain host-capability tasks (async fetch/timers) queued by the JS shims. */
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeTakeHostTasks(JNIEnv* env, jobject /*thiz*/,
+                                                                  jlong handle) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  if (b == 0) return nullptr;
+  // The runtime bridge allocator owns this string; runtimeStringToJString frees
+  // it with angnative_runtime_bridge_free_string after the Java copy is made.
+  const char* json = angnative_runtime_bridge_take_host_tasks(b);
+  return runtimeStringToJString(env, json);
+}

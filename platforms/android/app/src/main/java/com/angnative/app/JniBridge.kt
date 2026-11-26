@@ -72,6 +72,7 @@ class JniBridge(private val context: Context) {
   external fun nativeRuntimeBridgeStop(handle: Long): Int
   external fun nativeRuntimeBridgeMetricsJson(handle: Long): String?
   external fun nativeRuntimeBridgeLastErrorJson(handle: Long): String?
+  external fun nativeRuntimeBridgeTakeHostTasks(handle: Long): String?
 
   private var hostHandle: Long = 0
   private var runtimeBridgeHandle: Long = 0
@@ -200,6 +201,16 @@ class JniBridge(private val context: Context) {
     else nativeRuntimeBridgeLastErrorJson(runtimeBridgeHandle)
   } ?: "{\"code\":$FFI_INVALID_HANDLE,\"category\":\"invalid_handle\"," +
     "\"phase\":\"none\",\"message\":\"runtime bridge not initialized\",\"stack\":null}"
+
+  /**
+   * Drain host-capability tasks queued by the QuickJS shims. Always called on
+   * the owner/main thread through [runOnMainForNative]; a null result means
+   * the queue is empty (or the bridge is gone).
+   */
+  fun takeHostTasks(): String? = runOnMainForNative<String?> {
+    if (runtimeBridgeHandle == 0L) null
+    else nativeRuntimeBridgeTakeHostTasks(runtimeBridgeHandle)
+  }
 
   /** Load a self-contained JS bundle (e.g. compiled Angular AOT output). */
   fun loadScript(source: String): Int = runOnMainForNative {

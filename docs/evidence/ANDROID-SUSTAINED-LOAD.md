@@ -1,6 +1,6 @@
 # Android sustained-load benchmark evidence
 
-**Date:** 2026-11-25
+**Date:** 2026-11-25; physical socket-only repeat 2026-11-26
 **Plan:** `docs/plans/2026-11-25-sustained-load-benchmark-design.md`
 
 ## Device and command
@@ -104,6 +104,93 @@ the interaction, not a performance ranking.
   these three samples but is not proof of a leak.
 - `gfxinfo` summary is cumulative after the post-settle reset; raw per-frame
   rows are ring-limited and were not retained.
-- Physical OnePlus `b6640c8f` was not connected. Physical sustained CPU,
-  warm-start and multi-sample results remain **pending**; no physical claim is
-  made here.
+- The emulator figures above are the historical 2026-11-25 run; they are not
+  physical-GPU numbers.
+- Physical OnePlus `b6640c8f` sustained CPU, warm-start and multi-sample results
+  were subsequently run on 2026-11-26 and are recorded below. The physical run
+  used the final socket-only MarketPulse APK and the same harness with
+  MarketPulse added to the app map. `docs/assets/market-pulse-sustained-run.log`
+  and `docs/benchmarks/sustained/b6640c8f-20261126-170816.json` are retained.
+
+---
+
+## Physical socket-only repeat on OnePlus `b6640c8f` (2026-11-26)
+
+This section supersedes the pending placeholder. The MarketPulse APK used here
+is the final socket-only build staged at
+`dist/showcases/market-pulse/app-debug.apk` (SHA-256
+`EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`, length
+`33149157` bytes). It replaces the CoinGecko APK measured in the historical
+sections above.
+
+### Device and command
+
+`adb devices -l` at measurement time showed `b6640c8f device product:CPH2551
+model:CPH2551 device:OP5973L1 transport_id:2`. The retained JSON records
+`Android 16 (API 36)`, `arm64-v8a`, `1116x2484`, `nproc=8`, `CLK_TCK=100` and
+renderer `physical/unknown renderer (ro.hardware=qcom)`. This is not a
+production-GPU benchmark.
+
+```powershell
+pwsh -NoProfile -File scripts\measure-sustained.ps1 -Device b6640c8f -Samples 3 -DurationSeconds 30 -StartReps 5
+```
+
+Raw retained stdout: `docs/assets/market-pulse-sustained-run.log`. Retained JSON:
+`docs/benchmarks/sustained/b6640c8f-20261126-170816.json` — `status=ok`,
+`valid_samples=33/33`, 0 run errors across 11 configured apps (the original ten
+plus MarketPulse).
+
+MarketPulse lines from the observed stdout:
+
+```text
+[market-pulse] starts ...
+[market-pulse] 3 x 30 s sustained ...
+[market-pulse] sample 1: valid=True frames=1719 swipes=49
+[market-pulse] sample 2: valid=True frames=1695 swipes=47
+[market-pulse] sample 3: valid=True frames=1684 swipes=47
+status=ok valid_samples=33/33
+saved: C:\Users\Moid Iqbal\Projects\angnative\docs\benchmarks\sustained\b6640c8f-20261126-170816.json
+```
+
+### MarketPulse averages (3 × 30 s)
+
+| Metric | Value |
+|---|---:|
+| Valid samples | 3/3 |
+| Frames | 1699.3 |
+| Janky % | 2.2 |
+| p50 ms | 8.0 |
+| p95 ms | 22.0 |
+| CPU procstat % | 40.34 |
+| CPU top % | 38.45 |
+| ΔPSS KB | -8956.0 |
+| PSS slope KB/s | -5.27 |
+
+### MarketPulse start aggregates (5 cold + 5 warm)
+
+| Mode | `process_ms` mean | `process_ms` p95 | `TotalTime` mean | `TotalTime` p95 |
+|---|---:|---:|---:|---:|
+| Cold | 1275.4 | 1528 | 983.6 | 1206 |
+| Warm | 336.0 | 374 | 57.0 | 82 |
+
+All five warm reps confirmed the same PID. `process_ms` is wall time to
+`am start -W` plus `pidof` confirmation, not first-frame time. `WaitTime`
+fallback is labelled when `TotalTime` is omitted; start validity does not depend
+on it.
+
+### Physical-run caveats
+
+- `procstat CPU %` is percent of **one core** (`nproc=8`), not total machine
+  CPU. `top` values are instantaneous and are retained only for continuity.
+- `gfxinfo` summary is cumulative after the post-settle reset; raw per-frame
+  rows are ring-limited and were not retained.
+- Low-frame samples were retained, not discarded. Zero-frame apps have no
+  frame-pacing claim from those samples.
+- Memory deltas over 30 s include GC and settle effects. The negative
+  MarketPulse ΔPSS is not evidence of a leak fix.
+- These are one device and one harness configuration. They are not production
+  numbers, a NativeScript/Flutter comparison, or an iOS/Mac claim.
+
+The socket-only source/build/physical/ABI context for this run is recorded in
+`docs/evidence/ANDROID-MARKETPULSE.md` section 11, not in the historical
+CoinGecko sections there.

@@ -1,6 +1,23 @@
 # MarketPulse — Heavy + Animated + Crypto Demo Design (2026-11-25)
 
-Status: **Implemented and device-verified on emulator `emulator-5554` (API 34 x86_64).** Sections 1-2 were approved in chat on 2026-11-25. Exact commands, outputs, asset hashes and limitations are recorded in `docs/evidence/ANDROID-MARKETPULSE.md`. The active feed is CoinGecko BTC/USD 30-minute OHLC; 48 live bars and visible candles were verified on-device. The earlier Yahoo stock endpoint returned HTTP 429 and is no longer the active feed.
+> **Superseding decision (2026-11-26):** The user approved a fully socket-only
+> MarketPulse target design. Market data comes only from the Coinbase Exchange
+> WebSocket `matches` channel for BTC-USD executed matches; each `match` message
+> supplies price, size and time, and both the 30-minute OHLC bars and BTC volume
+> are derived from those match messages only. There is no REST market-data fetch
+> in the target design. The earlier CoinGecko/REST bootstrap, host-fetch adapter,
+> last-good REST caching, delayed Kotlin polling and one-shot-timer rationale in
+> this document are superseded and are no longer the target design. This note
+> records the approved decision, which was subsequently implemented and
+> verified on 2026-11-26 in `docs/evidence/ANDROID-MARKETPULSE.md` section 11.
+
+Status: **historical design, superseded by the socket-only implementation.**
+Sections 1-2 were approved in chat on 2026-11-25 and describe the earlier
+CoinGecko stage: 48 delayed BTC/USD 30-minute bars and visible candles were
+verified on `emulator-5554`; the Yahoo stock endpoint returned HTTP 429. The
+active build is socket-only Coinbase `matches` with match-derived 30m OHLC and
+volume; exact commands, outputs, hashes and limitations are in
+`docs/evidence/ANDROID-MARKETPULSE.md` section 11.
 
 ## Section 1 — Scope & data flow
 

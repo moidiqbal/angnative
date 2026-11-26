@@ -197,6 +197,13 @@ int32_t angnative_runtime_bridge_stop(AngNativeRuntimeBridgeHandle handle);
  * strings. Free them with angnative_runtime_bridge_free_string. */
 char* angnative_runtime_bridge_metrics_json(AngNativeRuntimeBridgeHandle handle);
 char* angnative_runtime_bridge_last_error_json(AngNativeRuntimeBridgeHandle handle);
+
+/** Take the pending host-capability tasks queued by JS (async fetch starts,
+ * timer schedules and timer cancels) as a newly allocated JSON string. Returns
+ * NULL when there is nothing to do. The owner thread must call this; free the
+ * result with angnative_runtime_bridge_free_string. */
+char* angnative_runtime_bridge_take_host_tasks(AngNativeRuntimeBridgeHandle handle);
+
 void angnative_runtime_bridge_free_string(char* ptr);
 
 /** Optional native callback for structured runtime errors. */

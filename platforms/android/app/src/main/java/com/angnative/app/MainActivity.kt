@@ -30,14 +30,11 @@ class MainActivity : AppCompatActivity() {
     angNativeView = AngNativeView(this)
     setContentView(angNativeView)
 
-    // MarketPulse fetches the public BTC/USD OHLC payload on a worker thread first.
-    // The QuickJS fetch shim is synchronous, so the host caches the normalized
-    // payload and registers it before the Angular AOT bundle boots. Builds
-    // without the MarketPulse asset keep the original counter boot path.
+    // Boot immediately with the honest pre-stream payload. Market data comes
+    // only from the Coinbase Exchange WebSocket started by AngNativeView after
+    // the bundle boots; there is no host-side REST fetch or seeded history.
     if (angNativeView.hasMarketPulseBundle()) {
-      MarketPulseFeed.fetch { quote ->
-        runOnUiThread { angNativeView.loadAngularApp(quote) }
-      }
+      angNativeView.loadAngularApp(MarketPulseFeed.initialPayload())
     } else {
       angNativeView.loadAngularApp()
     }

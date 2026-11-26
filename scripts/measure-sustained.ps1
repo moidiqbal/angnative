@@ -23,6 +23,9 @@ $script:AdbPath = $Adb
 $script:Serial = $Device
 
 # Package -> exact launcher activity. ecosystem-core is the only non-MainActivity.
+# MarketPulse reuses the generic shell package but is staged in dist/showcases,
+# so it carries an explicit APK path (the other 10 apps use the device-testing
+# <name>-<package>.apk convention via the fallback below).
 $AppMap = [ordered]@{
   'material'            = [pscustomobject]@{ Package = 'com.angnative.demo.material'; Activity = 'com.angnative.app.MainActivity' }
   'primeng'             = [pscustomobject]@{ Package = 'com.angnative.demo.primeng'; Activity = 'com.angnative.app.MainActivity' }
@@ -34,6 +37,7 @@ $AppMap = [ordered]@{
   'ecosystem-core'      = [pscustomobject]@{ Package = 'com.angnative.demo.ecosystem.core'; Activity = 'com.angnative.app.EcosystemCoreActivity' }
   'ecosystem-richtext'  = [pscustomobject]@{ Package = 'com.angnative.demo.ecosystem.richtext'; Activity = 'com.angnative.app.MainActivity' }
   'ecosystem-calendar'  = [pscustomobject]@{ Package = 'com.angnative.demo.ecosystem.calendar'; Activity = 'com.angnative.app.MainActivity' }
+  'market-pulse'        = [pscustomobject]@{ Package = 'com.angnative.app'; Activity = 'com.angnative.app.MainActivity'; Apk = 'dist\showcases\market-pulse\app-debug.apk' }
 }
 
 function Match-Number([string]$Text, [string]$Pattern) {
@@ -222,8 +226,11 @@ Views: 456
 
   $points = @([pscustomobject]@{ t_s = 0; pss_kb = 100 }, [pscustomobject]@{ t_s = 10; pss_kb = 200 })
   Assert-SelfTest 'memory slope' 10 (Get-LinearSlope $points)
-  Assert-SelfTest 'app map count' 10 $AppMap.Count
+  Assert-SelfTest 'app map count' 11 $AppMap.Count
   Assert-SelfTest 'core activity' 'com.angnative.app.EcosystemCoreActivity' $AppMap['ecosystem-core'].Activity
+  Assert-SelfTest 'market-pulse package' 'com.angnative.app' $AppMap['market-pulse'].Package
+  Assert-SelfTest 'market-pulse activity' 'com.angnative.app.MainActivity' $AppMap['market-pulse'].Activity
+  Assert-SelfTest 'market-pulse apk' 'dist\showcases\market-pulse\app-debug.apk' $AppMap['market-pulse'].Apk
   Write-Output 'SELFTEST OK'
   exit 0
 }
@@ -610,7 +617,9 @@ $runErrors = [System.Collections.Generic.List[object]]::new()
 
 foreach ($name in $selected) {
   $spec = $AppMap[$name]
-  $apk = Join-Path $repo "dist\device-testing\$name-$($spec.Package).apk"
+  # An explicit Apk override (currently only market-pulse) selects the staged
+  # showcase APK instead of the dist/device-testing naming fallback.
+  $apk = if ($spec.Apk) { Join-Path $repo $spec.Apk } else { Join-Path $repo "dist\device-testing\$name-$($spec.Package).apk" }
   $entry = [ordered]@{
     name      = $name
     package   = $spec.Package
@@ -625,9 +634,12 @@ foreach ($name in $selected) {
   Write-Output "[$name] starts ..."
   try {
     $list = Invoke-AdbShell @('shell', 'pm', 'list', 'packages', $spec.Package)
-    if ($list -notmatch [regex]::Escape($spec.Package)) {
+    # Entries with an explicit APK path are reinstalled every run so a stale
+    # com.angnative.app install cannot be measured in place of the staged build.
+    if ($spec.Apk -or $list -notmatch [regex]::Escape($spec.Package)) {
       if (-not (Test-Path $apk)) { throw "APK not found: $apk" }
-      & $Adb -s $Device install -r $apk 2>&1 | Out-Null
+      $installOut = & $Adb -s $Device install -r $apk 2>&1 | Out-String
+      if ($spec.Apk -and $installOut -notmatch 'Success') { throw "install failed: $apk`n$installOut" }
       $list = Invoke-AdbShell @('shell', 'pm', 'list', 'packages', $spec.Package)
       if ($list -notmatch [regex]::Escape($spec.Package)) { throw "install failed: $apk" }
     }

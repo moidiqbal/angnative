@@ -48,8 +48,11 @@ For each of the four apps in the earlier single-burst frame-pacing run:
   do not treat them as stable app rankings.
 - CPU values are instantaneous `top` samples taken between swipes and are frequently
   `0.0`; they are **not** sustained CPU utilization.
-- The physical OnePlus `b6640c8f` was not connected (`adb devices -l` listed only
-  the emulator), so **physical-device multi-sample frame pacing, CPU and
-  warm-start are not verified**. The earlier single-burst physical grid sample is
-  retained in `docs/benchmarks/physical/results.json` and is not a multi-sample result.
+- At the time of this multisample document, `b6640c8f` was not connected and
+  only the emulator was listed; the earlier single-burst physical grid sample in
+  `docs/benchmarks/physical/results.json` was not a multi-sample result. That
+  scope note is historical: physical multi-sample frame pacing, CPU and
+  warm-start were later measured on `b6640c8f` and retained in
+  `docs/benchmarks/sustained/b6640c8f-20261126-170816.json` (`status=ok`,
+  33/33 valid). See `docs/evidence/ANDROID-SUSTAINED-LOAD.md`.
 - No WebView was introduced; the benchmark apps are the existing native showcases.

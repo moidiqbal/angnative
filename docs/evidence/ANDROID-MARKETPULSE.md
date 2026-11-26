@@ -5,10 +5,13 @@
 **iOS / Mac:** not verified in this round.
 
 This document records only commands that were run and output that was observed.
-The demo is now a **crypto** demo: BTC/USD 30-minute OHLC from CoinGecko's public
-endpoint. The earlier stock stage used Yahoo and returned HTTP 429 on-device;
-that historical evidence is retained below but is no longer the active feed.
-Animation claims are limited to deterministic `SetStyle` samples; no smooth
+Sections 1-10 are **historical CoinGecko/Yahoo-stage evidence**, retained for
+audit. The **active build** is section 11: BTC/USD 30-minute OHLC and volume are
+derived only from Coinbase Exchange WebSocket `matches` messages; no REST
+market endpoint, seeded history or fabricated volume is used. The earlier stock
+stage used Yahoo and returned HTTP 429 on-device; the CoinGecko stage returned
+48 delayed bars on the emulator but is no longer the active feed. Animation
+claims are limited to deterministic `SetStyle` samples `0 → 0.5 → 1`; no smooth
 60 FPS, real-time easing or NativeScript/Flutter comparison is claimed.
 
 ---
@@ -620,7 +623,234 @@ change.
 
 ---
 
-## 10. Boundaries of this evidence
+## 10. Boundaries of the historical CoinGecko/Yahoo evidence (sections 1-9)
 
-- **Claimed:** APK builds/installs/launches; Angular AOT bundle boots in the Rust-owned QuickJS runtime; 213 native nodes on the final crypto boot; no WebView node in the UI dumps; `Custom:na-candlestick` in the UI hierarchy; native CandlestickView paints live BTC/USD bars (confirmed by green/red pixel samples); CoinGecko returned 48 real 30-minute OHLC bars on the emulator; a real `Demo bars` tap reaches two live Angular `press` listeners and updates the existing price text box in place; tagged factory parses the OHLC bars string on-device; deterministic animation samples `0 / 0.5 / 1` in-process; Angular Signals and an RxJS `Subject` drive the same native nodes; three delayed 30 s Kotlin polls delivered fresh 48-bar payloads without growing the 36 `TextView` nodes; the committed APK also booted (`nodes=213`), painted green/red candles and ran two 30 s scheduler pushes on physical OnePlus `b6640c8f`, with full instrumentation `OK (9 tests)` there.
-- **Not claimed:** WebSocket/SSE, real-time or guaranteed feed delivery (the physical-device polls hit DNS failures and pushed last-good data), RxJS `interval`/JS timers as the polling source, CoinGecko volume data (`v` is explicitly 0), smooth/eased 60 FPS animation, 10,000 native rows (only the dataset has 10,000 rows), `RecyclerView` recycling, unchanged AG Grid/ECharts/GSAP compatibility, the earlier Yahoo stock feed working on-device (it returned HTTP 429), physical-device results beyond the OnePlus MarketPulse run in section 9 (ABI re-verification, sustained load, CPU/warm-start), iOS/Mac verification, or any NativeScript/Flutter head-to-head result.
+The following bullets apply only to the historical stages in sections 1-9.
+Section 11 supersedes them for the active socket-only build.
+
+- **Claimed for sections 1-9:** APK builds/installs/launches; Angular AOT bundle boots in the Rust-owned QuickJS runtime; 213 native nodes on the final crypto boot; no WebView node in the UI dumps; `Custom:na-candlestick` in the UI hierarchy; native CandlestickView paints CoinGecko BTC/USD bars (confirmed by green/red pixel samples); CoinGecko returned 48 real 30-minute OHLC bars on the emulator; a real `Demo bars` tap reaches two live Angular `press` listeners and updates the existing price text box in place; tagged factory parses the OHLC bars string on-device; deterministic animation samples `0 / 0.5 / 1` in-process; Angular Signals and an RxJS `Subject` drive the same native nodes; three delayed 30 s Kotlin polls delivered fresh 48-bar payloads without growing the 36 `TextView` nodes; the committed CoinGecko APK also booted (`nodes=213`), painted green/red candles and ran two 30 s scheduler pushes on physical OnePlus `b6640c8f`, with full instrumentation `OK (9 tests)` there.
+- **Not claimed for sections 1-9:** WebSocket/SSE, real-time or guaranteed feed delivery (the physical-device polls hit DNS failures and pushed last-good data), RxJS `interval`/JS timers as the polling source, CoinGecko volume data (`v` is explicitly 0), smooth/eased 60 FPS animation, 10,000 native rows (only the dataset has 10,000 rows), `RecyclerView` recycling, unchanged AG Grid/ECharts/GSAP compatibility, the earlier Yahoo stock feed working on-device (it returned HTTP 429), physical-device results beyond the OnePlus MarketPulse run in section 9 (ABI re-verification, sustained load, CPU/warm-start), iOS/Mac verification, or any NativeScript/Flutter head-to-head result.
+
+---
+
+## 11. Socket-only Coinbase `matches` verification (2026-11-26; active build)
+
+This section supersedes the CoinGecko claims in sections 1-10. The active source
+uses only `wss://ws-feed.exchange.coinbase.com` and the `matches` channel.
+30-minute OHLC comes from each executed `match`'s `price`, `size` and `time`;
+volume is integer milli-BTC accumulated from executed `match` sizes. There is
+no REST bootstrap, REST history, REST OHLC or REST volume path. At boot the
+cache is empty (`bars=0`, `state=connecting`); bars appear only after real
+matches arrive. On failure the last-good quote is retained with `fresh:false`.
+The explicit `Demo bars` control remains a deterministic fixture labelled
+`not live`; it is not presented as market data.
+
+Coinbase object-form channels were tried during implementation and rejected by
+the endpoint (`Failed to subscribe` / ` is not a valid product`, then socket
+close). The observed working subscription payload in
+`platforms/android/app/src/main/java/com/angnative/app/MarketPulseFeed.kt` is
+exactly:
+
+```json
+{"type":"subscribe","product_ids":["BTC-USD"],"channels":["matches"]}
+```
+
+The async JS host capability contract is
+`na_fetchAsyncStart` / `na_onFetchResult`, `na_timerSchedule` /
+`na_timerCancel` / `na_onTimerTick`, and the owner-scoped C ABI drain
+`angnative_runtime_bridge_take_host_tasks(handle)`. Host task JSON kinds are
+`fetch`, `timerSchedule` and `timerCancel`. `/marketpulse/quote` is served by
+the host from its socket-derived cache; it is not a REST market endpoint.
+RxJS `interval(30000)` now drives the bounded refresh with one request in
+flight; WebSocket match pushes remain a separate path.
+
+### 11.1 Compile, bundles and repository gates
+
+```powershell
+pnpm compile:aot:marketpulse
+pnpm bundle:marketpulse
+pnpm bundle:third-party
+python scripts/check-ffi-declarations.py
+$env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
+cargo test --workspace
+cargo test -p angnative-runtime-bridge -- --ignored
+pnpm test
+git diff --check
+```
+
+Observed:
+
+```text
+AOT compilation complete (Ivy definitions verified).
+dist\aot\market-pulse-bundle.js 1.1mb
+dist\aot\rxjs-bundle.js 407.1kb
+FFI declaration check OK: 36 JNI methods across 2 Android shells, 22 Swift bindings (13 runtime bridge), 29 header declarations; iOS unified staticlib wiring OK
+```
+
+`cargo test --workspace` result lines total `154 passed`, `0 failed`,
+`17 ignored`. The ignored runtime-bridge suite reported:
+
+```text
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 3.74s
+```
+
+`pnpm test` reported 16 spec files / 251 tests passed. `git diff --check`
+reported no whitespace errors; only LF→CRLF working-copy warnings.
+
+### 11.2 Native rebuild, APK stage and hashes
+
+```powershell
+pwsh -NoProfile -File scripts\build-android-native.ps1
+# from platforms\android
+.\gradlew.bat assembleDebug --no-daemon
+# from repository root
+Copy-Item platforms\android\app\build\outputs\apk\debug\app-debug.apk dist\showcases\market-pulse\app-debug.apk -Force
+Get-Item dist\showcases\market-pulse\app-debug.apk | Select-Object FullName,Length,LastWriteTime
+Get-FileHash -Algorithm SHA256 dist\showcases\market-pulse\app-debug.apk
+Get-FileHash -Algorithm SHA256 dist\aot\market-pulse-bundle.js,platforms\android\app\src\main\assets\market-pulse-bundle.js,dist\aot\quickjs-bundle.js,platforms\android\app\src\main\assets\angnative-bundle.js
+```
+
+Observed: Gradle `BUILD SUCCESSFUL`; staged APK length `33149157` bytes,
+SHA-256 `EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`.
+The dist/staged asset pairs match:
+
+| Asset | SHA-256 |
+|---|---|
+| `market-pulse-bundle.js` | `F960CBD7659AF04D4012B1F57A14C36D582591E1E2FB8F459EDBCA2B0A35F3C2` |
+| `angnative-bundle.js` (`quickjs-bundle.js` in dist) | `AD8C07D59ACE87A3A6E6E59FDBD060170FB5F8A2576A9B552B64A8B19E37A80F` |
+
+The earlier APK hashes `3A648816480AFD6C7F040A95E27271D48E1E9956B0EB0093C8756A3B588D51ED`
+(CoinGecko) and `0EB26AD158355EBC2D131AA2ECCE7DAD5468565DB38757B3933EA4F817AA2DEC`
+(pre-subscription-fix socket build) are superseded.
+
+### 11.3 Physical socket run on OnePlus `b6640c8f`
+
+```powershell
+$adb = 'C:\Android\Sdk\platform-tools\adb.exe'
+& $adb devices -l
+& $adb shell getprop | Select-String -Pattern 'ro.build.version.release|ro.build.version.sdk|ro.product.cpu.abi|ro.product.model'
+& $adb install -r dist\showcases\market-pulse\app-debug.apk
+& $adb logcat -c
+& $adb shell am force-stop com.angnative.app
+& $adb shell am start -n com.angnative.app/.MainActivity
+& $adb logcat -d -s AngNative:V AndroidRuntime:E > docs\assets\market-pulse-socket-oneplus.log
+& $adb shell uiautomator dump /data/local/tmp/marketpulse-socket-oneplus.xml
+& $adb exec-out screencap -p > docs\assets\market-pulse-socket-oneplus.png
+```
+
+Observed device: `b6640c8f device product:CPH2551 model:CPH2551 device:OP5973L1
+transport_id:1`; `ro.build.version.release=16`, `ro.build.version.sdk=36`,
+`ro.product.cpu.abi=arm64-v8a`. Install reported `Success`.
+
+Retained log `docs/assets/market-pulse-socket-oneplus.log` (the `┬╖` bytes are
+the terminal rendering of the UI's `·` separator):
+
+```text
+11-26 16:43:27.855 I/AngNative(30509): MarketPulse waiting quote pushed: bars=0 state=connecting feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:27.855 I/AngNative(30509): Angular boot complete. nodes=213 plusNode=null
+11-26 16:43:33.697 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+```
+
+The `bars=0 → bars=1` transition is direct evidence that no history was seeded
+and that the first 30m bar was created from a live `match`. `docs/assets/market-pulse-socket-oneplus-window.xml`
+observed:
+
+```text
+Angular in Rust: nodes=213 · Coinbase Exchange WebSocket · matches · 30m bars from executed matches · volume from match sizes · 1 30m bars · fresh · live
+BTC/USD · 1 30m match-derived bars · live · live · Coinbase Exchange WebSocket · matches · 30m bars from executed matches · volume from match sizes · not guaranteed real-time
+BTC/USD 60700.26
+<node index="3" ... class="android.view.View" content-desc="Custom:na-candlestick" ... bounds="[168,826][1064,1134]" />
+nodes_total=43 textview_count=25
+```
+
+`nodes_total=43` is the visible `uiautomator` subset; `nodes=213` is the native
+shadow-tree count logged by the Angular bridge. A 2-pixel sample of the valid
+screenshot inside `[168,826][1064,1134]` reported
+`regionSamples=68992 greenPixels=0 redPixels=1518 image=1116x2484`, so the
+match-derived candle was painted. With one bar in the current 30m bucket, zero
+green pixels is expected for this capture; it is not a missing-chart claim.
+
+Earlier setup-window attempts showed transient
+`SocketException: Software caused connection abort` and
+`UnknownHostException: ws-feed.exchange.coinbase.com`; the payload kept
+last-good bars and showed a reconnecting state. Those are not the final result;
+the retained log above is the successful post-fix subscription run.
+
+### 11.4 ABI instrumentation re-run after the ABI changes
+
+```powershell
+$env:ANDROID_SERIAL = 'b6640c8f'
+# from showcases\ecosystem-core
+.\gradlew.bat connectedDebugAndroidTest --no-daemon
+```
+
+Observed in `docs/assets/market-pulse-abi-oneplus.log`:
+
+```text
+Running tests on devices: CPH2551 - 16
+BUILD SUCCESSFUL in 1m 13s
+75 actionable tasks: 16 executed, 59 up-to-date
+```
+
+Scope: this re-verified the post-change ABI instrumentation path in the
+`ecosystem-core` shell on the physical device. It is not a re-run of the
+historical nine-test generic MarketPulse instrumentation suite against the
+final socket APK.
+
+### 11.5 Physical sustained/CPU/warm-start repeat
+
+```powershell
+pwsh -NoProfile -File scripts\measure-sustained.ps1 -Device b6640c8f -Samples 3 -DurationSeconds 30 -StartReps 5
+```
+
+Observed in `docs/assets/market-pulse-sustained-run.log`:
+
+```text
+Device: CPH2551 / Android 16 (API 36) / b6640c8f
+[market-pulse] starts ...
+[market-pulse] 3 x 30 s sustained ...
+[market-pulse] sample 1: valid=True frames=1719 swipes=49
+[market-pulse] sample 2: valid=True frames=1695 swipes=47
+[market-pulse] sample 3: valid=True frames=1684 swipes=47
+status=ok valid_samples=33/33
+saved: C:\Users\Moid Iqbal\Projects\angnative\docs\benchmarks\sustained\b6640c8f-20261126-170816.json
+```
+
+The retained JSON records device `CPH2551`, `Android 16 (API 36)`, renderer
+`physical/unknown renderer (ro.hardware=qcom)`, `1116x2484`, `nproc=8`.
+MarketPulse averages over three valid 30 s samples:
+
+| Metric | Value |
+|---|---:|
+| Frames | 1699.3 |
+| Janky % | 2.2 |
+| p50 / p95 ms | 8.0 / 22.0 |
+| CPU procstat % (one core) | 40.34 |
+| CPU top % (instantaneous) | 38.45 |
+| ΔPSS KB | -8956.0 |
+| PSS slope KB/s | -5.27 |
+
+Start aggregates (n=5 each): cold `process_ms` mean `1275.4`, `TotalTime` mean
+`983.6`; warm `process_ms` mean `336.0`, `TotalTime` mean `57.0`.
+`process_ms` is wall time to `am start -W` plus `pidof`, not first-frame time.
+`gfxinfo` metrics are cumulative after a post-settle reset; raw per-frame rows
+are ring-limited and were not retained. `WaitTime` fallback is labelled when
+`TotalTime` is omitted. Memory deltas include GC/settle effects; the negative
+MarketPulse delta is not a leak-fix claim. All 11 configured apps produced
+33/33 valid samples with 0 errors; low-frame samples were retained.
+
+### 11.6 Boundaries of the active socket-only evidence
+
+- **Claimed:** socket-only BTC/USD market data; match-derived 30m OHLC and
+  real base-BTC volume; empty startup cache with no REST/bootstrap history;
+  post-failure last-good with `fresh:false`; real RxJS `interval` and host-backed
+  async fetch/timer capabilities; same native text node updated without node
+  growth; `Custom:na-candlestick` painted on the physical screen; post-change
+  ABI instrumentation on OnePlus; physical sustained/CPU/warm-start repeat on
+  the final staged APK; deterministic animation samples `0 → 0.5 → 1`.
+- **Not claimed:** guaranteed real-time delivery, REST market data, fabricated
+  history or volume as market data, unchanged ECharts/AG Grid/GSAP
+  compatibility, `RecyclerView` recycling, smooth/eased 60 FPS animation, a
+  production-GPU ranking, NativeScript/Flutter comparison, the historical
+  nine-test MarketPulse suite against this final APK, iOS/Mac build or run, or
+  any result beyond the documented OnePlus `b6640c8f` device.

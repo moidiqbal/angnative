@@ -2,11 +2,13 @@
  * MarketPulse AOT crypto demo — heavy windowed OHLC rows + Angular Signals +
  * an RxJS quote stream + the `na-candlestick` contract element.
  *
- * BTC/USD OHLC data is fetched by the Android host from CoinGecko's public
- * endpoint and delivered through the synchronous fetch handler / stream hook.
- * Bars are 30-minute delayed OHLC; no real-time claim or fabricated data is
- * made here. Polling lives in Kotlin because the QuickJS `setInterval` shim is
- * one-shot and an RxJS `interval` would starve the bounded host job loop.
+ * BTC/USD data comes only from the Android host's Coinbase Exchange WebSocket
+ * `matches` stream. Kotlin builds 30-minute OHLC bars from executed match
+ * prices and sizes; this component never fetches a REST market endpoint and
+ * never fabricates history or volume. A real RxJS `interval` asks the host
+ * (through the async HttpClient/fetch shim) for the latest socket-derived
+ * quote every 30s; the status reports live/last-good honestly and makes no
+ * real-time guarantee.
  */
 import {
   animate,
@@ -35,7 +37,7 @@ import {
   NaViewComponent,
 } from '@angnative/common';
 import { provideNativeAngular, provideNativeAnimations } from '@angnative/platform';
-import { Subject, type Subscription } from 'rxjs';
+import { interval, Subject, type Subscription } from 'rxjs';
 
 interface QuoteBar {
   t: number;
@@ -51,6 +53,8 @@ interface QuotePayload {
   feed: string;
   fetchedAt: string;
   bars: QuoteBar[];
+  fresh?: boolean;
+  streamState?: string;
   error?: string;
 }
 
@@ -60,7 +64,7 @@ interface DatasetRow {
 }
 
 const EMPTY_QUOTE_JSON =
-  '{"symbol":"","feed":"CoinGecko public OHLC · 30m bars","fetchedAt":"","bars":[]}';
+  '{"symbol":"","feed":"Coinbase Exchange WebSocket · matches · 30m bars from executed matches · volume from match sizes","fetchedAt":"","fresh":false,"streamState":"connecting","bars":[]}';
 
 @Component({
   selector: 'market-pulse-app',
@@ -177,7 +181,9 @@ export class MarketPulseAppComponent implements OnInit, OnDestroy {
   visibleRows: DatasetRow[] = this.rows.slice(0, this.windowSize);
 
   private readonly quote = signal<QuotePayload | null>(null);
-  readonly status = signal('waiting for BTC/USD OHLC quote');
+  readonly status = signal(
+    'waiting for Coinbase Exchange WebSocket matches · 30m bars (not guaranteed real-time)',
+  );
   readonly flashState = signal('idle');
   readonly streamEvents = signal(0);
 
@@ -194,16 +200,20 @@ export class MarketPulseAppComponent implements OnInit, OnDestroy {
 
   events: string[] = [];
 
-  /** RxJS stream: every quote source (initial HTTP, host poll, fixture) lands here. */
+  /** RxJS stream: initial fetch, real 30s refresh, socket push and fixture. */
   private readonly quoteInput$ = new Subject<string>();
   private readonly streamSubscription: Subscription;
+  private readonly pollSubscription: Subscription;
+  // HttpClient returns Angular's nested RxJS 7 Subscription while this bundle
+  // imports the workspace RxJS 6; keep only the structural part we use.
+  private refreshSubscription: { unsubscribe(): void } | null = null;
+  private refreshInFlight = false;
+  private static readonly REFRESH_INTERVAL_MS = 30_000;
 
   constructor(
     private readonly http: HttpClient,
     private readonly cdr: ChangeDetectorRef,
   ) {
-    // Keep the RxJS surface v6/v7-compatible: operators are intentionally not
-    // imported, so the stream stays a plain Subject in this constrained bundle.
     this.streamSubscription = this.quoteInput$.subscribe({
       next: (json) => {
         try {
@@ -217,17 +227,23 @@ export class MarketPulseAppComponent implements OnInit, OnDestroy {
       },
       error: (err: unknown) => this.fail(String((err as { message?: string })?.message ?? err)),
     });
+    // Real RxJS interval (host-backed timer via na_timerSchedule). It does not
+    // fetch market data itself; it asks the host for the latest socket payload.
+    this.pollSubscription = interval(MarketPulseAppComponent.REFRESH_INTERVAL_MS).subscribe(() =>
+      this.refreshQuote(),
+    );
   }
 
   ngOnInit(): void {
-    this.http.get<QuotePayload>('/marketpulse/quote').subscribe({
-      next: (body) => this.quoteInput$.next(JSON.stringify(body)),
-      error: (err: unknown) => this.fail(String((err as { message?: string })?.message ?? err)),
-    });
+    // Keep the initial fetch; it is served by the async fetch shim from the
+    // host's socket-derived quote, not by a REST market endpoint.
+    this.refreshQuote();
     this.flush();
   }
 
   ngOnDestroy(): void {
+    this.pollSubscription.unsubscribe();
+    this.refreshSubscription?.unsubscribe();
     this.streamSubscription.unsubscribe();
   }
 
@@ -236,27 +252,58 @@ export class MarketPulseAppComponent implements OnInit, OnDestroy {
     this.quoteInput$.next(json);
   }
 
+  /**
+   * One in-flight HttpClient request at a time. The request is routed through
+   * the async fetch shim to the host's cached Coinbase WebSocket payload.
+   */
+  refreshQuote(): void {
+    if (this.refreshInFlight) return;
+    this.refreshInFlight = true;
+    this.refreshSubscription?.unsubscribe();
+    this.refreshSubscription = this.http.get<QuotePayload>('/marketpulse/quote').subscribe({
+      next: (body) => {
+        this.refreshInFlight = false;
+        this.quoteInput$.next(JSON.stringify(body));
+      },
+      error: (err: unknown) => {
+        this.refreshInFlight = false;
+        this.fail(String((err as { message?: string })?.message ?? err));
+      },
+    });
+  }
+
   applyQuote(quote: QuotePayload): void {
     this.quote.set(quote);
     const count = quote.bars.length;
     const feed = quote.feed || 'public OHLC feed';
-    this.status.set(
-      quote.error
-        ? `feed unavailable: ${quote.error} · ${count} last-good bars`
-        : `${quote.symbol} · ${count} bars · ${feed}`,
-    );
+    const state = quote.streamState || 'connecting';
+    const hasStreamMeta = quote.fresh !== undefined || quote.streamState !== undefined;
+    let status: string;
+    if (quote.error) {
+      status = `feed unavailable: ${quote.error} · ${count} last-good 30m bars · ${state} · ${feed}`;
+    } else if (!hasStreamMeta) {
+      // Deterministic fixture path (no socket metadata): keep the legacy shape.
+      status = `${quote.symbol} · ${count} bars · ${feed}`;
+    } else {
+      const mode = quote.fresh === true ? 'live' : count > 0 ? 'last-good' : 'waiting';
+      status =
+        `${quote.symbol} · ${count} 30m match-derived bars · ${mode} · ${state} · ${feed}` +
+        ' · not guaranteed real-time';
+    }
+    this.status.set(status);
     this.flashState.set('flash');
     this.flush();
   }
 
   fail(reason: string): void {
     // Keep the last good payload visible; never fabricate market data.
-    this.status.set(`feed unavailable: ${reason}`);
+    this.status.set(`feed unavailable: ${reason} · last-good data kept`);
     this.flush();
   }
 
   onRefreshClick(): void {
-    this.status.set('refresh requested from BTC/USD OHLC feed');
+    this.status.set('refresh requested from Coinbase Exchange WebSocket · latest cached quote');
+    this.refreshQuote();
     this.flush();
   }
 

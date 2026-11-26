@@ -1,0 +1,44 @@
+--------- beginning of main
+11-26 16:43:27.217 I/AngNative(30509): AngNative runtime bridge created: 1
+11-26 16:43:27.217 I/AngNative(30509): View factory registered for host: 0xb4000077aedee000 (ctx=0xb40000776aa46560)
+11-26 16:43:27.855 I/AngNative(30509): MarketPulse waiting quote pushed: bars=0 state=connecting feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:27.855 I/AngNative(30509): Angular boot complete. nodes=213 plusNode=null
+11-26 16:43:27.973 D/AngNative(30509): Cancelled stale timer 2 (host generation 0)
+11-26 16:43:27.995 D/AngNative(30509): Cancelled stale timer 3 (host generation 0)
+11-26 16:43:28.119 I/AngNative(30509): MarketPulse waiting quote pushed: bars=0 state=connecting feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:33.068 I/AngNative(30509): MarketPulse waiting quote pushed: bars=0 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:33.697 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:34.370 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:34.670 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:35.088 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:35.403 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:35.681 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:36.114 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:36.724 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:37.343 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:37.756 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:38.473 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:38.782 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:39.083 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:39.538 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:39.804 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:40.112 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:40.727 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:41.450 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:41.744 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:42.158 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:42.975 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:43.282 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:44.102 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:44.355 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:45.026 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:46.049 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:47.152 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:48.099 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:48.403 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:49.058 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:49.533 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:49.942 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:50.653 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:51.140 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none
+11-26 16:43:51.447 I/AngNative(30509): MarketPulse fresh quote pushed: bars=1 state=live feed=Coinbase Exchange WebSocket ┬╖ matches ┬╖ 30m bars from executed matches ┬╖ volume from match sizes error=none

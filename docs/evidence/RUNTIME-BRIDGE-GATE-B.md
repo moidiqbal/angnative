@@ -33,9 +33,12 @@ thread-local path + legacy FFI fallback); no duplicate delivery claim is made.
 ## Scope caveats
 
 - This evidence covers the Rust bridge and in-repo engine paths only.
-- Physical OnePlus `b6640c8f` ABI re-verification is **not verified** — the
-  device is online again, but no separate ABI re-verification was run in this
-  round. Retained earlier device results are historical evidence only.
+- This document retains the original Gate B in-process scope. A later
+  post-change physical ABI instrumentation run did occur on `b6640c8f`:
+  `BUILD SUCCESSFUL in 1m 13s`, retained at
+  `docs/assets/market-pulse-abi-oneplus.log` and summarized in
+  `docs/evidence/ANDROID-MARKETPULSE.md` section 11. It does not change the
+  Rust-only assertions recorded here.
 - No iOS/macOS runtime claim is made.
 - Ignored tests require their explicit test invocation; no local run result is
   asserted by this document beyond the named tests' presence and scope.

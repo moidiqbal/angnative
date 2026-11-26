@@ -15,7 +15,7 @@
 | Build system | Gradle 9.9.2 / AGP 9.5.2 / JDK 25 (latest profile) **or** Gradle 8.2 / AGP 8.2 / JDK 17 (legacy) |
 | Android SDK | `C:\Android\Sdk`, API 34/36, NDK 27.2.12479018 |
 | Web adapter | `@angnative/web` — DOM path only, explicitly NOT used for native APKs |
-| Existing tests | `cargo test --workspace`: 151 passed / 0 failed / 16 ignored; `pnpm test`: 251 passed; Android emulator UI + click verified |
+| Existing tests | `cargo test --workspace`: 154 passed / 0 failed / 17 ignored (ignored runtime-bridge suite 17 passed); `pnpm test`: 251 passed; Android emulator + physical OnePlus UI/tap/ABI verified |
 
 ### DOM-dependent libraries — verdict before implementation
 Angular Material, PrimeNG, NG-ZORRO, Taiga UI, Spartan UI, AG Grid, ECharts,
@@ -53,7 +53,7 @@ Build/verify scripts: `scripts/generate-showcase.ps1`, `scripts/build-showcases.
 
 | Rich text | `com.angnative.demo.ecosystem.richtext` | ✅ APK built, installed, launched; native `SpannableString` editor (bold/italic/underline/bullet/color/size/link/undo); WebViews=0; report + source.zip |
 | Calendar | `com.angnative.demo.ecosystem.calendar` | ✅ APK built, installed, launched; native Canvas month grid with event dots/selection; WebViews=0; report + source.zip |
-| MarketPulse (combined heavy + animated + crypto candlestick demo) | `com.angnative.app` (generic shell) | ✅ APK built, installed, launched on `emulator-5554` (API 34 x86_64) and physical OnePlus `b6640c8f` (Android 16 / arm64-v8a, APK SHA-256 `3A648816480AFD6C7F040A95E27271D48E1E9956B0EB0093C8756A3B588D51ED`); CoinGecko BTC/USD OHLC returned 48 live 30m bars on the emulator; final boot `nodes=213`, UI dump `content-desc="Custom:na-candlestick"` with green/red candle pixels; real `Demo bars` tap → 2 live Angular `press` listeners and same-price-textbox update `58024 → 60895`; Android suite 9/9 on both devices; two-asset split keeps counter tests green. Added Angular Signals + RxJS `Subject` stream with three verified 30 s delayed Kotlin polls on the emulator (`bars=48`, 36 `TextView` nodes unchanged); on physical device two 30 s scheduler pushes used last-good cached data after DNS failures, UI showed `BTC/USD 60838`, `TextViewCount=28`, chart bounds `[168,652][1064,960]` and sampled `green=1476 red=883 grid=2834`; full instrumentation `OK (9 tests)` there. No WebSocket/SSE, real-time guarantee, ABI re-verification or sustained-load claim. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` sections 8-9; staged `dist/showcases/market-pulse/{app-debug.apk,source.zip,compatibility-report.md}`; screenshots `docs/assets/market-pulse-crypto-boot.png`, `docs/assets/market-pulse-crypto-demo.png`, `docs/assets/market-pulse-signals-poll.png`, `docs/assets/market-pulse-physical.png`; physical logs/XML `docs/assets/market-pulse-physical-boot.log`, `docs/assets/market-pulse-physical-poll.log`, `docs/assets/market-pulse-physical.xml` |
+| MarketPulse (combined heavy + animated + crypto candlestick demo) | `com.angnative.app` (generic shell) | ✅ **active socket-only build** staged/installed/launched on physical OnePlus `b6640c8f` (Android 16 / arm64-v8a), APK SHA-256 `EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`, 33,149,157 bytes. Coinbase Exchange WebSocket `matches` only: no REST bootstrap/history/OHLC/volume; startup `bars=0 state=connecting`, first live match `bars=1 state=live`, `BTC/USD 60700.26`, `fresh · live`, `Custom:na-candlestick` bounds `[168,826][1064,1134]` with painted match-derived candle. Real RxJS `interval(30000)` + host-backed async fetch/timer capabilities; one refresh in flight. Post-change ABI instrumentation passed on device; physical sustained repeat `status=ok`, 33/33 valid, MarketPulse 1699.3 frames / 2.2% janky / p50-p95 8-22 ms / 40.34% procstat CPU (one core) / warm `process_ms` mean 336.0 ms. ⚠️ No real-time guarantee, no fabricated history/volume, no final-socket nine-test rerun, no iOS/Mac claim. Historical CoinGecko/Signals evidence retained in `docs/evidence/ANDROID-MARKETPULSE.md` sections 1-10; active evidence in section 11 and retained artifacts `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`, `docs/assets/market-pulse-abi-oneplus.log`, `docs/assets/market-pulse-sustained-run.log`, `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`. |
 
 Microfrontends remain documented in the compatibility matrix as `Not yet tested` (requires
 JS runtime); no APK claimed.
@@ -66,16 +66,16 @@ JS runtime); no APK claimed.
 
 ## Phase 5/6 — build/verify/performance
 - All 8 showcase APKs staged under `dist/showcases/<name>/` with source.zip + compatibility-report.md; installed/launched on emulator API 34; `WebViews=0`.
-- MarketPulse staged under `dist/showcases/market-pulse/` with APK + source.zip + compatibility-report.md; installed/launched on emulator API 34; `WebViews=0`. It uses the generic shell package `com.angnative.app`, not a separate showcase package.
+- MarketPulse staged under `dist/showcases/market-pulse/` with APK + source.zip + compatibility-report.md; active socket-only APK installed/launched on physical OnePlus `b6640c8f`; no WebView node in UI dumps. It uses the generic shell package `com.angnative.app`, not a separate showcase package.
 - Initial cold-start/memory numbers in `docs/BENCHMARKS.md` + `docs/benchmarks/*.json` (1 sample, emulator, honest caveats).
 - Frame pacing measured on emulator: `docs/benchmarks/frame-pacing.json` (single burst) and `docs/benchmarks/emulator-multisample.json` (3 bursts per app).
-- Sustained load measured on emulator: `docs/benchmarks/sustained/emulator-20261125-143058.json` + `docs/evidence/ANDROID-SUSTAINED-LOAD.md` (10 apps, 5 cold + 5 warm starts, 3 × 30 s, `status=ok`, 30/30 valid). Physical-device multi-sample, sustained CPU and warm-start still pending.
+- Sustained load measured on emulator: `docs/benchmarks/sustained/emulator-20261125-143058.json` (10 apps, 5 cold + 5 warm starts, 3 × 30 s, `status=ok`, 30/30 valid, historical). Physical repeat on `b6640c8f`: `docs/benchmarks/sustained/b6640c8f-20261126-170816.json` (11 apps, `status=ok`, 33/33 valid, final socket-only MarketPulse APK). Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md`.
 
 ## Phase 3 — Reusable packages
 ✅ `@angnative/native-ui-core` is a real tested Android library (line 63); adapter packages and remaining native widgets stay incremental-only — no empty placeholders.
 
 ## Phases 4-7
-✅ Compatibility matrix, APK build/verify, initial benchmarks and repository deliverables are in place; only physical multi-sample/CPU benchmarking remains pending.
+✅ Compatibility matrix, APK build/verify, initial benchmarks and repository deliverables are in place; physical multi-sample/CPU/warm-start benchmarking is now recorded for OnePlus `b6640c8f` on the final socket-only MarketPulse APK. iOS/Mac remains unverified locally.
 
 ## Evidence rules
 - No APK reported as verified unless installed + launched on emulator.

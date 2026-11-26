@@ -70,9 +70,17 @@ comparison.
 WebViews=0 on every app. Real-GPU headline: **ecosystem-grid 170 frames, 1.76% jank,
 6 ms p50 / 20 ms p95** vs emulator 16.13% / 20 ms. Clean screenshots for all 10 apps are kept in `docs/benchmarks/physical/*.png`
 (status bar + navbar cropped, strict foreground guard so notification shades are
-never captured). Physical multi-sample, CPU and warm-start are still pending:
-`b6640c8f` was not connected on 2026-11-23, so no new physical claim is made.
-- Sustained CPU, warm-start and multi-sample averages on the physical device (emulator results now retained; OnePlus online but repeats not run)
+never captured).
+
+Physical multi-sample, CPU and warm-start are now recorded for `b6640c8f`:
+`docs/benchmarks/sustained/b6640c8f-20261126-170816.json` is `status=ok`,
+33/33 valid samples across 11 apps (the original ten plus the final socket-only
+MarketPulse APK). MarketPulse averaged 1699.3 frames, 2.2% janky, p50/p95 8/22 ms,
+40.34% procstat CPU (one core), 38.45% instantaneous top CPU, ΔPSS -8956 KB;
+warm `process_ms` mean was 336.0 ms. Renderer is
+`physical/unknown renderer (ro.hardware=qcom)`, not a production-GPU ranking.
+Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md` and
+`docs/assets/market-pulse-sustained-run.log`.
 - WebView comparison builds (deliberately not built for native showcases)
 
 Do not present these numbers as a NativeScript/Flutter comparison — no equivalent builds exist in this repo.

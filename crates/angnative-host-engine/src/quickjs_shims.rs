@@ -248,31 +248,17 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
                 return null;
             }
         };
-        globalThis.fetch = function (url, options) {
-            var opts = options || {};
-            var request = {
-                url: String(url),
-                method: opts.method || 'GET',
-                headers: opts.headers || {},
-                body: opts.body === undefined ? null : opts.body
-            };
-            var result = null;
-            for (var i = 0; i < _angFetchHandlers.length; i++) {
-                result = _angFetchHandlers[i](request);
-                if (result) break;
-            }
-            var status = result && result.status ? result.status : 404;
-            var rawBody = result && result.body !== undefined ? result.body : '';
-            var bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
-            var rawHeaders = (result && result.headers) || {};
 
-            // Enumerable own string values so Angular's HttpHeaders(Object.entries)
-            // path works; `get` lives on a shared prototype (never a closure
-            // over the instance — that would create a GC cycle).
+        // Build the exact Angular-shaped Response for BOTH the synchronous
+        // registered-handler path and the host async-result path. The reader
+        // closes over primitive bytes/offset only — never over the response —
+        // so no cyclic JS object graph is created.
+        function _angFetchMakeResponse(url, status, statusText, bodyText, rawHeaders) {
             var headerMap = Object.create(_angHeadersProto);
-            for (var hk in rawHeaders) {
-                if (!Object.prototype.hasOwnProperty.call(rawHeaders, hk)) continue;
-                var hv = rawHeaders[hk];
+            var headers = rawHeaders || {};
+            for (var hk in headers) {
+                if (!Object.prototype.hasOwnProperty.call(headers, hk)) continue;
+                var hv = headers[hk];
                 headerMap[String(hk)] = Array.isArray(hv) ? hv.join(', ') : String(hv);
             }
             if (headerMap['content-type'] === undefined &&
@@ -298,10 +284,10 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
                 releaseLock: function () {}
             };
 
-            var response = {
+            return {
                 ok: status >= 200 && status < 300,
                 status: status,
-                statusText: (result && result.statusText) || '',
+                statusText: statusText || '',
                 url: String(url),
                 redirected: false,
                 type: 'basic',
@@ -313,7 +299,81 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
                 text: function () { return Promise.resolve(bodyText); },
                 json: function () { return Promise.resolve(JSON.parse(bodyText)); }
             };
-            return Promise.resolve(response);
+        }
+
+        // Flat, numeric-keyed pending map. Only primitive ids/urls and the
+        // Promise's own resolve/reject functions are stored (no object cycles).
+        var _angFetchNextId = 1;
+        var _angFetchPending = Object.create(null);
+        var _angHostFetch = typeof na_fetchAsyncStart === 'function';
+
+        globalThis.fetch = function (url, options) {
+            var opts = options || {};
+            var request = {
+                url: String(url),
+                method: opts.method || 'GET',
+                headers: opts.headers || {},
+                body: opts.body === undefined ? null : opts.body
+            };
+            var result = null;
+            for (var i = 0; i < _angFetchHandlers.length; i++) {
+                result = _angFetchHandlers[i](request);
+                if (result) break;
+            }
+            if (result) {
+                var syncBody = result.body !== undefined ? result.body : '';
+                var syncText = typeof syncBody === 'string'
+                    ? syncBody : JSON.stringify(syncBody);
+                return Promise.resolve(_angFetchMakeResponse(
+                    url,
+                    result.status ? result.status : 404,
+                    result.statusText || '',
+                    syncText,
+                    result.headers || {}
+                ));
+            }
+
+            if (_angHostFetch) {
+                return new Promise(function (resolve, reject) {
+                    var id = _angFetchNextId++;
+                    _angFetchPending[id] = {
+                        resolve: resolve, reject: reject, url: String(url)
+                    };
+                    try {
+                        // Never pass JS function handles to Rust: only a numeric
+                        // id and the JSON-stringified request cross the bridge.
+                        na_fetchAsyncStart(id, JSON.stringify(request));
+                    } catch (e) {
+                        delete _angFetchPending[id];
+                        reject(e);
+                    }
+                });
+            }
+
+            // No host fetch capability: keep the historic default 404 response
+            // so Angular's FetchBackend can initialize without a network stack.
+            return Promise.resolve(_angFetchMakeResponse(url, 404, '', '', {}));
+        };
+
+        globalThis.na_onFetchResult = function (id, status, bodyText, headersJson) {
+            var pending = _angFetchPending[id];
+            if (!pending) return;
+            delete _angFetchPending[id];
+            try {
+                var parsedHeaders = {};
+                if (headersJson) {
+                    var decoded = typeof headersJson === 'string'
+                        ? JSON.parse(headersJson) : headersJson;
+                    if (decoded && typeof decoded === 'object') parsedHeaders = decoded;
+                }
+                var text = bodyText === null || bodyText === undefined
+                    ? '' : String(bodyText);
+                pending.resolve(_angFetchMakeResponse(
+                    pending.url, Number(status) || 404, '', text, parsedHeaders
+                ));
+            } catch (e) {
+                try { pending.reject(e); } catch (_) {}
+            }
         };
 
         // Minimal i18n support: Angular AOT emits $localize tagged templates.
@@ -688,44 +748,73 @@ pub fn install_dom_shims<E: JsEngine>(engine: &mut E) -> Result<(), crate::engin
         };
     "#)?;
 
-    // Timer stubs (minimal)
+    // Timer shims. When the host registers na_timerSchedule/na_timerCancel,
+    // timers are host-owned: JS keeps a flat numeric registry of handlers and
+    // the host drives na_onTimerTick(id, generation). The legacy microtask path
+    // is retained ONLY for engines without host timers, and stays one-shot
+    // (including setInterval) so it cannot starve the bounded host job loop.
     engine.eval(r#"
-        // Drive one-shot timers from the host-drained microtask queue. Angular
-        // Router uses setTimeout for navigation scheduling; a no-op would leave
-        // navigation pending forever.
-        var _angTimerId = 1;
-        var _angTimerQueue = new Map();
+        var _angTimerNextId = 1;
+        var _angTimers = Object.create(null);
+        var _angHostTimers = typeof na_timerSchedule === 'function';
+
+        function _angTimerSchedule(handler, kind, delay) {
+            var id = _angTimerNextId++;
+            var generation = 0;
+            var delayMs = Number(delay) || 0;
+            _angTimers[id] = {
+                handler: handler, kind: kind, generation: generation, delay: delayMs
+            };
+            if (_angHostTimers) {
+                try {
+                    na_timerSchedule(id, delayMs, kind === 'interval' ? 1 : 0, generation);
+                } catch (e) {
+                    delete _angTimers[id];
+                    throw e;
+                }
+            } else {
+                // Legacy fallback: one-shot microtask, even for setInterval.
+                // RxJS asyncScheduler asks for a fresh interval after each flush,
+                // so an auto-repeating chain would never let the queue drain.
+                queueMicrotask(function () {
+                    var entry = _angTimers[id];
+                    if (!entry || entry.generation !== generation) return;
+                    delete _angTimers[id];
+                    handler();
+                });
+            }
+            return id;
+        }
+
+        function _angTimerClear(id) {
+            var entry = _angTimers[id];
+            if (!entry) return;
+            entry.generation++;
+            delete _angTimers[id];
+            if (_angHostTimers && typeof na_timerCancel === 'function') {
+                try { na_timerCancel(id, entry.generation); } catch (e) {}
+            }
+        }
+
         function setTimeout(handler, delay) {
-            var id = _angTimerId++;
-            var run = function () {
-                if (!_angTimerQueue.has(id)) return;
-                _angTimerQueue.delete(id);
-                handler();
-            };
-            _angTimerQueue.set(id, run);
-            queueMicrotask(run);
-            return id;
+            return _angTimerSchedule(handler, 'timeout', delay);
         }
-        function clearTimeout(id) { _angTimerQueue.delete(id); }
-        // RxJS asyncScheduler (used by Angular Router) flushes through
-        // setInterval(0), so a no-op here leaves the navigation pipeline dead.
-        // One-shot, NOT auto-repeating: an auto-repeating microtask chain never
-        // drains and starves the host's bounded job loop. RxJS asyncScheduler
-        // requests a fresh interval after each flush when it has more work.
-        var _angIntervalId = 1;
-        var _angIntervalQueue = new Map();
+        function clearTimeout(id) { _angTimerClear(id); }
         function setInterval(handler, delay) {
-            var id = _angIntervalId++;
-            var run = function () {
-                if (!_angIntervalQueue.has(id)) return;
-                _angIntervalQueue.delete(id);
-                handler();
-            };
-            _angIntervalQueue.set(id, run);
-            queueMicrotask(run);
-            return id;
+            return _angTimerSchedule(handler, 'interval', delay);
         }
-        function clearInterval(id) { _angIntervalQueue.delete(id); }
+        function clearInterval(id) { _angTimerClear(id); }
+
+        // Host callback: one-shot timers fire once, intervals once per tick.
+        // A stale/mismatched generation is always ignored.
+        globalThis.na_onTimerTick = function (id, generation) {
+            var entry = _angTimers[id];
+            if (!entry || entry.generation !== Number(generation)) return;
+            if (typeof entry.handler !== 'function') return;
+            if (entry.kind === 'timeout') delete _angTimers[id];
+            entry.handler();
+        };
+
         // Angular's zoneless scheduler uses an rAF-vs-setTimeout race. Drive
         // rAF from the same queue the host drains after each event, otherwise
         // change detection never ticks in QuickJS.
@@ -1303,5 +1392,207 @@ mod tests {
 
         let result = engine.eval("typeof System").unwrap();
         assert_eq!(result, crate::engine::JsValue::String("object".to_string()));
+    }
+
+    /// Socket-only-era fetch: a synchronous handler still wins, but with no
+    /// handler the shim hands a numeric id + JSON string to the host and leaves
+    /// the Promise pending until `na_onFetchResult` arrives.
+    #[test]
+    fn test_async_fetch_host_result_resolves_angular_response() {
+        use crate::engine::JsValue;
+        use std::sync::{Arc, Mutex};
+
+        let calls: Arc<Mutex<Vec<(i64, String)>>> = Arc::new(Mutex::new(Vec::new()));
+        let recorded = calls.clone();
+        let mut engine = QuickJsEngine::new().unwrap();
+        engine.register_function("na_fetchAsyncStart", move |args| {
+            let id = match args.first() {
+                Some(JsValue::Number(n)) => *n as i64,
+                _ => -1,
+            };
+            let request = match args.get(1) {
+                Some(JsValue::String(s)) => s.clone(),
+                _ => String::new(),
+            };
+            recorded.lock().unwrap().push((id, request));
+            Ok(JsValue::Number(0.0))
+        });
+        install_dom_shims(&mut engine).unwrap();
+
+        engine
+            .eval(
+                r#"
+                globalThis.__asyncFetchState = 'pending';
+                fetch('/api/async', { method: 'POST', body: 'ping' }).then(function (r) {
+                    var reader = r.body.getReader();
+                    return Promise.all([
+                        reader.read(), r.text(), r.json()
+                    ]).then(function (values) {
+                        globalThis.__asyncFetchState = [
+                            r.status, r.ok, values[0].done,
+                            new TextDecoder().decode(values[0].value),
+                            values[1], values[2].message,
+                            r.headers.get('X-Host'), r.headers.get('content-type')
+                        ].join('|');
+                    });
+                });
+                "#,
+            )
+            .unwrap();
+        engine.drain_microtasks().unwrap();
+        assert_eq!(
+            engine.eval("__asyncFetchState").unwrap(),
+            JsValue::String("pending".to_string()),
+            "fetch must stay pending until the host reports a result"
+        );
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1, "host must receive exactly one fetch start");
+        let (id, request) = calls[0].clone();
+        drop(calls);
+        let request: serde_json::Value = serde_json::from_str(&request).unwrap();
+        assert_eq!(request["url"], "/api/async");
+        assert_eq!(request["method"], "POST");
+        assert_eq!(request["body"], "ping");
+
+        engine
+            .call_function(
+                "na_onFetchResult",
+                &[
+                    JsValue::Number(id as f64),
+                    JsValue::Number(202.0),
+                    JsValue::String(r#"{"message":"host-body"}"#.to_string()),
+                    JsValue::String(
+                        r#"{"X-Host":"header-value","content-type":"application/json"}"#
+                            .to_string(),
+                    ),
+                ],
+            )
+            .unwrap();
+        engine.drain_microtasks().unwrap();
+        assert_eq!(
+            engine.eval("__asyncFetchState").unwrap(),
+            JsValue::String(
+                "202|true|false|{\"message\":\"host-body\"}|{\"message\":\"host-body\"}|host-body|header-value|application/json"
+                    .to_string()
+            )
+        );
+    }
+
+    /// Host-owned timers: schedule/cancel cross as plain numbers, every tick
+    /// comes from the host, and a stale generation must never fire a handler.
+    #[test]
+    fn test_host_timers_schedule_tick_and_cancel() {
+        use crate::engine::JsValue;
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        struct Schedule {
+            id: i64,
+            delay: i64,
+            interval: i64,
+            generation: i64,
+        }
+
+        let schedules: Arc<Mutex<Vec<Schedule>>> = Arc::new(Mutex::new(Vec::new()));
+        let cancels: Arc<Mutex<Vec<(i64, i64)>>> = Arc::new(Mutex::new(Vec::new()));
+        let schedule_log = schedules.clone();
+        let cancel_log = cancels.clone();
+        let mut engine = QuickJsEngine::new().unwrap();
+        engine.register_function("na_timerSchedule", move |args| {
+            let number = |i: usize| match args.get(i) {
+                Some(JsValue::Number(n)) => *n as i64,
+                _ => -1,
+            };
+            schedule_log.lock().unwrap().push(Schedule {
+                id: number(0),
+                delay: number(1),
+                interval: number(2),
+                generation: number(3),
+            });
+            Ok(JsValue::Number(0.0))
+        });
+        engine.register_function("na_timerCancel", move |args| {
+            let number = |i: usize| match args.get(i) {
+                Some(JsValue::Number(n)) => *n as i64,
+                _ => -1,
+            };
+            cancel_log.lock().unwrap().push((number(0), number(1)));
+            Ok(JsValue::Null)
+        });
+        install_dom_shims(&mut engine).unwrap();
+
+        engine
+            .eval(
+                r#"
+                globalThis.__timeoutHits = 0;
+                globalThis.__intervalHits = 0;
+                globalThis.__timeoutId = setTimeout(function () {
+                    __timeoutHits++;
+                }, 5);
+                globalThis.__intervalId = setInterval(function () {
+                    __intervalHits++;
+                }, 7);
+                globalThis.__spareTimeoutId = setTimeout(function () {}, 9);
+                "#,
+            )
+            .unwrap();
+
+        let timeout_id;
+        let interval_id;
+        let spare_id;
+        {
+            let log = schedules.lock().unwrap();
+            assert_eq!(log.len(), 3, "every timer must be scheduled with the host");
+            assert_eq!(
+                log[0],
+                Schedule { id: 1, delay: 5, interval: 0, generation: 0 }
+            );
+            assert_eq!(
+                log[1],
+                Schedule { id: 2, delay: 7, interval: 1, generation: 0 }
+            );
+            assert_eq!(
+                log[2],
+                Schedule { id: 3, delay: 9, interval: 0, generation: 0 }
+            );
+            timeout_id = log[0].id;
+            interval_id = log[1].id;
+            spare_id = log[2].id;
+        }
+
+        let tick = |engine: &mut QuickJsEngine, id: i64, generation: i64| {
+            engine
+                .call_function(
+                    "na_onTimerTick",
+                    &[JsValue::Number(id as f64), JsValue::Number(generation as f64)],
+                )
+                .unwrap();
+        };
+        let hits = |engine: &mut QuickJsEngine, name: &str| match engine.eval(name).unwrap() {
+            JsValue::Number(n) => n as i64,
+            other => panic!("unexpected hit counter: {other:?}"),
+        };
+
+        tick(&mut engine, timeout_id, 0);
+        assert_eq!(hits(&mut engine, "__timeoutHits"), 1);
+        tick(&mut engine, timeout_id, 0);
+        assert_eq!(hits(&mut engine, "__timeoutHits"), 1, "one-shot fired twice");
+
+        tick(&mut engine, interval_id, 0);
+        tick(&mut engine, interval_id, 0);
+        tick(&mut engine, interval_id, 1);
+        assert_eq!(hits(&mut engine, "__intervalHits"), 2, "generation guard failed");
+
+        engine
+            .eval("clearInterval(__intervalId); clearTimeout(__spareTimeoutId); 0;")
+            .unwrap();
+        assert_eq!(
+            *cancels.lock().unwrap(),
+            vec![(interval_id, 1), (spare_id, 1)]
+        );
+        tick(&mut engine, interval_id, 0);
+        tick(&mut engine, interval_id, 1);
+        assert_eq!(hits(&mut engine, "__intervalHits"), 2, "cleared interval fired");
     }
 }

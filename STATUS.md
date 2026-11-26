@@ -1,6 +1,6 @@
 # AngNative — Current Status (single source of truth)
 
-**Last verified:** 2026-11-25
+**Last verified:** 2026-11-26
 **Repo:** `C:\Users\Moid Iqbal\Projects\angnative`
 **Branch:** `master`
 
@@ -46,8 +46,9 @@ functions and exposes `NativeRuntimeBridge` (main-thread owner, borrowed host,
 bundle load, event dispatch). `Package.swift` and `build-ios-native.sh` link the
 unified `libangnative_runtime_bridge.a`, which bundles host-ffi, host-engine and
 QuickJS; the old host-only archive is not linked.
-`python scripts/check-ffi-declarations.py` statically verifies the 14 Swift
-bindings, their runtime-bridge signatures and the build wiring.
+`python scripts/check-ffi-declarations.py` statically verifies 36 JNI methods
+across 2 Android shells, 22 Swift bindings (13 runtime bridge), 29 header
+declarations and the unified staticlib wiring.
 
 **Honest status:** no Mac here → Swift compile, `swift test`, Simulator/device
 run and the runtime-bridge smoke test are **NOT performed**. First action on the
@@ -84,32 +85,40 @@ Live run opens a window titled **"AngNative Desktop"**. A WGSL validation panic
 - Wrong-thread JNI guard: `connectedDebugAndroidTest` passed 2/2 on `emulator-5554` (Android 14, x86_64) and 2/2 on OnePlus Open `b6640c8f` (`CPH2551`, Android 16, arm64-v8a); evidence in `docs/evidence/ANDROID-THREAD-AFFINITY-EMULATOR.md` and `docs/evidence/ANDROID-THREAD-AFFINITY-ONEPLUS.md`
 - UI-thread marshalling: `ViewFactoryMainThreadTest.kt` records `Looper.myLooper()` inside `NativeViewSink` callbacks; full suite 4/4 pass on both devices. Evidence: `docs/evidence/ANDROID-VIEWFACTORY-MAINTHREAD.md`.
 - Real tap → live Angular listener: on both devices logcat showed `Angular tap node=17 -> 1 listener(s)` and UI changed `Count: 0 → Count: 1`. Screenshot retained for emulator (`docs/assets/angular-real-tap-emulator-count1.png`); OnePlus logcat + before/after XML retained (`docs/assets/angular-real-tap-oneplus-count1.png` was 0 bytes after device disconnect, so no image claim).
-- Generic `platforms/android` shell (2026-11-25): now uses the same runtime bridge
-  as the flagship — creates `RuntimeBridge`, loads a staged Angular AOT asset,
-  materializes Angular-emitted native ops, and walks the native ancestor chain on
-  tap. `.\gradlew.bat assembleDebug assembleDebugAndroidTest --no-daemon` →
-  **BUILD SUCCESSFUL**. Two assets are staged: `assets/angnative-bundle.js`
-  (1,098,643 bytes, stable counter name asserted by instrumentation) and
-  `assets/market-pulse-bundle.js` (1,165,920 bytes, selected at runtime for the
-  MarketPulse demo). Dist/staged hashes match for both. The shell is now
-  **device-verified on `emulator-5554` (API 34 x86_64)**: after the white-screen
-  layout fix, logcat reported `Angular boot complete. nodes=210 plusNode=null`,
-  `WebViews: 0`; UI dump had 34 visible `TextView`s and
-  `content-desc="Custom:na-candlestick"`, and screenshot
-  `docs/assets/market-pulse-final.png` was non-white. The demo is now a crypto
-  demo: CoinGecko BTC/USD 30-minute OHLC returned 48 live bars on-device, the
-  UI showed `BTC/USD · 48 bars · CoinGecko public OHLC · 30m bars`, and the chart
-  region contained green/red candle pixels. A real `Demo bars` tap invoked 2
-  Angular `press` listeners and changed `BTC/USD 58024` → `BTC/USD 60895` in the
-  same price text box (same bounds and node count). The full instrumentation
-  suite passed `OK (9 tests)`. The earlier Yahoo stock feed returned HTTP 429
-  and is no longer active. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md`.
-  `python scripts/check-ffi-declarations.py` checks both Android JNI bridges.
-- Sustained-load benchmark (2026-11-25): `scripts/measure-sustained.ps1` ran all 10
-  showcase APKs on `emulator-5554` with 5 cold + 5 warm starts and 3 × 30 s samples.
-  `docs/benchmarks/sustained/emulator-20261125-143058.json` is `status=ok`,
-  30/30 valid samples, 0 errors. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md`.
-  Physical OnePlus sustained-load repeats remain pending (device online; repeats not run).
+- Generic `platforms/android` shell: uses the same runtime bridge as the flagship
+  — creates `RuntimeBridge`, loads a staged Angular AOT asset, materializes
+  Angular-emitted native ops, and walks the native ancestor chain on tap. Two
+  assets are staged: `assets/angnative-bundle.js` (1,098,643 bytes, stable
+  counter name asserted by instrumentation) and `assets/market-pulse-bundle.js`
+  (1,180,071 bytes, selected at runtime for MarketPulse). Dist/staged hashes
+  match. The active MarketPulse build (2026-11-26) is **socket-only**: Coinbase
+  Exchange `wss://ws-feed.exchange.coinbase.com`, `matches` channel only; 30m
+  OHLC and integer milli-BTC volume come from executed `match` price/size/time.
+  No REST bootstrap, history, OHLC or volume path exists; startup reports
+  `bars=0 state=connecting`, then the first real match produced `bars=1
+  state=live` on physical OnePlus `b6640c8f` (Android 16 / arm64-v8a). Failure
+  keeps last-good data with `fresh:false`. Real RxJS `interval(30000)` drives
+  bounded refresh through host-backed async fetch/timer capabilities; no
+  real-time guarantee is made. Physical log/UI/screenshot evidence is in
+  `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. The earlier
+  CoinGecko stage and its `OK (9 tests)` instrumentation run are historical and
+  are not claimed for the final socket APK. Evidence:
+  `docs/evidence/ANDROID-MARKETPULSE.md` sections 1-10 (historical) and 11
+  (active). `python scripts/check-ffi-declarations.py` checks both Android JNI
+  bridges.
+- Sustained-load benchmark: the historical emulator run
+  (`docs/benchmarks/sustained/emulator-20261125-143058.json`, 10 apps,
+  5 cold + 5 warm starts, 3 × 30 s, `status=ok`, 30/30 valid) is retained. The
+  physical repeat on `b6640c8f` (2026-11-26, final socket-only APK) is
+  `docs/benchmarks/sustained/b6640c8f-20261126-170816.json` — `status=ok`,
+  33/33 valid samples, 0 errors across 11 apps. MarketPulse averaged 1699.3
+  frames, 2.2% janky, p50/p95 8/22 ms, 40.34% procstat CPU (one core), 38.45%
+  instantaneous top CPU, ΔPSS -8956 KB; warm `process_ms` mean 336.0 ms.
+  Post-change ABI instrumentation on the same device passed
+  (`Running tests on devices: CPH2551 - 16`, `BUILD SUCCESSFUL in 1m 13s`).
+  Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md`,
+  `docs/assets/market-pulse-sustained-run.log`,
+  `docs/assets/market-pulse-abi-oneplus.log`.
 
 ---
 
@@ -122,23 +131,23 @@ elevation (error 740). Git's copy does not. Workaround:
 ```powershell
 $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
 cargo build --workspace
-cargo test --workspace   # 151 tests pass, 16 ignored; includes host-engine and desktop (11)
+cargo test --workspace   # 154 tests pass, 17 ignored; includes host-engine and desktop (11)
 ```
 
 ## Verification summary
 
 | Item | Status |
 |---|---|
-| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **151 tests pass**, 16 ignored (with Git `patch.exe` on PATH — see note above) |
+| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **154 tests pass**, 17 ignored (with Git `patch.exe` on PATH — see note above); ignored runtime-bridge suite 17 passed / 0 failed |
 | JS/TS (16 spec files) | ✅ 251 tests pass |
 | Android JNI + emulator/physical run | ✅ verified: wrong-thread JNI instrumentation passed 2/2 and full Android suite passed 4/4 on Android 14 emulator and OnePlus Open (Android 16, arm64-v8a); real tap reached a live Angular listener on both |
-| Generic `platforms/android` AOT shell | ✅ build + device verified (2026-11-25): two staged AOT assets, runtime-bridge JNI, UI from native ops, final crypto boot `nodes=213`, no WebView node in UI dumps, `Custom:na-candlestick` in UI dump, painted candle pixels, real emulator tap → live Angular listeners, full instrumentation `OK (9 tests)`, FFI checker covers both shells. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md`. |
-| MarketPulse combined crypto demo | ✅ built, installed and launched on `emulator-5554` and physical OnePlus `b6640c8f` (Android 16 / arm64-v8a, APK SHA-256 `3A648816480AFD6C7F040A95E27271D48E1E9956B0EB0093C8756A3B588D51ED`); CoinGecko BTC/USD 30-minute OHLC returned 48 live bars on the emulator, candles visibly painted, `Demo bars` tap updated the same price text box in place, deterministic animation samples verified in QuickJS, Angular Signals + RxJS `Subject` stream verified in the ignored AOT test, three delayed 30 s Kotlin polls verified on the emulator (`bars=48`, no node growth); on physical device two 30 s scheduler pushes delivered last-good cached data after DNS failures, UI showed `BTC/USD 60838` with `Custom:na-candlestick` and green/red candle pixels, full instrumentation `OK (9 tests)` there. ⚠️ no WebSocket/SSE, real-time feed guarantee, ABI re-verification, sustained-load or iOS/Mac claim. Artifacts: `dist/showcases/market-pulse/`, `docs/assets/market-pulse-crypto-boot.png`, `docs/assets/market-pulse-crypto-demo.png`, `docs/assets/market-pulse-signals-poll.png`, `docs/assets/market-pulse-physical-boot.log`, `docs/assets/market-pulse-physical-poll.log`, `docs/assets/market-pulse-physical.xml`, `docs/assets/market-pulse-physical.png`. |
-| Sustained-load benchmark | ✅ emulator `status=ok`, 30/30 valid samples across 10 apps (5+5 starts, 3 × 30 s). ⚠️ physical repeats pending. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md`. |
+| Generic `platforms/android` AOT shell | ✅ build + device verified: two staged AOT assets (`market-pulse-bundle.js` 1,180,071 bytes), runtime-bridge JNI, UI from native ops, physical socket boot `nodes=213`, no WebView node in UI dumps, `Custom:na-candlestick` bounds `[168,826][1064,1134]` with painted red candle pixels, post-change ABI instrumentation passed on OnePlus, FFI checker covers both shells (36 JNI / 22 Swift / 29 headers). The historical `OK (9 tests)` suite belongs to the CoinGecko APK, not the final socket APK. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11. |
+| MarketPulse combined crypto demo | ✅ **socket-only active build** installed/launched on physical OnePlus `b6640c8f`; APK SHA-256 `EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`, length 33,149,157 bytes. Coinbase Exchange WebSocket `matches` only: no REST bootstrap/history/OHLC/volume; startup `bars=0 state=connecting`, first live match `bars=1 state=live`, price `BTC/USD 60700.26`, `fresh · live`, `Custom:na-candlestick` painted, deterministic animation samples `0 → 0.5 → 1`. Real RxJS `interval(30000)` + host-backed async fetch/timer capabilities; one refresh in flight. Historical CoinGecko/Signals evidence is retained separately. ⚠️ no real-time guarantee, no fabricated history/volume, no final-socket nine-test instrumentation rerun, no iOS/Mac claim. Artifacts: `dist/showcases/market-pulse/`, `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11. |
+| Sustained-load benchmark | ✅ emulator `status=ok`, 30/30 valid samples across 10 apps (historical); ✅ physical OnePlus `b6640c8f` `status=ok`, 33/33 valid samples across 11 apps on the final socket APK. MarketPulse: 1699.3 frames, 2.2% janky, p50/p95 8/22 ms, 40.34% procstat CPU (one core), warm `process_ms` mean 336.0 ms. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md` and `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`. |
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified |
 | iOS shell | ⚠️ Swift runtime-bridge bindings + unified staticlib wiring statically verified; Swift compile / Simulator / device run NOT verified (no Mac/Xcode here). Runbook in `docs/IOS-BUILD.md`. |
-| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; one delivery per event (canonical JS thread-local path + legacy FFI fallback); 16 ignored tests are present; the Angular acceptance set (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n + MarketPulse) passes once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; shipping shell tap verified on emulator and OnePlus (`docs/EVENT-BRIDGE.md`) |
+| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; one delivery per event (canonical JS thread-local path + legacy FFI fallback); 17 ignored tests are present; the Angular acceptance set (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n + MarketPulse) passes once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; shipping shell tap verified on emulator and OnePlus (`docs/EVENT-BRIDGE.md`) |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |
 | Template-driven `ngModel` in QuickJS | ✅ verified by ignored acceptance test `angular_template_driven_forms_round_trip_in_quickjs`: AOT `FormsAppComponent` uses `FormsModule`/`ngModel` on `<input>`; JS model changes emit native `SetProperty`/text mutations, and a Rust-dispatched native `input` event updates the model. `<input>` now maps to the `na-text-input` primitive; `navigator.userAgent` shim added for Angular's DefaultValueAccessor. |
 | AOT i18n markers in QuickJS | ✅ verified by ignored acceptance test `angular_aot_i18n_translated_text_in_native_tree`: `tsconfig.aot.i18n.json` compiles `<na-text i18n>Hello {{ name }}!</na-text>` to `$localize` + `ɵɵi18n`/`ɵɵi18nExp`; a registered translation renders `Assalam-o-Alaikum AngNative!` in the native tree. Root causes: `$localize` placeholder self-substitution loop and missing `Node` DOM constants. |

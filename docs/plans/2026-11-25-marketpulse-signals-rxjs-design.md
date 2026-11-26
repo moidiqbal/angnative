@@ -1,5 +1,17 @@
 # MarketPulse — Signals + RxJS stream design (2026-11-25)
 
+> **Superseding decision (2026-11-26):** The user approved a fully socket-only
+> MarketPulse target design. Market data comes only from the Coinbase Exchange
+> WebSocket `matches` channel for BTC-USD executed matches; each `match` message
+> supplies price, size and time, and both the 30-minute OHLC bars and BTC volume
+> are derived from those match messages only. There is no REST market-data fetch
+> in the target design. The earlier CoinGecko/REST bootstrap and the
+> Kotlin-scheduled polling / one-shot `setInterval` rationale in this document
+> are superseded and are no longer the target design. This note records the
+> approved decision, which was subsequently implemented with real RxJS
+> `interval(30000)` and host-backed async fetch/timer capabilities; verification
+> is in `docs/evidence/ANDROID-MARKETPULSE.md` section 11.
+
 ## Scope
 
 Add reactive state and a polled quote stream to the existing MarketPulse Android

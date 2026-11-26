@@ -59,10 +59,39 @@ thread_local! {
     /// Per-bridge native error callback state.
     static JS_ERROR_STATE: RefCell<HashMap<usize, JsErrorState>> =
         RefCell::new(HashMap::new());
+    /// Host capability tasks (fetch starts, timer schedules/cancels) queued by
+    /// the JS shims. Owner-scoped like the dispatch/host slots so a second
+    /// bridge cannot drain another bridge's tasks. Each entry is already a
+    /// serialized JSON object.
+    static CURRENT_BRIDGE_HOST_TASKS: RefCell<HashMap<usize, Vec<serde_json::Value>>> =
+        RefCell::new(HashMap::new());
 }
 
 /// Unique, process-local identity for a live bridge. Never crosses FFI.
 static NEXT_BRIDGE_OWNER: AtomicU64 = AtomicU64::new(1);
+
+fn js_number_arg(args: &[JsValue], index: usize) -> i64 {
+    match args.get(index) {
+        Some(JsValue::Number(n)) => *n as i64,
+        _ => 0,
+    }
+}
+
+fn js_string_arg(args: &[JsValue], index: usize) -> Option<String> {
+    match args.get(index) {
+        Some(JsValue::String(s)) => Some(s.clone()),
+        _ => None,
+    }
+}
+
+/// Append one host task to this bridge's owner-scoped queue.
+fn push_host_task(owner: usize, task: serde_json::Value) {
+    CURRENT_BRIDGE_HOST_TASKS.with(|tasks| {
+        if let Some(queue) = tasks.borrow_mut().get_mut(&owner) {
+            queue.push(task);
+        }
+    });
+}
 
 /// Engine-neutral view of an AngNativeRuntime used by the canonical JS callback.
 pub trait RuntimeEventDispatch {
@@ -173,6 +202,10 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
             let previous = state.borrow_mut().insert(owner, JsErrorState::default());
             assert!(previous.is_none(), "bridge owner {owner} already installed");
         });
+        CURRENT_BRIDGE_HOST_TASKS.with(|tasks| {
+            let previous = tasks.borrow_mut().insert(owner, Vec::new());
+            assert!(previous.is_none(), "bridge owner {owner} already installed");
+        });
     }
 
     fn register_bridge_functions(&mut self) -> Result<(), AngNativeError> {
@@ -223,6 +256,52 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
                 na_reportError(message, stack == null ? null : String(stack));
             };"#,
         )?;
+
+        // Socket-only-era host capabilities. The JS shims detect these globals
+        // and hand work to the host as plain numbers/strings. These closures
+        // deliberately do NOT call back into JS — the host drains tasks later
+        // via `take_host_tasks()` and drives `na_onFetchResult`/`na_onTimerTick`.
+        self.runtime.engine().register_function("na_fetchAsyncStart", move |args| {
+            let id = js_number_arg(&args, 0);
+            let request = js_string_arg(&args, 1).unwrap_or_default();
+            push_host_task(
+                owner,
+                serde_json::json!({ "kind": "fetch", "id": id, "request": request }),
+            );
+            Ok(JsValue::Number(0.0))
+        });
+
+        self.runtime.engine().register_function("na_timerSchedule", move |args| {
+            let id = js_number_arg(&args, 0);
+            let delay_ms = js_number_arg(&args, 1);
+            let interval = js_number_arg(&args, 2) != 0;
+            let generation = js_number_arg(&args, 3);
+            push_host_task(
+                owner,
+                serde_json::json!({
+                    "kind": "timerSchedule",
+                    "id": id,
+                    "delayMs": delay_ms,
+                    "interval": interval,
+                    "generation": generation
+                }),
+            );
+            Ok(JsValue::Number(0.0))
+        });
+
+        self.runtime.engine().register_function("na_timerCancel", move |args| {
+            let id = js_number_arg(&args, 0);
+            let generation = js_number_arg(&args, 1);
+            push_host_task(
+                owner,
+                serde_json::json!({
+                    "kind": "timerCancel",
+                    "id": id,
+                    "generation": generation
+                }),
+            );
+            Ok(JsValue::Null)
+        });
 
         Ok(())
     }
@@ -402,6 +481,21 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
         }
     }
 
+    /// Drain every host capability task queued by this bridge's JS shims.
+    /// Returns a JSON array of task objects; an empty queue returns `[]`.
+    pub fn take_host_tasks(&mut self) -> String {
+        self.assert_owner_thread();
+        let owner = self.owner_id;
+        let tasks = CURRENT_BRIDGE_HOST_TASKS.with(|tasks| {
+            tasks
+                .borrow_mut()
+                .get_mut(&owner)
+                .map(std::mem::take)
+                .unwrap_or_default()
+        });
+        serde_json::to_string(&tasks).unwrap_or_else(|_| "[]".to_string())
+    }
+
     pub fn host_mut(&mut self) -> &mut Host {
         &mut *self.host
     }
@@ -424,6 +518,9 @@ impl<E: JsEngine> Drop for RuntimeBridge<E> {
         });
         JS_ERROR_STATE.with(|state| {
             state.borrow_mut().remove(&owner);
+        });
+        CURRENT_BRIDGE_HOST_TASKS.with(|tasks| {
+            tasks.borrow_mut().remove(&owner);
         });
         clear_js_runtime_dispatch_for_thread(owner);
     }
@@ -687,6 +784,39 @@ pub unsafe extern "C" fn angnative_runtime_bridge_load_script(
     }
 }
 
+/// Drain pending host capability tasks (fetch starts, timer schedules/cancels)
+/// as a JSON array string. Free with `angnative_runtime_bridge_free_string`.
+///
+/// Uses `load_script`'s status convention encoded as a string: `"1"` for an
+/// invalid handle / script-style error, `"2"` (`LOAD_SCRIPT_PANIC`) when called
+/// from the wrong thread or on panic. An empty queue returns NULL so the host
+/// can skip a drain round; otherwise success returns a JSON array.
+#[no_mangle]
+pub unsafe extern "C" fn angnative_runtime_bridge_take_host_tasks(handle: u64) -> *mut c_char {
+    match bridge_thread_state(handle) {
+        Ok(true) => {}
+        Ok(false) => {
+            note_wrong_thread_rejection();
+            return c_string(&LOAD_SCRIPT_PANIC.to_string()).into_raw();
+        }
+        Err(_) => return c_string("1").into_raw(),
+    }
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        with_bridge(handle, |bridge| {
+            let json = bridge.take_host_tasks();
+            if json == "[]" {
+                std::ptr::null_mut()
+            } else {
+                c_string(&json).into_raw()
+            }
+        })
+    }));
+    match result {
+        Ok(Ok(ptr)) => ptr,
+        Ok(Err(_)) | Err(_) => c_string(&LOAD_SCRIPT_PANIC.to_string()).into_raw(),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn angnative_runtime_bridge_get_host(handle: u64) -> *mut Host {
     if handle == 0 {
@@ -893,6 +1023,57 @@ mod tests {
 
         assert_eq!(bridge.runtime_mut().eval("_loaded").unwrap(), JsValue::Number(42.0));
         assert_eq!(bridge.runtime_mut().eval("_tick").unwrap(), JsValue::Number(1.0));
+    }
+
+    /// Host capabilities are queued (never called back into JS from the Rust
+    /// registration closure) and drained once as a JSON array. The C ABI uses
+    /// load_script's wrong-thread sentinel, encoded as a string.
+    #[test]
+    fn test_take_host_tasks_queue_and_wrong_thread_sentinel() {
+        use std::ffi::CStr;
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge
+            .load_script(
+                r#"
+                na_fetchAsyncStart(11, '{"url":"/api"}');
+                na_timerSchedule(12, 25, 1, 0);
+                na_timerCancel(12, 1);
+                0;
+                "#,
+            )
+            .unwrap();
+        let tasks: Vec<serde_json::Value> =
+            serde_json::from_str(&bridge.take_host_tasks()).unwrap();
+        assert_eq!(tasks.len(), 3, "all host calls must be queued in order");
+        assert_eq!(tasks[0]["kind"], "fetch");
+        assert_eq!(tasks[0]["id"], 11);
+        assert_eq!(tasks[0]["request"], r#"{"url":"/api"}"#);
+        assert_eq!(tasks[1]["kind"], "timerSchedule");
+        assert_eq!(tasks[1]["delayMs"], 25);
+        assert_eq!(tasks[1]["interval"], true);
+        assert_eq!(tasks[1]["generation"], 0);
+        assert_eq!(tasks[2]["kind"], "timerCancel");
+        assert_eq!(tasks[2]["id"], 12);
+        assert_eq!(tasks[2]["generation"], 1);
+        assert_eq!(bridge.take_host_tasks(), "[]", "drain must empty the queue");
+
+        let handle = angnative_runtime_bridge_create();
+        assert_ne!(handle, 0);
+        let before = WRONG_THREAD_FFI_REJECTIONS.load(AtomicOrdering::SeqCst);
+        let ptr = thread::spawn(move || unsafe {
+            angnative_runtime_bridge_take_host_tasks(handle) as usize
+        })
+        .join()
+        .expect("wrong-thread C ABI drain must not panic") as *mut std::ffi::c_char;
+        let sentinel = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap();
+        assert_eq!(sentinel, LOAD_SCRIPT_PANIC.to_string());
+        unsafe { angnative_runtime_bridge_free_string(ptr) };
+        assert_eq!(
+            WRONG_THREAD_FFI_REJECTIONS.load(AtomicOrdering::SeqCst),
+            before + 1
+        );
+        unsafe { angnative_runtime_bridge_destroy(handle) };
     }
 
     /// Acceptance test for Angular bootstrap in QuickJS (P0-06).
@@ -2371,6 +2552,127 @@ mod tests {
             bridge.runtime_mut().eval("__rxjsError").unwrap(),
             JsValue::Null,
             "RxJS pipeline must not error"
+        );
+    }
+
+    /// RxJS `interval` must run on host-owned timers: the scheduler's
+    /// `setInterval` request is drained as a host task, one `na_onTimerTick`
+    /// produces exactly one emission, and `clearInterval` suppresses later
+    /// ticks. Requires: `pnpm bundle:third-party`.
+    #[test]
+    #[ignore = "requires generated dist/aot/rxjs-bundle.js"]
+    fn third_party_rxjs_interval_runs_on_host_timers() {
+        let handle = std::thread::Builder::new()
+            .name("rxjs-host-timer-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_third_party_rxjs_interval_host_timers)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_third_party_rxjs_interval_host_timers() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/rxjs-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm bundle:third-party` first");
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge
+            .load_script(&source)
+            .expect("unmodified RxJS bundle must load in QuickJS");
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __thirdPartyRxjs.interval")
+                .unwrap(),
+            JsValue::String("function".to_string()),
+            "RxJS bundle must expose interval()"
+        );
+
+        bridge
+            .load_script(
+                r#"
+                globalThis.__rxjsIntervalValues = [];
+                globalThis.__rxjsIntervalSub = __thirdPartyRxjs.interval(1).subscribe(
+                    function (v) { __rxjsIntervalValues.push(v); }
+                );
+                0; // a Subscription is cyclic; never return it to Rust
+                "#,
+            )
+            .expect("RxJS interval subscription must be created");
+
+        let tasks: Vec<serde_json::Value> =
+            serde_json::from_str(&bridge.take_host_tasks()).unwrap();
+        let schedule = tasks
+            .iter()
+            .find(|task| {
+                task["kind"] == "timerSchedule" && task["interval"].as_bool() == Some(true)
+            })
+            .unwrap_or_else(|| panic!("no interval schedule task: {tasks:?}"));
+        let id = schedule["id"].as_i64().expect("numeric timer id");
+        let generation = schedule["generation"].as_i64().expect("numeric generation");
+
+        for expected in 1..=3 {
+            bridge
+                .runtime_mut()
+                .engine()
+                .call_function(
+                    "na_onTimerTick",
+                    &[JsValue::Number(id as f64), JsValue::Number(generation as f64)],
+                )
+                .expect("host tick must be dispatchable");
+            bridge.runtime_mut().drain_microtasks().unwrap();
+            assert_eq!(
+                bridge
+                    .runtime_mut()
+                    .eval("__rxjsIntervalValues.length")
+                    .unwrap(),
+                JsValue::Number(expected as f64),
+                "RxJS interval must emit exactly once per host tick"
+            );
+        }
+
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("__rxjsIntervalValues.join(',')")
+                .unwrap(),
+            JsValue::String("0,1,2".to_string())
+        );
+        bridge
+            .runtime_mut()
+            .engine()
+            .call_function("clearInterval", &[JsValue::Number(id as f64)])
+            .expect("clearInterval must be callable");
+        let tasks: Vec<serde_json::Value> =
+            serde_json::from_str(&bridge.take_host_tasks()).unwrap();
+        assert!(
+            tasks.iter().any(|task| {
+                task["kind"] == "timerCancel"
+                    && task["id"].as_i64() == Some(id)
+                    && task["generation"].as_i64() == Some(generation + 1)
+            }),
+            "clearInterval must queue a host cancel with the next generation: {tasks:?}"
+        );
+        for gen in [generation, generation + 1] {
+            bridge
+                .runtime_mut()
+                .engine()
+                .call_function(
+                    "na_onTimerTick",
+                    &[JsValue::Number(id as f64), JsValue::Number(gen as f64)],
+                )
+                .unwrap();
+        }
+        bridge.runtime_mut().drain_microtasks().unwrap();
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("__rxjsIntervalValues.length")
+                .unwrap(),
+            JsValue::Number(3.0),
+            "cleared RxJS interval must not emit on later ticks"
         );
     }
 }
