@@ -12,9 +12,9 @@
 |----------|-------|
 | **P0 - Critical** | 8 |
 | **P1 - High** | 12 |
-| **P2 - Medium** | 16 |
+| **P2 - Medium** | 17 |
 | **P3 - Low** | 8 |
-| **Total** | **44** |
+| **Total** | **45** |
 
 ---
 
@@ -229,6 +229,12 @@
 **Files**: `platforms/android/app/src/main/java/com/angnative/app/MarketPulseFeed.kt`, `HostCapabilities.kt`, `AngNativeView.kt`, `apps/demo-app/src/marketpulse/main.marketpulse.ts`, `crates/angnative-host-engine/src/quickjs_shims.rs`, `crates/angnative-runtime-bridge/src/lib.rs`
 **Remediation**: Closed for the host-backed async fetch/timer capability. SSE and REST market-data paths remain deliberately out of scope; no real-time guarantee is made.
 
+### P2-17: No Real-Time Animation Easing Driver — implemented (scope-limited)
+
+**Evidence**: The native animation player now has two modes. Linear/empty easing keeps the historical deterministic `0 → 0.5 → 1` samples; recognized non-linear easing (`ease`, `ease-in`, `ease-out`, `ease-in-out`) opts into a host-clock scheduler backed by `na_nowMs()` (Rust `Instant`) and `requestAnimationFrame`. Five fake-clock unit tests, a timed renderer test, and the ignored AOT test `angular_timed_easing_drives_native_styles` verify ease-in-out native opacity frames ending at `0.125 / 0.5 / 0.875 / 1` for controlled 25/50/75/100 ms frames, `start,done` callbacks and final native opacity `1`. Full worktree gates: `pnpm test` 266 passed, `cargo test --workspace` 154 passed / 18 ignored, web gate 112,461 B gzip / 128,000 B. No 60 FPS, vsync, GPU, new JNI/FFI method, mutation-protocol change or platform guarantee is claimed. Evidence: `docs/evidence/REAL-TIME-EASING.md`.
+**Files**: `packages/core/src/animation.ts`, `packages/core/src/animation.spec.ts`, `packages/core/src/renderer.spec.ts`, `crates/angnative-runtime-bridge/src/lib.rs`, `apps/demo-app/src/animations/main.animations.ts`.
+**Remediation**: Implemented on the local `feat/real-time-easing-scheduler` branch (not merged to `master`); the prior deferral is lifted. Device pacing, web animation parity and HMR remain separate/out of scope.
+
 ---
 
 ## P3 - Low Issues (Polish)
@@ -315,6 +321,7 @@
 | P2-14 | ✅ Closed (emulator + physical 11-app sustained artifacts retained; 33/33 physical valid) | - | G |
 | P2-15 | ✅ Done | - | A |
 | P2-16 | ✅ Implemented (host-backed async fetch/timer; real RxJS interval; socket-only market data, no REST market path) | - | C |
+| P2-17 | ✅ Implemented (host-clock easing scheduler, scope-limited; non-linear easing verified in QuickJS/native tree; no 60 FPS/platform claim; local feature branch not merged) | - | C |
 | P3-01 | ✅ Closed (warning cleanup reconciled; no local count claimed) | - | - |
 | P3-02 | ✅ Closed (unused import removed in unified bridge) | - | - |
 | P3-03 | ✅ Closed (not dead — intentional concept UI) | - | D |
@@ -345,6 +352,6 @@
 - P0-01 through P0-05 addressed in runtime bridge refactor (thread-local, single Host, one delivery per event (canonical JS thread-local path + legacy FFI fallback))
 - P0-06 and P0-07 are closed (see `docs/CODE-REVIEW-2026-11-22.md`); P0-08 is closed as a flagship-only scope decision — the flagship has a verified live Angular E2E, while other shells remain imperative concept demos by design (ADR 0003).
 - 2026-11-23 reconciliation: P1-01, P1-04, P1-05, P3-01, P3-02 and P3-07 closed with retained evidence/reasoning above; Gate B and Gate F passed (see `docs/evidence/RUNTIME-BRIDGE-GATE-B.md` and `docs/evidence/RUNTIME-BRIDGE-GATE-F.md`).
-- P1-08 stays deferred (self-contained IIFE bundles; no ES module loader). P2-02 is deferred after a bytecode feasibility spike (`docs/evidence/BYTECODE-FEASIBILITY-SPIKE.md`); bytecode loading is not implemented or verified.
+- P1-08 stays deferred (self-contained IIFE bundles; no ES module loader). P2-02 is deferred after a bytecode feasibility spike (`docs/evidence/BYTECODE-FEASIBILITY-SPIKE.md`); bytecode loading is not implemented or verified. P2-17 lifted the real-time easing deferral on the local `feat/real-time-easing-scheduler` branch; no 60 FPS, vsync, GPU, protocol or platform claim is made (`docs/evidence/REAL-TIME-EASING.md`).
 - iOS (P2-08) remains BLOCKED pending macOS/Xcode access; iOS runtime is static-only in this repo. Hermes/V8 are not integrated — the Gate F engine is the in-repo `ReferenceEngine` only. Physical OnePlus `b6640c8f` now has three distinct recorded results: the historical CoinGecko runtime/polling/instrumentation run (`docs/evidence/ANDROID-MARKETPULSE.md` section 9), the post-change ABI instrumentation pass (`docs/assets/market-pulse-abi-oneplus.log`), and the active socket-only match-derived bar/candle run plus physical sustained repeat (`docs/evidence/ANDROID-MARKETPULSE.md` section 11; `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`). The final socket APK passed the generic nine-test suite on the API 34 emulator (`docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`); the physical-device nine-test rerun is not claimed. Desktop real window/GPU is not verified (GPU-free integration only).
 - Documentation (P2-15) completed for research phase

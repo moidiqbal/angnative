@@ -160,6 +160,55 @@ describe('AngNativeRenderer mutation batching', () => {
     expect(finished).toBe(1);
   });
 
+  it('animate() with easing emits host-clock eased SetStyle mutations', () => {
+    const globals = globalThis as unknown as Record<string, unknown>;
+    const keys = ['na_nowMs', 'requestAnimationFrame', 'cancelAnimationFrame'] as const;
+    const saved = new Map<string, unknown>(keys.map((key) => [key, globals[key]]));
+    let now = 0;
+    const frames: Array<(timestamp: number) => void> = [];
+    globals['na_nowMs'] = () => now;
+    globals['requestAnimationFrame'] = (callback: (timestamp: number) => void) => {
+      frames.push(callback);
+      return frames.length;
+    };
+    globals['cancelAnimationFrame'] = (id: number) => {
+      if (id > 0 && id <= frames.length) frames[id - 1] = () => {};
+    };
+
+    try {
+      const el = renderer.createElement(null, 'na-view');
+      renderer.flushBatch();
+      const player = (el as any).animate(
+        [{ offset: 0, opacity: 0 }, { offset: 1, opacity: 1 }],
+        { duration: 100, easing: 'ease-in' },
+      ) as { play(): unknown };
+      player.play();
+
+      const opacityValues = () => {
+        renderer.flushBatch();
+        return flushes.flatMap((json) => {
+          const batch = JSON.parse(json);
+          return batch.commands
+            .filter((command: any) => command.kind === 'SetStyle' && command.key === 'opacity')
+            .map((command: any) => String(command.value));
+        });
+      };
+
+      expect(opacityValues()).toEqual(['0']);
+      now = 50;
+      frames.shift()?.(0);
+      expect(opacityValues()).toEqual(['0', '0.25']);
+      now = 100;
+      frames.shift()?.(0);
+      expect(opacityValues()).toEqual(['0', '0.25', '1']);
+    } finally {
+      for (const [key, value] of saved) {
+        if (value === undefined) delete globals[key];
+        else globals[key] = value;
+      }
+    }
+  });
+
   it('setStyle throws on unknown property', () => {
     const el = renderer.createElement(null, 'na-view');
     expect(() => renderer.setStyle(el, 'border-box', '1px')).toThrow(/Unknown/);

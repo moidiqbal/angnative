@@ -303,6 +303,16 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
             Ok(JsValue::Null)
         });
 
+        // Dedicated monotonic clock for the scoped real-time easing scheduler.
+        // `performance.now()` and rAF timestamps stay 0 for legacy tests; only
+        // animations that opt into non-linear easing read this capability.
+        let clock_origin = Instant::now();
+        self.runtime.engine().register_function("na_nowMs", move |_args| {
+            Ok(JsValue::Number(
+                clock_origin.elapsed().as_secs_f64() * 1000.0,
+            ))
+        });
+
         Ok(())
     }
 
@@ -1718,6 +1728,176 @@ mod tests {
             }),
             "native tree must end at opacity 1; got {:?}",
             snapshot.nodes.iter().map(|n| n.styles.clone()).collect::<Vec<_>>()
+        );
+    }
+
+    /// Host-clock easing path. Requires:
+    ///   pnpm compile:aot:animations && pnpm bundle:framework
+    #[test]
+    #[ignore = "requires generated dist/aot/animations-app-bundle.js"]
+    fn angular_timed_easing_drives_native_styles() {
+        let handle = std::thread::Builder::new()
+            .name("timed-easing-test-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_angular_timed_easing_drives_native_styles)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_angular_timed_easing_drives_native_styles() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/animations-app-bundle.js"
+        );
+        let source = std::fs::read_to_string(path)
+            .expect("run `pnpm compile:aot:animations && pnpm bundle:framework` first");
+        assert!(
+            source.contains("easedFade"),
+            "AOT bundle must contain the eased animation trigger"
+        );
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof na_nowMs === 'function' ? 1 : 0")
+                .unwrap(),
+            JsValue::Number(1.0),
+            "runtime bridge must expose the dedicated monotonic clock"
+        );
+        bridge
+            .load_script(&source)
+            .expect("animations AOT bundle must load");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __animationsError === 'undefined' ? null : __animationsError")
+                .unwrap(),
+            JsValue::Null,
+            "animations AOT bootstrap rejected"
+        );
+
+        // Install a controlled clock and a one-frame-at-a-time rAF queue only
+        // after bootstrap, so Angular's zoneless scheduler still starts normally.
+        bridge
+            .runtime_mut()
+            .eval(
+                r#"
+                var __clockNow = 0;
+                globalThis.na_nowMs = function () { return __clockNow; };
+                var __timedFrames = [];
+                globalThis.requestAnimationFrame = function (cb) {
+                    __timedFrames.push(cb);
+                    return __timedFrames.length;
+                };
+                globalThis.cancelAnimationFrame = function (id) {
+                    if (id > 0 && id <= __timedFrames.length) __timedFrames[id - 1] = null;
+                };
+                globalThis.__flushTimedFrame = function (ms) {
+                    __clockNow = ms;
+                    var pending = __timedFrames.splice(0);
+                    for (var i = 0; i < pending.length; i++) {
+                        if (pending[i]) pending[i](0);
+                    }
+                    return pending.length;
+                };
+                "#,
+            )
+            .unwrap();
+
+        let snapshot = bridge.host_mut().engine().snapshot();
+        let text = snapshot
+            .nodes
+            .iter()
+            .find(|node| node.text_content.as_deref() == Some("eased"))
+            .expect("eased text node must exist in the native tree");
+        let eased_id = text.parent_id.expect("eased text node must have a parent");
+
+        let baseline = match bridge
+            .runtime_mut()
+            .eval("__angnativeBatches.length")
+            .unwrap()
+        {
+            JsValue::Number(value) => value as usize,
+            other => panic!("expected batch count, got {:?}", other),
+        };
+        let values_script = format!(
+            r#"(function () {{
+                var values = [];
+                for (var i = {baseline}; i < __angnativeBatches.length; i++) {{
+                    var batch = JSON.parse(__angnativeBatches[i]);
+                    for (var j = 0; j < batch.commands.length; j++) {{
+                        var command = batch.commands[j];
+                        if (command.kind === 'SetStyle' && command.key === 'opacity' && command.id === {eased_id}) {{
+                            values.push(command.value);
+                        }}
+                    }}
+                }}
+                return values.join(',');
+            }})()"#
+        );
+        macro_rules! history {
+            () => {{
+                match bridge.runtime_mut().eval(&values_script).unwrap() {
+                    JsValue::String(value) => value,
+                    other => panic!("expected eased opacity history, got {:?}", other),
+                }
+            }};
+        }
+
+        bridge
+            .load_script("__resetEasedAnimationEvents(); __setEasedAnimationState('visible'); 0;")
+            .expect("eased state transition must run");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+        // Angular writes the hidden-state opacity before the player starts;
+        // only the final value matters for the start sample check.
+        assert!(
+            history!().ends_with('0'),
+            "play must apply the start sample; history={}",
+            history!()
+        );
+
+        // Each controlled frame applies an eased opacity; the explicit change
+        // detection flush commits that mutation as a native-visible batch.
+        for (at_ms, expected) in [
+            (25, "0.125"),
+            (50, "0.5"),
+            (75, "0.875"),
+            (100, "1"),
+        ] {
+            bridge
+                .load_script(&format!("__flushTimedFrame({at_ms}); __flushEasedFrame(); 0;"))
+                .unwrap();
+            bridge.runtime_mut().drain_microtasks().unwrap();
+            let history = history!();
+            assert!(
+                history.ends_with(expected),
+                "ease-in-out frame at {at_ms} ms must end at opacity {expected}; history={history}"
+            );
+        }
+
+        let events = bridge
+            .runtime_mut()
+            .eval("__easedAnimationEvents().join(',')")
+            .unwrap();
+        assert_eq!(
+            events,
+            JsValue::String("start,done".to_string()),
+            "eased trigger callbacks must fire; got {:?}",
+            events
+        );
+
+        let snapshot = bridge.host_mut().engine().snapshot();
+        let eased = snapshot
+            .nodes
+            .iter()
+            .find(|node| node.id == eased_id)
+            .expect("eased node must remain in the tree");
+        assert_eq!(
+            eased.styles.get("opacity").map(String::as_str),
+            Some("1"),
+            "eased native style must end at opacity 1"
         );
     }
 
