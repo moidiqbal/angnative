@@ -13,12 +13,10 @@ import { Window } from 'happy-dom';
 type Win = InstanceType<typeof Window>;
 
 let win: Win;
-let Component: typeof import('@angular/core').Component;
+let WebAotFixtureComponent: typeof import('../../testing/fixtures/web-aot/compiled/web-aot-fixture.component').WebAotFixtureComponent;
 let bootstrapWebApp: typeof import('./bootstrap').bootstrapWebApp;
 let DomBackend: typeof import('./dom-backend').DomBackend;
 let commandsToPlatformOps: typeof import('./renderer').commandsToPlatformOps;
-let NaViewComponent: typeof import('./primitives').NaViewComponent;
-let NaTextComponent: typeof import('./primitives').NaTextComponent;
 
 beforeAll(async () => {
   win = new Window({ url: 'http://localhost/' });
@@ -43,13 +41,9 @@ beforeAll(async () => {
     Object.defineProperty(g, key, { value, configurable: true, writable: true });
   }
 
-  // JIT template compilation needs the compiler loaded before components run.
-  await import('@angular/compiler');
-  const core = await import('@angular/core');
-  Component = core.Component;
-  const primitives = await import('./primitives');
-  NaViewComponent = primitives.NaViewComponent;
-  NaTextComponent = primitives.NaTextComponent;
+  // Real ngc output is checked in, so no JIT compiler import is needed.
+  const fixture = await import('../../testing/fixtures/web-aot/compiled/web-aot-fixture.component');
+  WebAotFixtureComponent = fixture.WebAotFixtureComponent;
   const backendModule = await import('./dom-backend');
   DomBackend = backendModule.DomBackend;
   const rendererModule = await import('./renderer');
@@ -63,28 +57,8 @@ describe('@angnative/web integration', () => {
     const doc = win.document;
     doc.body.innerHTML = '<app-web-test></app-web-test>';
 
-    @Component({
-      selector: 'app-web-test',
-      standalone: true,
-      imports: [NaViewComponent, NaTextComponent],
-      template: `
-        <na-view [padding]="'8px'">
-          <na-text>{{ label }}</na-text>
-          <div id="tap" (click)="onClick()">Tap</div>
-        </na-view>
-      `,
-    })
-    class TestApp {
-      label = 'Hello';
-      clicks = 0;
-      onClick(): void {
-        this.clicks++;
-        this.label = `Clicked ${this.clicks}`;
-      }
-    }
-
     const backend = new DomBackend(doc);
-    const app = await bootstrapWebApp(TestApp, { doc, backend });
+    const app = await bootstrapWebApp(WebAotFixtureComponent, { doc, backend });
 
     const root = doc.querySelector('app-web-test') as HTMLElement;
     expect(root).not.toBeNull();
@@ -98,7 +72,7 @@ describe('@angnative/web integration', () => {
     tap.dispatchEvent(new win.Event('click', { bubbles: true }));
     app.tick();
 
-    const instance = app.components[0]!.instance as TestApp;
+    const instance = app.components[0]!.instance as WebAotFixtureComponent;
     expect(instance.clicks).toBe(1);
     expect(root.textContent).toContain('Clicked 1');
 

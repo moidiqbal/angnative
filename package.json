@@ -20,13 +20,16 @@
     "compile:aot:i18n": "node scripts/compile-aot.mjs tsconfig.aot.i18n.json",
     "compile:aot:animations": "node scripts/compile-aot.mjs tsconfig.aot.animations.json",
     "compile:aot:marketpulse": "node scripts/compile-aot.mjs tsconfig.aot.marketpulse.json",
+    "compile:aot:web": "node scripts/compile-aot.mjs tsconfig.aot.web.json",
+    "compile:aot:web-fixture": "node scripts/compile-aot.mjs tsconfig.aot.web-fixture.json",
+    "bundle:aot:web": "node scripts/bundle-web-aot.mjs",
     "bundle:quickjs": "node scripts/bundle-quickjs.mjs",
     "bundle:marketpulse": "node scripts/bundle-marketpulse.mjs",
     "bundle:forms": "node scripts/bundle-forms.mjs",
     "bundle:framework": "node scripts/bundle-framework.mjs",
     "bundle:third-party": "node scripts/bundle-third-party.mjs",
     "bundle:fixtures": "node -e \"import('./packages/cli/dist/bundle.js').then(m => m.bundleApp('packages/testing/fixtures/out/app.js', 'packages/testing/fixtures/out/bundle.js'))\"",
-    "start": "pnpm --filter @angnative/web run build && node scripts/serve-web.mjs"
+    "start": "pnpm --filter @angnative/web run build && pnpm compile:aot:web && pnpm bundle:aot:web && node scripts/serve-web.mjs"
   },
   "keywords": [
     "angular",

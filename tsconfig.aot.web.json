@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.aot.json",
+  "compilerOptions": {
+    "outDir": "dist/aot/web",
+    "rootDir": "apps/demo-app/src"
+  },
+  "files": [
+    "apps/demo-app/src/main.web.ts"
+  ],
+  "include": [
+    "apps/demo-app/src/main.web.ts",
+    "apps/demo-app/src/app.component.ts",
+    "apps/demo-app/src/counter.component.ts",
+    "apps/demo-app/src/counter-signal.ts"
+  ],
+  "exclude": []
+}

@@ -195,9 +195,9 @@
 **Remediation**: Retained GPU-free coverage; real-GPU verification remains open.
 
 ### P2-10: CLI Build Pipeline Gaps — CLOSED
-**Evidence**: `pnpm compile:aot` produces real `ngc` output in `dist/aot/*.js` and multiple ignored tests load those AOT bundles in QuickJS and assert native tree mutations (`angular_bootstrap_runs_in_quickjs`, `angular_router_bootstraps_with_outlet`, `angular_aot_i18n_translated_text_in_native_tree`, `angular_animation_engine_interpolates_native_styles`).
-**Files**: `scripts/compile-aot.mjs`, `packages/cli/src/bundle.ts`, `docs/UNSUPPORTED-FEATURES.md`.
-**Remediation**: None for AOT output verification; the web-demo JIT-to-AOT migration is separately deferred.
+**Evidence**: `pnpm compile:aot` produces real `ngc` output in `dist/aot/*.js` and multiple ignored tests load those AOT bundles in QuickJS and assert native tree mutations (`angular_bootstrap_runs_in_quickjs`, `angular_router_bootstraps_with_outlet`, `angular_aot_i18n_translated_text_in_native_tree`, `angular_animation_engine_interpolates_native_styles`). The browser demo AOT migration is also verified: `pnpm compile:aot:web` + `pnpm bundle:aot:web` produce a bundle whose metafile has no `@angular/compiler` / `@angular/platform-browser-dynamic` input, Angular Linker processes partial declarations, and Playwright observed `Count: 0 → Count: 1` with no console/page errors (`docs/evidence/WEB-AOT-MIGRATION.md`).
+**Files**: `scripts/compile-aot.mjs`, `packages/cli/src/bundle.ts`, `tsconfig.aot.web.json`, `scripts/bundle-web-aot.mjs`, `scripts/angular-linker-plugin.mjs`, `docs/UNSUPPORTED-FEATURES.md`.
+**Remediation**: None for AOT output verification; the browser-demo deferral is lifted. Web size-budget gate remains a separate follow-up.
 
 ### P2-11: Size Budget Enforcement — implemented (CI wiring)
 **Evidence**: The `size` job in `.github/workflows/ci.yml` installs the pinned Rust toolchain (`nightly-2026-11-14`) and runs `node scripts/check-rust-size.mjs --host` alongside the JS size gate. `scripts/check-rust-size.mjs` now reads `rustCoreMaxBytesPerPlatform` from `packages/cli/src/budgets.json` instead of a hardcoded default. Apple/Windows targets remain explicit skips where the toolchain targets are unavailable (`docs/evidence/RUST-SIZE-GATE.md`). No local size measurement is claimed by this round.
@@ -308,7 +308,7 @@
 | P2-07 | ⚠️ Implemented (tagged custom conformance fixture; full de-dup not claimed) | - | E |
 | P2-08 | 🔴 Blocked (iOS static-only; no runtime verification) | - | - |
 | P2-09 | ⚠️ Implemented (GPU-free bridge/view-tree integration; real GPU not verified) | - | - |
-| P2-10 | ✅ Closed (AOT output load verified in QuickJS) | - | C |
+| P2-10 | ✅ Closed (AOT output load verified in QuickJS; browser demo AOT/JIT-free verified) | - | C |
 | P2-11 | ⚠️ Implemented (CI size gate wired; budget from budgets.json; no measurement claimed) | - | E |
 | P2-12 | ⚠️ Gate F implemented (generic `RuntimeBridge` over `JsEngine`) | - | F |
 | P2-13 | ⚠️ Gate F proof via in-repo `ReferenceEngine`; Hermes/V8 not integrated | - | F |

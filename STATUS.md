@@ -10,26 +10,37 @@
 
 ---
 
-## 1. `@angnative/web` — EXISTS, TESTED, BROWSER-VERIFIED ✅
+## 1. `@angnative/web` — EXISTS, TESTED, AOT BROWSER-VERIFIED ✅
 
 **Files** (`packages/web/`): `package.json`, `README.md`, `tsconfig.json`,
 `vitest.config.ts`, and `src/{index,bootstrap,renderer,dom-backend,primitives}.ts`
-plus `dom-backend.spec.ts` and `web.spec.ts`.
+plus `dom-backend.spec.ts` and `web.spec.ts`. The browser demo is now compiled
+by real `ngc` via `tsconfig.aot.web.json` and bundled by
+`scripts/bundle-web-aot.mjs`; `apps/demo-app/src/main.web.ts` no longer imports
+`@angular/compiler`. Angular partial declarations in `node_modules` are linked
+by `scripts/angular-linker-plugin.mjs` before bundling/testing.
 
 ```powershell
 Get-ChildItem packages\web\src -File          # shows all files above
+pnpm compile:aot:web                          # Ivy definitions verified
+pnpm bundle:aot:web                           # JIT packages absent from metafile
 pnpm --filter @angnative/web test             # 2 files / 6 tests passed
 pnpm test                                     # 16 files / 251 tests passed
 ```
 
-Browser verification (Playwright/Chromium) — no console errors:
+Browser verification (Playwright/Chromium) — no console or page errors:
 ```
-BODY: AngNative Demo | Angular running natively — no WebView. | Counter | Count: 0 | - | reset | + | even
-NA-TAGS: 11
-BODY AFTER CLICK: ... Count: 1 ... odd
+Count: 0 -> Count: 1, even -> odd after clicking '+'
+Requests: http://localhost:4173/ and http://localhost:4173/app.js only
+script[type=module][fetchpriority=high], html lang=en
 ```
-Screenshots: `docs/assets/web-demo.png`, `docs/assets/web-demo-clicked.png`
-Automation: `scripts/verify-web.py` + `scripts/serve-web.mjs` (`pnpm start`)
+Screenshot: `docs/assets/web-aot-demo.png` (SHA-256
+`F631441729078E8BB0B3E1106E7F13177BFBE551196FB729D45A1AD999E8C0BD`).
+Bundle: `dist/web-demo/app.js` 353,854 bytes, SHA-256
+`832465B703BDE83C563A5D1DFCE5FA29523AF006D8627C373851D9C42C2B245B`.
+Automation: `scripts/verify-web-aot.py` + `scripts/serve-web.mjs` (`pnpm start`).
+Evidence: `docs/evidence/WEB-AOT-MIGRATION.md`. Web size-budget gate remains a
+separate follow-up.
 
 ---
 
@@ -145,7 +156,7 @@ cargo test --workspace   # 154 tests pass, 17 ignored; includes host-engine and 
 | MarketPulse combined crypto demo | ✅ **socket-only active build** installed/launched on physical OnePlus `b6640c8f`; APK SHA-256 `EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7`, length 33,149,157 bytes. Coinbase Exchange WebSocket `matches` only: no REST bootstrap/history/OHLC/volume; startup `bars=0 state=connecting`, first live match `bars=1 state=live`, price `BTC/USD 60700.26`, `fresh · live`, `Custom:na-candlestick` painted, deterministic animation samples `0 → 0.5 → 1`. Real RxJS `interval(30000)` + host-backed async fetch/timer capabilities; one refresh in flight. Historical CoinGecko/Signals evidence is retained separately. ⚠️ no real-time guarantee, no fabricated history/volume, no final-socket nine-test instrumentation rerun, no iOS/Mac claim. Artifacts: `dist/showcases/market-pulse/`, `docs/assets/market-pulse-socket-oneplus.{log,xml,png}`. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11. |
 | Sustained-load benchmark | ✅ emulator `status=ok`, 30/30 valid samples across 10 apps (historical); ✅ physical OnePlus `b6640c8f` `status=ok`, 33/33 valid samples across 11 apps on the final socket APK. MarketPulse: 1699.3 frames, 2.2% janky, p50/p95 8/22 ms, 40.34% procstat CPU (one core), warm `process_ms` mean 336.0 ms. Evidence: `docs/evidence/ANDROID-SUSTAINED-LOAD.md` and `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`. |
 | Desktop window | ✅ verified |
-| Web adapter (browser) | ✅ verified |
+| Web adapter (browser) | ✅ verified — AOT/JIT-free bundle (`app.js` 353,854 bytes, SHA-256 `832465B703BDE83C563A5D1DFCE5FA29523AF006D8627C373851D9C42C2B245B`), Playwright click and request check; evidence `docs/evidence/WEB-AOT-MIGRATION.md` |
 | iOS shell | ⚠️ Swift runtime-bridge bindings + unified staticlib wiring statically verified; Swift compile / Simulator / device run NOT verified (no Mac/Xcode here). Runbook in `docs/IOS-BUILD.md`. |
 | Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; one delivery per event (canonical JS thread-local path + legacy FFI fallback); 17 ignored tests are present; the Angular acceptance set (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n + MarketPulse) passes once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; shipping shell tap verified on emulator and OnePlus (`docs/EVENT-BRIDGE.md`) |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |

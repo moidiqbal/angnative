@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.aot.json",
+  "compilerOptions": {
+    "outDir": "packages/testing/fixtures/web-aot/compiled",
+    "rootDir": "packages/testing/fixtures/web-aot",
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "inlineSources": false
+  },
+  "files": [
+    "packages/testing/fixtures/web-aot/web-aot-fixture.component.ts"
+  ],
+  "include": [
+    "packages/testing/fixtures/web-aot/**/*.ts"
+  ],
+  "exclude": []
+}
