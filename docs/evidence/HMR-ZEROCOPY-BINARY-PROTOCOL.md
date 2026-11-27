@@ -112,9 +112,9 @@ end-to-end budget is therefore **not claimed**. This is harness-level proof,
 not shipping dev-app auto-reload (the dev root HTML does not wire the client),
 and ANB1 is not used on the web SSE path.
 
-## 4. Physical-device proof (OnePlus `b6640c8f`)
+## 4. Historical physical-device run (OnePlus `b6640c8f`)
 
-`adb devices -l` at run time:
+`adb devices -l` at the time of that earlier run:
 
 ```
 b6640c8f               device product:CPH2551 model:CPH2551 device:OP5973L1 transport_id:1
@@ -122,7 +122,7 @@ emulator-5554          device product:sdk_gphone64_x86_64 model:sdk_gphone64_x86
 ```
 
 Test `showcases/ecosystem-core/app/src/androidTest/java/com/angnative/app/HmrZeroCopyBinaryTest.kt`
-was installed and invoked on the physical OnePlus only:
+was installed and invoked on the physical OnePlus in that earlier run:
 
 ```
 $env:ANDROID_SERIAL='b6640c8f'; adb -s b6640c8f install -r app-debug.apk
@@ -139,13 +139,32 @@ OK (1 test)
 
 Retained raw log: `docs/assets/hmr-zerocopy-binary-oneplus.log`
 (79 bytes, SHA-256 `2F6268B9FE3CB3E925713E1C74D0FD28058734D5822FF1E2C31D06C2A5CD615C`).
+It records the passing result but **not** device properties, APK hashes or
+exact command provenance, so no new physical-device claim is made from it.
 The test asserts, on device: ANB1 binary batch creates two native nodes with the
 expected text; caller-buffer zeroing afterwards does not change the tree; and
 HMR reload yields the exact native text `7|424242|true|2` — restored state,
 same-realm marker, disposed old instance and advanced generation.
 
-The emulator was attached but this round's filtered test was **not run on it**;
-no emulator claim is made for these three features.
+### 4.1 Emulator execution with full provenance
+
+`python scripts/collect-android-hmr-evidence.py emulator-5554 docs/assets/hmr-zerocopy-binary-emulator.log`
+installed the same APKs and ran the same test on `emulator-5554`
+(`sdk_gphone64_x86_64`, Android 14 / SDK 34, `x86_64`). Raw output is retained
+in `docs/assets/hmr-zerocopy-binary-emulator.log`: UTC timestamps, exact `adb`
+commands, device properties, both APK hashes and `OK (1 test)` in 0.102 s.
+APK identity used for that run:
+
+- `app-debug.apk` — 22,805,896 bytes, SHA-256
+  `D7BE870A73F646FD7ED17C9BD29DE47FF4EE08B15615F2EA139CA9F6B500584A`
+- `app-debug-androidTest.apk` — 413,350 bytes, SHA-256
+  `35F6C0A6C1FB980B8802F191D3D348F214D029BA22A5C10285843109E0371E86`
+
+**Physical-device rerun with these identical hashes is not verified**: the
+`adb devices -l` transcript at the time of the emulator run listed only
+`emulator-5554`, and `adb -s b6640c8f get-state` returned
+`error: device 'b6640c8f' not found`. No emulator-vs-physical comparison or
+superiority claim is made.
 
 ## 5. APK size cap (non-negotiable ≤ 20 MB)
 
@@ -183,6 +202,7 @@ code behavior was changed by that fix.
   harness measured 6,548–6,571 ms save→DOM (see §3.1); only delivery, state
   preservation and no-reload are claimed.
 - iOS/macOS build, simulator or device execution (static FFI wiring only).
-- Emulator execution of this round's binary/HMR instrumentation.
+- Physical-device rerun of this round's binary/HMR instrumentation with the
+  documented APK hashes (`b6640c8f` was not attached; see §4.1).
 - Zero-copy throughput comparison against JSON; no performance superiority claim.
 - WebView, Hermes/V8, SSR/hydration and unchanged DOM-library parity (out of scope).

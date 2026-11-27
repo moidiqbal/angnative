@@ -1,0 +1,85 @@
+captured_at_utc: 2026-11-27T20:27:17.140996+00:00
+claim: Android instrumentation of ANB1, borrowed JNI buffer and HMR
+claim_boundary: execution on adb serial emulator-5554 only; no other device is claimed
+workspace_head: fd57519f6ff6d49baa6748a4b594626a273ef348
+adb_path: C:\Android\Sdk\platform-tools\adb.exe
+adb_version: Android Debug Bridge version 1.0.41
+serial: emulator-5554
+app_apk: showcases\ecosystem-core\app\build\outputs\apk\debug\app-debug.apk
+app_apk_bytes: 22805896
+app_apk_sha256: D7BE870A73F646FD7ED17C9BD29DE47FF4EE08B15615F2EA139CA9F6B500584A
+test_apk: showcases\ecosystem-core\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+test_apk_bytes: 413350
+test_apk_sha256: 35F6C0A6C1FB980B8802F191D3D348F214D029BA22A5C10285843109E0371E86
+runner: com.angnative.demo.ecosystem.core.test/androidx.test.runner.AndroidJUnitRunner
+test_class: com.angnative.app.HmrZeroCopyBinaryTest
+
+# devices — 2026-11-27T20:27:17.320616+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe devices -l
+--- stdout ---
+List of devices attached
+emulator-5554          device product:sdk_gphone64_x86_64 model:sdk_gphone64_x86_64 device:emu64xa transport_id:1
+exit_code: 0
+
+# getprop ro.product.manufacturer — 2026-11-27T20:27:17.384172+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.manufacturer
+value: Google
+exit_code: 0
+
+# getprop ro.product.model — 2026-11-27T20:27:17.454051+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.model
+value: sdk_gphone64_x86_64
+exit_code: 0
+
+# getprop ro.product.device — 2026-11-27T20:27:17.519626+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.device
+value: emu64xa
+exit_code: 0
+
+# getprop ro.build.version.release — 2026-11-27T20:27:17.618685+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.build.version.release
+value: 14
+exit_code: 0
+
+# getprop ro.build.version.sdk — 2026-11-27T20:27:17.711059+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.build.version.sdk
+value: 34
+exit_code: 0
+
+# getprop ro.product.cpu.abi — 2026-11-27T20:27:17.820712+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.cpu.abi
+value: x86_64
+exit_code: 0
+
+# getprop ro.build.date.utc — 2026-11-27T20:27:17.929615+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.build.date.utc
+value: 1720722121
+exit_code: 0
+
+# install app APK — 2026-11-27T20:27:18.040613+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 install -r C:\Users\Moid Iqbal\Projects\angnative\showcases\ecosystem-core\app\build\outputs\apk\debug\app-debug.apk
+--- stdout ---
+Performing Streamed Install
+Success
+exit_code: 0
+
+# install test APK — 2026-11-27T20:27:20.400266+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 install -r C:\Users\Moid Iqbal\Projects\angnative\showcases\ecosystem-core\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+--- stdout ---
+Performing Streamed Install
+Success
+exit_code: 0
+
+# instrument test — 2026-11-27T20:27:22.181049+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell am instrument -w -e class com.angnative.app.HmrZeroCopyBinaryTest com.angnative.demo.ecosystem.core.test/androidx.test.runner.AndroidJUnitRunner
+--- stdout ---
+
+com.angnative.app.HmrZeroCopyBinaryTest:.
+
+Time: 0.102
+
+OK (1 test)
+exit_code: 0
+
+captured_at_utc_end: 2026-11-27T20:27:25.973309+00:00
+command_failures: 0
