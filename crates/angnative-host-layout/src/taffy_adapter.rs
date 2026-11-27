@@ -1,4 +1,4 @@
-//! Version boundary for Taffy 0.15.1.
+//! Version boundary for Taffy 0.16.0.
 //!
 //! Keep Taffy types and tree operations in this module so an upstream upgrade
 //! does not leak through the host layout algorithm.

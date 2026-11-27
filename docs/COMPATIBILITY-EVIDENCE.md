@@ -13,7 +13,7 @@
 | Angular | `@angular/core` 22.2.5, `@angular/compiler-cli` 22.2.5 |
 | TypeScript | 6.0.3 |
 | Rust | nightly-2026-11-14 (cargo 1.102.0-nightly) |
-| Taffy | 0.15.1 (workspace `Cargo.toml`) |
+| Taffy | 0.16.0 (workspace `Cargo.toml`) |
 | Gradle | 9.9.2 (latest profile) / 8.2 (legacy profile) |
 | AGP | 9.5.2 (latest) / 8.2.0 (legacy) |
 | JDK | 25.0.5.1 (latest) / Temurin 17.0.21 (legacy) |

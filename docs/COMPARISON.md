@@ -20,7 +20,7 @@ NativeScript / Flutter / React Native, so **no performance superiority is claime
 | | **AngNative** | **NativeScript 9.1** | **React Native** | **Flutter** | **Capacitor / Ionic** |
 |---|---|---|---|---|---|
 | UI primitives | Real native widgets via Rust `PlatformOp` → JNI/C-ABI | Real native widgets, direct native API access via metadata bridge | Real native widgets via Fabric/JSI | Skia/Impeller-drawn widgets (**not** platform widgets) | HTML/CSS in a **WebView** |
-| Rendering brain | Rust host: mutation shadow tree + **Taffy 0.15.1** layout before UI thread | JS runtime (`V8 14.9` on Android, JavaScriptCore on iOS) drives native views | JS (Hermes/JSC) + Yoga layout | Dart VM + own layout engine | Browser engine |
+| Rendering brain | Rust host: mutation shadow tree + **Taffy 0.16.0** layout before UI thread | JS runtime (`V8 14.9` on Android, JavaScriptCore on iOS) drives native views | JS (Hermes/JSC) + Yoga layout | Dart VM + own layout engine | Browser engine |
 | WebView in native mode | ❌ none | ❌ none | ❌ none | ❌ none | ✅ **yes** |
 | Angular support | Custom `Renderer2` + `na-*` primitives; Angular 22 signals/zoneless | Mature `@nativescript/angular` (since 2014, OpenJS Foundation) | n/a (React) | n/a (Dart) | Angular web stack runs in WebView |
 | Does your compiled Angular app run in the native shell today? | ⚠️ **Yes in ecosystem-core: AOT bundle boots, native views render, real tap updates Count 0 -> 1 (docs/assets/angular-real-tap-count1.png)** — real AOT bundle boots in QuickJS with a working click round trip (8 acceptance tests); shells still render Rust/Kotlin-driven trees (see `EVENT-BRIDGE.md`) | ✅ **Yes** — that is NativeScript's core product | n/a | n/a | ✅ yes (as a web app) |

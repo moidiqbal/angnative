@@ -1,4 +1,4 @@
-//! Translate the supported AngNative CSS subset to Taffy 0.15.1 styles.
+//! Translate the supported AngNative CSS subset to Taffy 0.16.0 styles.
 
 use crate::taffy_adapter::style::{
     AlignContent, AlignItems, BoxSizing, Dimension, Direction, Display, FlexDirection, FlexWrap,

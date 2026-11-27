@@ -29,7 +29,7 @@ Each mutation record contains an opcode and typed payload:
 
 ## 2. Supported Styling Properties (Taffy Subset)
 
-AngNative implements a high-performance subset of CSS Flexbox and Box Model properties evaluated by **Taffy 0.15.1**:
+AngNative implements a high-performance subset of CSS Flexbox and Box Model properties evaluated by **Taffy 0.16.0**:
 
 ### 2.1 Layout & Flexbox
 - `display`: `flex` | `none`

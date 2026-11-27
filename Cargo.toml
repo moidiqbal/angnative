@@ -38,5 +38,5 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
 log = "0.4"
-taffy = { version = "0.15.1", features = ["serde"] }
+taffy = { version = "0.16.0", features = ["serde"] }
 rquickjs = { version = "0.14", features = ["classes", "chrono"] }

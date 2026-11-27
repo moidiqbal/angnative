@@ -77,7 +77,7 @@ All 10 showcase sources + prebuilt APKs: [`dist/device-testing/`](dist/device-te
                                v
 +-------------------------------------------------------------+
 |                      Rust Host Engine                       |
-|  host-core (mutations) | host-view (ops) | host-layout (Taffy 0.15.1)
+|  host-core (mutations) | host-view (ops) | host-layout (Taffy 0.16.0)
 |  host-ffi (C ABI)      | host-engine (QuickJS) | services-core
 +-------------------------------------------------------------+
           | JNI / C-FFI          | C-ABI          | DOM backend

@@ -39,7 +39,7 @@ Layout calculation is handled asynchronously in Rust via **Taffy** (W3C Flexbox 
 |                                                                         |
 |  +------------------------------+     +------------------------------+  |
 |  |    angnative-host-core       |     |     angnative-host-layout    |  |
-|  |  Shadow Tree Management      |     |  Taffy 0.15.1 Layout Adapter  |  |
+|  |  Shadow Tree Management      |     |  Taffy 0.16.0 Layout Adapter  |  |
 |  |  Mutation Protocol & Diffs   |     |  Text Measurer & Flex Cache  |  |
 |  +------------------------------+     +------------------------------+  |
 |                                                                         |
@@ -87,7 +87,7 @@ The Rust engine serves as the single source of truth for the UI shadow tree and 
    - Parses the mutation protocol with zero allocations.
    - Enforces element schema and property types.
 2. **`angnative-host-layout`**:
-   - Adapts [Taffy 0.15.1](https://github.com/DioxusLabs/taffy) for Flexbox and CSS Grid calculations.
+   - Adapts [Taffy 0.16.0](https://github.com/DioxusLabs/taffy) for Flexbox and CSS Grid calculations.
    - Maintains an asynchronous text-measuring cache so complex text wraps without blocking the main UI thread.
 3. **`angnative-host-ffi`**:
    - Exposes clean C-ABI functions defined in `angnative_host_ffi.h`.
