@@ -4,10 +4,11 @@
  * Implements the native methods declared in JniBridge.kt:
  *   - nativeRuntimeBridgeCreate / nativeRuntimeBridgeDestroy / ...GetHost
  *   - nativeRuntimeBridgeDispatchEvent / nativeRuntimeBridgeLoadScript
+ *   - nativeRuntimeBridgeHmrReload / nativeHostProcessBatchBytes
  *   - nativeRuntimeBridgeLifecycleState / Suspend / Resume / Stop
  *   - nativeRuntimeBridgeMetricsJson / nativeRuntimeBridgeLastErrorJson
  *   - nativeHostRegisterViewFactory
- *   - nativeHostProcessBatch
+ *   - nativeHostProcessBatch / nativeHostProcessBatchBytes
  *   - nativeHostRunLayout
  *   - nativeHostLastError
  *   - nativeHostNodeCount / nativeHostSnapshot / nativeHostDispatchEvent
@@ -403,6 +404,26 @@ Java_com_angnative_app_JniBridge_nativeHostProcessBatch(JNIEnv* env, jobject /*t
 }
 
 extern "C" JNIEXPORT jstring JNICALL
+Java_com_angnative_app_JniBridge_nativeHostProcessBatchBytes(JNIEnv* env, jobject /*thiz*/,
+                                                            jlong handle, jobject buffer) {
+  AngNativeHost* h = reinterpret_cast<AngNativeHost*>(handle);
+  void* address = env->GetDirectBufferAddress(buffer);
+  jlong capacity = env->GetDirectBufferCapacity(buffer);
+  if (address == nullptr || capacity <= 0) {
+    return env->NewStringUTF("{\"error\":\"invalid direct buffer\"}");
+  }
+
+  unsigned int outLen = 0;
+  // Borrowed for this synchronous call only: no global ref, no retained pointer.
+  const char* result = angnative_host_process_batch_bytes(
+      h, static_cast<const uint8_t*>(address), static_cast<size_t>(capacity), &outLen);
+  if (result == nullptr) {
+    return env->NewStringUTF("{\"error\":\"binary batch processing failed\"}");
+  }
+  return rustStringToJString(env, result);  // frees the Rust string
+}
+
+extern "C" JNIEXPORT jstring JNICALL
 Java_com_angnative_app_JniBridge_nativeHostRunLayout(JNIEnv* env, jobject thiz, jlong handle,
                                                      jfloat width, jfloat height) {
   AngNativeHost* h = reinterpret_cast<AngNativeHost*>(handle);
@@ -565,6 +586,25 @@ Java_com_angnative_app_JniBridge_nativeRuntimeBridgeLoadScript(JNIEnv* env, jobj
   int rc = angnative_runtime_bridge_load_script(b, script);
   env->ReleaseStringUTFChars(source, script);
   if (rc != 0) LOGE("Failed to load JS bundle into runtime bridge (rc=%d)", rc);
+  return static_cast<jint>(rc);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_angnative_app_JniBridge_nativeRuntimeBridgeHmrReload(JNIEnv* env, jobject /*thiz*/,
+                                                             jlong handle, jstring moduleId,
+                                                             jstring source) {
+  AngNativeRuntimeBridgeHandle b = static_cast<AngNativeRuntimeBridgeHandle>(handle);
+  if (b == 0 || moduleId == nullptr || source == nullptr) return 1;
+  const char* id = env->GetStringUTFChars(moduleId, nullptr);
+  const char* script = env->GetStringUTFChars(source, nullptr);
+  if (id == nullptr || script == nullptr) {
+    if (id != nullptr) env->ReleaseStringUTFChars(moduleId, id);
+    if (script != nullptr) env->ReleaseStringUTFChars(source, script);
+    return 1;
+  }
+  int rc = angnative_runtime_bridge_hmr_reload(b, id, script);
+  env->ReleaseStringUTFChars(moduleId, id);
+  env->ReleaseStringUTFChars(source, script);
   return static_cast<jint>(rc);
 }
 

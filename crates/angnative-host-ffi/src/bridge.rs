@@ -404,10 +404,25 @@ impl Host {
     pub fn process_batch_json(&mut self, batch_json: &str) -> Result<String, String> {
         self.clear_error();
 
-        // Decode the command batch from JSON.
+        // Decode the command batch from JSON. JSON remains the fallback path.
         let batch: CommandBatch = serde_json::from_str(batch_json)
             .map_err(|e| format!("Invalid command batch JSON: {e}"))?;
+        self.process_batch(batch)
+    }
 
+    /// Process a versioned ANB1 batch borrowed from a caller-owned byte slice.
+    ///
+    /// The slice is used only for the duration of this synchronous call; the
+    /// decoded batch is owned, so no pointer survives the call.
+    pub fn process_batch_binary(&mut self, bytes: &[u8]) -> Result<String, String> {
+        self.clear_error();
+        let batch = angnative_host_core::binary::decode_binary_batch(bytes)
+            .map_err(|e| format!("Invalid binary command batch: {e}"))?;
+        self.process_batch(batch)
+    }
+
+    /// Shared stage-then-commit pipeline for both JSON and ANB1 batches.
+    fn process_batch(&mut self, batch: CommandBatch) -> Result<String, String> {
         // Validate protocol version.
         angnative_host_core::command::validate_version(batch.protocol_version)
             .map_err(|e| format!("Protocol error: {e}"))?;

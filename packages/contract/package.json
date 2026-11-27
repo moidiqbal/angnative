@@ -23,6 +23,14 @@
     "./protocol": {
       "types": "./dist/protocol.d.ts",
       "default": "./dist/protocol.js"
+    },
+    "./binary": {
+      "types": "./dist/binary.d.ts",
+      "default": "./dist/binary.js"
+    },
+    "./hmr": {
+      "types": "./dist/hmr.d.ts",
+      "default": "./dist/hmr.js"
     }
   },
   "files": ["dist/**"],

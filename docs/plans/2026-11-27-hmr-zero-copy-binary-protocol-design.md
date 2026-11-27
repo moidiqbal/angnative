@@ -30,10 +30,10 @@ Out of scope remains: Hermes/V8, SSR/hydration, full DOM-library parity, and AG 
 |---|---|---|
 | 0 | 4 bytes | magic `ANB1` |
 | 4 | `u16` LE | version, currently `1` |
-| 6 | `u32` LE | frame id |
-| 10 | `u64` LE | timestamp (ms) |
-| 18 | `u32` LE | command count |
-| 22 | repeated | commands |
+| 6 | `u64` LE | frame id |
+| 14 | `u64` LE | timestamp (ms) |
+| 22 | `u32` LE | command count |
+| 26 | repeated | commands |
 
 Each command is a `u8` opcode followed by little-endian fields. Strings are `u32` byte length + UTF-8 bytes; node ids are `u64` LE. Opcode mapping follows the canonical table in `docs/SPECIFICATIONS.md`: `0x01 CreateNode`, `0x02 SetProps`, `0x03 SetText`, `0x04 InsertChild`, `0x05 RemoveChild`, `0x06 DropNode`. Current `RemoveNode` maps to `DropNode`; current `SetStyle`, which has no canonical opcode, is `0x07 SetStyle` and is documented as an extension.
 

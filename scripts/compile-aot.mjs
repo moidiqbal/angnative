@@ -18,6 +18,7 @@ import { dirname, join, resolve } from 'path';
 
 const require = createRequire(import.meta.url);
 const AOT_TSCONFIG = process.argv[2] || 'tsconfig.aot.json';
+const EXTRA_NGC_ARGS = process.argv.slice(3);
 
 if (!existsSync(AOT_TSCONFIG)) {
   console.error(`error: AOT tsconfig not found: ${AOT_TSCONFIG}`);
@@ -40,7 +41,7 @@ if (!existsSync(ngc)) {
 console.log(`[angnative aot] Angular compiler-cli: ${ngc}`);
 console.log(`[angnative aot] compiling with ${AOT_TSCONFIG}...`);
 try {
-  execFileSync(process.execPath, [ngc, '--project', AOT_TSCONFIG], {
+  execFileSync(process.execPath, [ngc, '--project', AOT_TSCONFIG, ...EXTRA_NGC_ARGS], {
     stdio: 'inherit',
     cwd: process.cwd(),
   });
@@ -52,7 +53,8 @@ try {
 // Verify real AOT output — at least one Ivy component definition. The output
 // directory comes from the tsconfig so router/forms fixtures are checked too.
 const tsconfig = JSON.parse(readFileSync(AOT_TSCONFIG, 'utf-8'));
-const outDir = resolve(process.cwd(), tsconfig.compilerOptions?.outDir ?? 'dist/aot');
+// TypeScript resolves outDir relative to the tsconfig file, not the shell cwd.
+const outDir = resolve(dirname(resolve(AOT_TSCONFIG)), tsconfig.compilerOptions?.outDir ?? 'dist/aot');
 if (!existsSync(outDir)) {
   console.error(`error: AOT output directory missing: ${outDir}`);
   process.exit(1);

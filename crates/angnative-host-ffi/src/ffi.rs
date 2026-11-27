@@ -186,6 +186,47 @@ pub unsafe extern "C" fn angnative_host_process_batch(
     }
 }
 
+/** Process a versioned ANB1 batch borrowed from a caller-owned buffer.
+ *
+ * `batch_ptr`/`batch_len` — borrowed bytes; valid for this synchronous call
+ * only. Rust decodes into an owned CommandBatch and never stores the pointer.
+ * Returns: allocated C string with JSON of Vec<PlatformOp>, or null on error.
+ *          Caller frees with angnative_host_free_string.
+ */
+#[no_mangle]
+pub unsafe extern "C" fn angnative_host_process_batch_bytes(
+    handle: *mut AngNativeHost,
+    batch_ptr: *const u8,
+    batch_len: usize,
+    out_len: *mut u32,
+) -> *mut c_char {
+    if handle.is_null() || batch_ptr.is_null() || batch_len == 0 {
+        return CString::new(r#"{"error":"null handle or empty batch buffer"}"#)
+            .ok()
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut());
+    }
+
+    let host = unsafe { &mut *(handle as *mut Host) };
+    // Borrowed slice: no copy and no retained pointer after this call.
+    let bytes = unsafe { std::slice::from_raw_parts(batch_ptr, batch_len) };
+    match host.process_batch_binary(bytes) {
+        Ok(ops_json) => {
+            if !out_len.is_null() {
+                unsafe { *out_len = ops_json.len() as u32 };
+            }
+            CString::new(ops_json)
+                .ok()
+                .map(|s| s.into_raw())
+                .unwrap_or_else(|| error_cstring(host))
+        }
+        Err(e) => {
+            host.set_last_error(&e);
+            error_cstring(host)
+        }
+    }
+}
+
 /** Process a raw CommandBatch (in-memory, no JSON parse).
  *
  * Used by Rust-side consumers that already have a CommandBatch value.

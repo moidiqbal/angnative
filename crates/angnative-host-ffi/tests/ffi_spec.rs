@@ -13,6 +13,7 @@
  * C ABI directly from Rust. Platform shells (Kotlin/Swift) will call the same
  * entry points via JNI/Swift FFI.
  */
+use angnative_host_core::binary::encode_binary_batch;
 use angnative_host_core::command::{Command, CommandBatch};
 use angnative_host_ffi::bridge::{LayoutNodeInputJson, LayoutRequestJson, set_js_runtime_dispatch_for_thread, clear_js_runtime_dispatch_for_thread};
 use angnative_host_ffi::ffi;
@@ -144,6 +145,102 @@ fn register_view_factory_and_process_batch() {
     // Clean up the user_data box.
     unsafe { drop(Box::from_raw(factory_ptr)) };
 
+    unsafe { ffi::angnative_host_destroy(handle) };
+}
+
+#[test]
+fn process_batch_bytes_borrows_only_for_the_synchronous_call() {
+    let handle = ffi::angnative_host_create();
+    assert!(!handle.is_null());
+
+    let commands = vec![
+        Command::CreateNode {
+            id: 1,
+            node_type: "View".to_string(),
+        },
+        Command::CreateNode {
+            id: 2,
+            node_type: "Text".to_string(),
+        },
+        Command::InsertChild {
+            parent_id: 1,
+            child_id: 2,
+            index: 0,
+        },
+        Command::SetTextContent {
+            id: 2,
+            text: "hello\u{0000}world".to_string(),
+        },
+    ];
+    let mut bytes = encode_binary_batch(&batch(commands.clone())).unwrap();
+    let mut out_len: u32 = 0;
+    let result_ptr = unsafe {
+        ffi::angnative_host_process_batch_bytes(handle, bytes.as_ptr(), bytes.len(), &mut out_len)
+    };
+    assert!(!result_ptr.is_null());
+    let ops_json = unsafe { CStr::from_ptr(result_ptr) }
+        .to_str()
+        .unwrap()
+        .to_owned();
+    unsafe { free_cstr(result_ptr) };
+    assert_eq!(out_len as usize, ops_json.len());
+
+    // The caller-owned buffer may be reused immediately: the host decoded an
+    // owned batch during the call and kept no pointer into this memory.
+    bytes.fill(0);
+    assert_eq!(unsafe { ffi::angnative_host_node_count(handle) }, 2);
+    let snapshot_ptr = unsafe { ffi::angnative_host_snapshot(handle) };
+    let snapshot = unsafe { CStr::from_ptr(snapshot_ptr) }
+        .to_str()
+        .unwrap()
+        .to_owned();
+    unsafe { free_cstr(snapshot_ptr) };
+    let snapshot: Value = serde_json::from_str(&snapshot).unwrap();
+    let text = snapshot["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["id"] == 2)
+        .unwrap()["text_content"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(text, "hello\u{0000}world");
+
+    // Same batch through the JSON fallback produces identical ordered ops.
+    let json = serde_json::to_string(&batch(commands)).unwrap();
+    let json_handle = ffi::angnative_host_create();
+    let json_ptr = unsafe {
+        ffi::angnative_host_process_batch(json_handle, cstr(&json).as_ptr(), std::ptr::null_mut())
+    };
+    assert!(!json_ptr.is_null());
+    let json_ops = unsafe { CStr::from_ptr(json_ptr) }.to_str().unwrap().to_owned();
+    unsafe { free_cstr(json_ptr) };
+    unsafe { ffi::angnative_host_destroy(json_handle) };
+    let ops: Vec<PlatformOp> = serde_json::from_str(&ops_json).unwrap();
+    let json_ops: Vec<PlatformOp> = serde_json::from_str(&json_ops).unwrap();
+    assert_eq!(ops.len(), json_ops.len());
+    for (a, b) in ops.iter().zip(json_ops.iter()) {
+        assert_eq!(std::mem::discriminant(a), std::mem::discriminant(b));
+    }
+
+    unsafe { ffi::angnative_host_destroy(handle) };
+}
+
+#[test]
+fn process_batch_bytes_rejects_malformed_frames() {
+    let handle = ffi::angnative_host_create();
+    let bytes = b"ANB1\x01\x00not-a-batch";
+    let result_ptr = unsafe {
+        ffi::angnative_host_process_batch_bytes(handle, bytes.as_ptr(), bytes.len(), std::ptr::null_mut())
+    };
+    assert!(!result_ptr.is_null());
+    unsafe { free_cstr(result_ptr) };
+    let err_ptr = unsafe { ffi::angnative_host_last_error(handle) };
+    assert!(!err_ptr.is_null());
+    let err = unsafe { CStr::from_ptr(err_ptr) }.to_str().unwrap().to_owned();
+    unsafe { free_cstr(err_ptr) };
+    assert!(err.contains("Invalid binary command batch"), "error was: {err}");
     unsafe { ffi::angnative_host_destroy(handle) };
 }
 

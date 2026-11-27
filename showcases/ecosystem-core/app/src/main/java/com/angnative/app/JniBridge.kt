@@ -30,6 +30,7 @@ import android.view.View
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -58,6 +59,8 @@ class JniBridge(private val context: Context) {
   // would double-free it. Use nativeRuntimeBridge* exclusively.
   external fun nativeHostRegisterViewFactory(handle: Long)
   external fun nativeHostProcessBatch(handle: Long, batchJson: String): String?
+  /** Borrow a caller-owned direct ByteBuffer for one synchronous call; no pointer is retained. */
+  external fun nativeHostProcessBatchBytes(handle: Long, buffer: ByteBuffer): String?
   external fun nativeHostRunLayout(handle: Long, width: Float, height: Float): String?
   external fun nativeHostLastError(handle: Long): String?
   external fun nativeHostNodeCount(handle: Long): Int
@@ -69,6 +72,8 @@ class JniBridge(private val context: Context) {
   external fun nativeRuntimeBridgeDispatchEvent(handle: Long, nodeId: Long, eventName: String, payloadJson: String?): Int
   external fun nativeRuntimeBridgeGetHost(handle: Long): Long
   external fun nativeRuntimeBridgeLoadScript(handle: Long, source: String): Int
+  /** Reload one module in the existing JS realm; local state is preserved. */
+  external fun nativeRuntimeBridgeHmrReload(handle: Long, moduleId: String, source: String): Int
   external fun nativeRuntimeBridgeLifecycleState(handle: Long): Int
   external fun nativeRuntimeBridgeSuspend(handle: Long): Int
   external fun nativeRuntimeBridgeResume(handle: Long): Int
@@ -222,11 +227,41 @@ class JniBridge(private val context: Context) {
     nativeRuntimeBridgeLoadScript(runtimeBridgeHandle, source)
   }
 
+  /** Reload one module in place; local state survives via the HMR contract. */
+  fun hmrReload(moduleId: String, source: String): Int = runOnMainForNative {
+    check(isInitialized) { "AngNative host not initialized" }
+    nativeRuntimeBridgeHmrReload(runtimeBridgeHandle, moduleId, source)
+  }
+
   /** Process a JSON command batch through the Rust host. */
   fun processBatch(batchJson: String): String {
     val result = runOnMainForNative<String?> {
       check(isInitialized) { "AngNative host not initialized" }
       nativeHostProcessBatch(hostHandle, batchJson)
+    }
+    return result ?: "{\"error\":\"null result\"}"
+  }
+
+  /**
+   * Process a versioned ANB1 batch without copying it through a JNI string.
+   * The direct buffer is allocated per call and borrowed only while the
+   * synchronous native call runs.
+   */
+  fun processBatchBinary(batchBytes: ByteArray): String {
+    val buffer = ByteBuffer.allocateDirect(batchBytes.size)
+    buffer.put(batchBytes)
+    buffer.flip()
+    return processBatchDirect(buffer)
+  }
+
+  /**
+   * Borrow a caller-owned direct buffer for one synchronous call. Instrumentation
+   * tests reuse this entry point to prove Rust keeps no pointer after return.
+   */
+  fun processBatchDirect(buffer: ByteBuffer): String {
+    val result = runOnMainForNative<String?> {
+      check(isInitialized) { "AngNative host not initialized" }
+      nativeHostProcessBatchBytes(hostHandle, buffer)
     }
     return result ?: "{\"error\":\"null result\"}"
   }

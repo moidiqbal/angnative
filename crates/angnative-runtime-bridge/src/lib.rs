@@ -29,10 +29,24 @@ use std::thread::{self, ThreadId};
 use std::thread_local;
 use std::time::Instant;
 
+/// Idempotent HMR runtime shim evaluated into the existing QuickJS realm.
+/// Mirrors `packages/contract/src/hmr.ts` without ES-module imports.
+const HMR_SHIM: &str = include_str!("hmr_shim.js");
+
 /// Sentinel returned by event dispatch when a panic was caught / wrong thread.
 pub const DISPATCH_PANIC: u32 = u32::MAX;
 /// 0 = success, 1 = script error / invalid input, 2 = wrong thread or panic.
 pub const LOAD_SCRIPT_PANIC: i32 = 2;
+
+/// Outcome of a same-realm HMR reload. `state_json` is the captured state after
+/// replacement, so callers can verify preservation without another eval.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HmrReloadResult {
+    pub applied: bool,
+    pub generation: u64,
+    pub state_json: String,
+    pub host_task_count: usize,
+}
 
 #[cfg(test)]
 static WRONG_THREAD_FFI_REJECTIONS: std::sync::atomic::AtomicUsize =
@@ -147,6 +161,9 @@ impl RuntimeBridge<QuickJsEngine> {
     pub fn new() -> Result<Self, AngNativeError> {
         let mut bridge = Self::with_engine(QuickJsEngine::new()?)?;
         angnative_host_engine::quickjs_shims::install_dom_shims(bridge.runtime.engine())?;
+        // Install the shared HMR runtime in this realm up front so production
+        // bundles can query it; the eval is idempotent.
+        bridge.runtime.engine().eval(HMR_SHIM)?;
         Ok(bridge)
     }
 }
@@ -481,6 +498,54 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
         }
     }
 
+    /// Reload one module in the existing JS realm.
+    ///
+    /// The shim is installed idempotently, the new source is evaluated in the
+    /// same realm, and `load_script` drains microtasks so every mutation batch
+    /// emitted by the new code is committed to the Host before returning. The
+    /// module table (and therefore local component state) is never reset.
+    pub fn hmr_reload(
+        &mut self,
+        module_id: &str,
+        source: &str,
+    ) -> Result<HmrReloadResult, AngNativeError> {
+        self.assert_owner_thread();
+        self.require_running()?;
+        let started = Instant::now();
+
+        self.runtime.engine().eval(HMR_SHIM)?;
+        self.runtime.load_script(source)?;
+        self.metrics.record_script_load(started);
+        self.drain_js_reported_error();
+
+        // JSON strings are valid JS string literals; serde escapes control
+        // characters so a hostile module id cannot break out of the literal.
+        let id = serde_json::to_string(module_id).unwrap_or_else(|_| "\"\"".to_string());
+        let generation = match self.runtime.engine().eval(&format!("__angnativeHmr.generation({id})"))? {
+            JsValue::Number(n) => n as u64,
+            _ => 0,
+        };
+        let state_json = match self
+            .runtime
+            .engine()
+            .eval(&format!("JSON.stringify(__angnativeHmr.state({id}))"))?
+        {
+            JsValue::String(s) => s,
+            _ => "null".to_string(),
+        };
+        let tasks_json = self.take_host_tasks();
+        let host_task_count = serde_json::from_str::<Vec<serde_json::Value>>(&tasks_json)
+            .map(|tasks| tasks.len())
+            .unwrap_or(0);
+
+        Ok(HmrReloadResult {
+            applied: generation > 0,
+            generation,
+            state_json,
+            host_task_count,
+        })
+    }
+
     /// Drain every host capability task queued by this bridge's JS shims.
     /// Returns a JSON array of task objects; an empty queue returns `[]`.
     pub fn take_host_tasks(&mut self) -> String {
@@ -776,6 +841,46 @@ pub unsafe extern "C" fn angnative_runtime_bridge_load_script(
     };
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         with_bridge(handle, |bridge| bridge.load_script(source).is_ok())
+    }));
+    match result {
+        Ok(Ok(true)) => 0,
+        Ok(Ok(false) | Err(_)) => 1,
+        Err(_) => LOAD_SCRIPT_PANIC,
+    }
+}
+
+/// Reload one module in the bridge's existing JS realm.
+///
+/// `module_id`/`source` are NUL-terminated UTF-8. Returns `0` on success, `1`
+/// on invalid input or a script error, and `2` (`LOAD_SCRIPT_PANIC`) when called
+/// from the wrong thread or on panic — the same convention as `load_script`.
+#[no_mangle]
+pub unsafe extern "C" fn angnative_runtime_bridge_hmr_reload(
+    handle: u64,
+    module_id: *const c_char,
+    source: *const c_char,
+) -> i32 {
+    if handle == 0 || module_id.is_null() || source.is_null() {
+        return 1;
+    }
+    if let Some(sentinel) = wrong_thread_sentinel(handle, LOAD_SCRIPT_PANIC as u32) {
+        return sentinel as i32;
+    }
+    let module_id = match CStr::from_ptr(module_id).to_str() {
+        Ok(s) => s,
+        Err(_) => return 1,
+    };
+    let source = match CStr::from_ptr(source).to_str() {
+        Ok(s) => s,
+        Err(_) => return 1,
+    };
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        with_bridge(handle, |bridge| {
+            bridge
+                .hmr_reload(module_id, source)
+                .map(|result| result.generation)
+                .is_ok()
+        })
     }));
     match result {
         Ok(Ok(true)) => 0,
@@ -2674,5 +2779,122 @@ mod tests {
             JsValue::Number(3.0),
             "cleared RxJS interval must not emit on later ticks"
         );
+    }
+
+    /// HMR: a code edit is evaluated in the SAME QuickJS realm. The counter's
+    /// local state is snapshotted/restored by the shared contract and the new
+    /// code's mutation batch is flushed to the Host before reload returns.
+    #[test]
+    fn hmr_reload_preserves_counter_state_in_same_quickjs_realm() {
+        const INITIAL: &str = r#"
+(function () {
+  globalThis.__realmMarker = 424242;
+  function makeCounter(label) {
+    return {
+      count: 0,
+      label: label,
+      disposed: false,
+      snapshot: function () { return { count: this.count }; },
+      restore: function (s) {
+        if (s && typeof s.count === 'number') this.count = s.count;
+      },
+      dispose: function () { this.disposed = true; }
+    };
+  }
+  globalThis.__makeCounter = makeCounter;
+  var hooks = {
+    snapshot: function (i) { return i.snapshot(); },
+    restore: function (i, s) { i.restore(s); },
+    dispose: function (i) { i.dispose(); }
+  };
+  __angnativeHmr.register('counter', function () {
+    return makeCounter('v1');
+  }, hooks);
+  globalThis.__oldInstance = __angnativeHmr.instance('counter');
+  __angnativeHmr.instance('counter').count = 7;
+  na_dispatchBatch(JSON.stringify({
+    protocolVersion: 1, frameId: 1, timestampMs: 0,
+    commands: [
+      { kind: 'CreateNode', id: 1, nodeType: 'View' },
+      { kind: 'CreateNode', id: 2, nodeType: 'Text' },
+      { kind: 'InsertChild', parentId: 1, childId: 2, index: 0 },
+      { kind: 'SetTextContent', id: 2, text: '7' }
+    ]
+  }));
+})();
+"#;
+
+        // "Edited" module: new label, new factory identity, but it calls the
+        // shared replace() instead of resetting the realm or module table.
+        const RELOADED: &str = r#"
+(function () {
+  globalThis.__makeCounter = function (label) {
+    var c = {
+      count: 0, label: label, disposed: false,
+      snapshot: function () { return { count: this.count }; },
+      restore: function (s) {
+        if (s && typeof s.count === 'number') this.count = s.count;
+      },
+      dispose: function () { this.disposed = true; }
+    };
+    return c;
+  };
+  __angnativeHmr.replace('counter', function () {
+    return globalThis.__makeCounter('v2');
+  }, {
+    snapshot: function (i) { return i.snapshot(); },
+    restore: function (i, s) { i.restore(s); },
+    dispose: function (i) { i.dispose(); }
+  });
+  var restored = __angnativeHmr.instance('counter').count;
+  na_dispatchBatch(JSON.stringify({
+    protocolVersion: 1, frameId: 2, timestampMs: 0,
+    commands: [{ kind: 'SetTextContent', id: 2, text: String(restored) }]
+  }));
+})();
+"#;
+
+        let mut bridge = RuntimeBridge::new().expect("QuickJS bridge must create");
+        bridge.load_script(INITIAL).expect("initial module must load");
+
+        let result = bridge
+            .hmr_reload("counter", RELOADED)
+            .expect("HMR reload must succeed");
+        assert!(result.applied);
+        assert_eq!(result.generation, 2, "replace must advance the generation");
+        assert_eq!(result.state_json, r#"{"count":7}"#);
+        assert_eq!(result.host_task_count, 0, "no async tasks queued by this edit");
+
+        // Same realm: a fresh QuickJS context would have lost this global.
+        assert_eq!(
+            bridge.runtime_mut().eval("__realmMarker").unwrap(),
+            JsValue::Number(424242.0)
+        );
+        // The outgoing instance ran its dispose hook: this is the shared
+        // snapshot → dispose → factory → restore path, not a state reset.
+        assert_eq!(
+            bridge.runtime_mut().eval("__oldInstance.disposed").unwrap(),
+            JsValue::Boolean(true)
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("__angnativeHmr.instance('counter').label").unwrap(),
+            JsValue::String("v2".to_string()),
+            "new factory code must be live"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("__angnativeHmr.instance('counter').count").unwrap(),
+            JsValue::Number(7.0),
+            "local counter state must survive the reload"
+        );
+
+        // The new code's mutation batch was flushed into the Host tree.
+        let snapshot = bridge.host_mut().engine().snapshot();
+        let text = snapshot
+            .nodes
+            .iter()
+            .find(|node| node.id == 2)
+            .and_then(|node| node.text_content.clone())
+            .expect("text node must exist");
+        assert_eq!(text, "7", "restored state must drive the flushed mutation");
     }
 }

@@ -91,6 +91,19 @@ const char* angnative_host_process_batch(
     unsigned int* out_len
 );
 
+/** Process a borrowed versioned ANB1 batch.
+ *
+ * batch_ptr/batch_len - borrowed bytes, valid for the synchronous call only
+ * out_len              - output length of returned string (optional)
+ * Returns: allocated C string with JSON of Vec<PlatformOp>, or NULL on error.
+ *          Caller must free with angnative_host_free_string. */
+const char* angnative_host_process_batch_bytes(
+    AngNativeHost* handle,
+    const uint8_t* batch_ptr,
+    size_t batch_len,
+    unsigned int* out_len
+);
+
 /** Process a raw CommandBatch (in-memory). */
 const char* angnative_host_process_batch_raw(
     AngNativeHost* handle,
@@ -181,6 +194,14 @@ unsigned int angnative_runtime_bridge_dispatch_event(AngNativeRuntimeBridgeHandl
  * 2 when called from a non-owner thread. */
 int angnative_runtime_bridge_load_script(AngNativeRuntimeBridgeHandle handle,
                                          const char* source);
+
+/** Reload one module in the bridge's existing JS realm. The module table is
+ * not reset, so a registered module's snapshot/restore hooks preserve local
+ * state. microtasks and mutation batches are drained before returning.
+ * Same status convention as load_script: 0 success, 1 error, 2 wrong thread. */
+int angnative_runtime_bridge_hmr_reload(AngNativeRuntimeBridgeHandle handle,
+                                        const char* module_id,
+                                        const char* source);
 
 /** Borrow the Host owned by the bridge (valid until the bridge is destroyed).
  * Returns NULL when called from a non-owner thread. */
