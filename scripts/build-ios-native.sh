@@ -2,19 +2,24 @@
 # build-ios-native.sh — Build the AngNative iOS shell on macOS.
 #
 # Prerequisites (Mac only):
-#   - Xcode command line tools + Swift 6
+#   - Xcode (not just the command line tools) with an iOS Simulator runtime
 #   - Rust iOS targets: rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+#     (added automatically below if missing)
 #
 # Usage:
-#   ./scripts/build-ios-native.sh [simulator|device]
+#   ./scripts/build-ios-native.sh [simulator|device] [--test]
 #
 # What it does:
 #   1. Builds angnative-runtime-bridge as a static lib for the selected iOS
 #      target. This archive bundles host-ffi, host-engine and QuickJS and
 #      exports both legacy host and unified runtime-bridge C ABI symbols.
+#      rquickjs-sys has no pregenerated iOS bindings, so bindgen runs against
+#      the iOS SDK (see crates/angnative-host-engine/Cargo.toml).
 #   2. Copies the .a + C header into the SwiftPM package.
-#   3. Runs `swift build` (simulator) or `swift build -c release` (device).
-#   4. Prints the exact commands to launch the demo in Simulator / on a device.
+#   3. Builds the package with xcodebuild for an iOS destination. Plain
+#      `swift build` / `swift test` compile for macOS, where UIKit does not
+#      exist, so they cannot build this package.
+#   4. With --test (simulator only), runs the XCTest suite in the Simulator.
 
 set -euo pipefail
 
@@ -23,7 +28,13 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 IOS_DIR="${REPO_ROOT}/platforms/ios"
 
 BUILD_TARGET="${1:-simulator}"
+RUN_TESTS="${2:-}"
 HOST_LIB_DIR="${IOS_DIR}/Sources/AngNativeHost"
+DERIVED_DATA="${IOS_DIR}/.build/xcode"
+
+# Must match `platforms: [.iOS(.v17)]` in platforms/ios/Package.swift, so the
+# QuickJS C objects are not built for a newer iOS than the app links against.
+export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.0}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "ERROR: iOS builds require macOS/Xcode. Run this on the Mac."
@@ -35,23 +46,40 @@ if [[ "${BUILD_TARGET}" == "simulator" ]]; then
     arm64) IOS_TARGET="aarch64-apple-ios-sim" ;;
     *)     IOS_TARGET="x86_64-apple-ios" ;;
   esac
-  SWIFT_FLAGS=""
-else
+  SDK_NAME="iphonesimulator"
+  CONFIGURATION="Debug"
+  # Any available iPhone simulator works; override with IOS_SIM_DESTINATION.
+  DESTINATION="${IOS_SIM_DESTINATION:-platform=iOS Simulator,name=$(
+    xcrun simctl list devices available | sed -n 's/^ *\(iPhone[^(]*\) (.*/\1/p' | head -1 | sed 's/ *$//'
+  )}"
+elif [[ "${BUILD_TARGET}" == "device" ]]; then
   IOS_TARGET="aarch64-apple-ios"
-  SWIFT_FLAGS="-c release"
+  SDK_NAME="iphoneos"
+  CONFIGURATION="Release"
+  DESTINATION="generic/platform=iOS"
+else
+  echo "usage: $0 [simulator|device] [--test]"
+  exit 2
 fi
+
+SDK_PATH="$(xcrun --sdk "${SDK_NAME}" --show-sdk-path)"
 
 echo "=============================================="
 echo "  AngNative iOS Build"
 echo "=============================================="
 echo "  Rust target : ${IOS_TARGET}"
-echo "  Build mode  : ${BUILD_TARGET}"
+echo "  Build mode  : ${BUILD_TARGET} (${CONFIGURATION})"
+echo "  Destination : ${DESTINATION}"
+echo "  Min iOS     : ${IPHONEOS_DEPLOYMENT_TARGET}"
 echo ""
 
 # 1. Rust static library
 if ! rustup target list --installed | grep -q "^${IOS_TARGET}$"; then
   rustup target add "${IOS_TARGET}"
 fi
+
+# bindgen (rquickjs-sys) needs the iOS SDK headers, not the macOS ones.
+export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:-} -isysroot ${SDK_PATH}"
 
 cargo build --release --target "${IOS_TARGET}" --package angnative-runtime-bridge
 
@@ -72,19 +100,37 @@ cp "${REPO_ROOT}/crates/angnative-host-ffi/include/angnative_host_ffi.h" \
 
 echo "  ✓ staged Rust library and header"
 
-# 3. Swift build
+# 3. Build the Swift package for iOS
 cd "${IOS_DIR}"
-swift build ${SWIFT_FLAGS} \
-  -Xlinker -L"${HOST_LIB_DIR}"
+XCODEBUILD_ARGS=(
+  -scheme AngNative-Package
+  -destination "${DESTINATION}"
+  -configuration "${CONFIGURATION}"
+  -derivedDataPath "${DERIVED_DATA}"
+  LIBRARY_SEARCH_PATHS="${HOST_LIB_DIR}"
+  IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET}"
+)
+if [[ "${BUILD_TARGET}" == "device" ]]; then
+  XCODEBUILD_ARGS+=(CODE_SIGNING_ALLOWED=NO)
+  xcodebuild build "${XCODEBUILD_ARGS[@]}"
+else
+  xcodebuild build-for-testing "${XCODEBUILD_ARGS[@]}"
+fi
 
 echo ""
-echo "=============================================="
-echo "  iOS shell build complete"
-echo "=============================================="
-echo "Run tests:"
-echo "  cd ${IOS_DIR} && swift test -Xlinker -L${HOST_LIB_DIR}"
+echo "  ✓ iOS shell build complete"
+
+# 4. Optional XCTest run in the Simulator
+if [[ "${RUN_TESTS}" == "--test" ]]; then
+  if [[ "${BUILD_TARGET}" != "simulator" ]]; then
+    echo "ERROR: --test is only supported for simulator builds."
+    exit 2
+  fi
+  xcodebuild test-without-building "${XCODEBUILD_ARGS[@]}"
+fi
+
 echo ""
-echo "Open in Xcode (simulator):"
-echo "  open -a Simulator"
-echo "  xcode-select -p   # ensure Xcode is selected"
-echo "  swift run AngNativeDemo   # or run the .app from DerivedData"
+echo "Run tests in the Simulator:"
+echo "  ./scripts/build-ios-native.sh simulator --test"
+echo "Install and launch the demo app in the Simulator:"
+echo "  ./scripts/run-ios-simulator.sh"

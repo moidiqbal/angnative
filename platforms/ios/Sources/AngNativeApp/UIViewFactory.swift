@@ -9,9 +9,18 @@
 import UIKit
 import AngNativeHost
 
+/// The Rust host invokes these callbacks synchronously from inside
+/// `angnative_host_process_batch` / `run_layout`, on the thread that called it.
+/// The host and runtime bridge are thread-affine and must be driven from the
+/// main thread, so each callback asserts main-actor isolation and mutates
+/// UIKit synchronously. (Deferring with `DispatchQueue.main.async` meant the
+/// views did not exist yet when the caller tried to mount the root after
+/// `processBatch` returned.)
+@MainActor
 public final class UIKitViewFactory {
 
-    private var views: [UInt64: UIView] = [:]
+    // Internal (not private) getter so @testable tests can inspect the tree.
+    private(set) var views: [UInt64: UIView] = [:]
 
     /// Register all 8 callbacks with the Rust host.
     public init(host: AngNativeHost) throws {
@@ -20,50 +29,56 @@ public final class UIKitViewFactory {
         let result = angnative_host_register_view_factory(
             host,
             { nodeId, viewTypePtr, ud in
-                guard let factory = factory(from: ud), let viewTypePtr else { return }
+                guard let viewTypePtr else { return }
                 let viewType = String(cString: viewTypePtr)
-                let view = factory.makeView(viewType: viewType)
-                DispatchQueue.main.async { factory.views[nodeId] = view }
+                MainActor.assumeIsolated {
+                    guard let factory = factoryFrom(ud) else { return }
+                    factory.views[nodeId] = factory.makeView(viewType: viewType)
+                }
             },
             { nodeId, x, y, width, height, ud in
-                guard let factory = factory(from: ud) else { return }
-                DispatchQueue.main.async {
-                    guard let view = factory.views[nodeId] else { return }
+                MainActor.assumeIsolated {
+                    guard let view = factoryFrom(ud)?.views[nodeId] else { return }
                     view.frame = CGRect(x: CGFloat(x), y: CGFloat(y),
                                         width: CGFloat(width), height: CGFloat(height))
                 }
             },
             { nodeId, propsPtr, ud in
-                guard let factory = factory(from: ud), let propsPtr else { return }
+                guard let propsPtr else { return }
                 let json = String(cString: propsPtr)
-                guard let data = json.data(using: .utf8),
-                      let props = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-                else { return }
-                DispatchQueue.main.async { factory.applyProps(props, to: nodeId) }
+                MainActor.assumeIsolated {
+                    guard let factory = factoryFrom(ud),
+                          let data = json.data(using: .utf8),
+                          let props = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    else { return }
+                    factory.applyProps(props, to: nodeId)
+                }
             },
             { nodeId, textPtr, ud in
-                guard let factory = factory(from: ud), let textPtr else { return }
+                guard let textPtr else { return }
                 let text = String(cString: textPtr)
-                DispatchQueue.main.async { factory.setText(text, on: nodeId) }
+                MainActor.assumeIsolated {
+                    factoryFrom(ud)?.setText(text, on: nodeId)
+                }
             },
             { parentId, childId, ud in
-                guard let factory = factory(from: ud) else { return }
-                DispatchQueue.main.async { factory.attach(childId, to: parentId, at: nil) }
+                MainActor.assumeIsolated {
+                    factoryFrom(ud)?.attach(childId, to: parentId, at: nil)
+                }
             },
             { parentId, childId, index, ud in
-                guard let factory = factory(from: ud) else { return }
-                DispatchQueue.main.async { factory.attach(childId, to: parentId, at: Int(index)) }
+                MainActor.assumeIsolated {
+                    factoryFrom(ud)?.attach(childId, to: parentId, at: Int(index))
+                }
             },
-            { parentId, childId, ud in
-                guard let factory = factory(from: ud) else { return }
-                DispatchQueue.main.async {
-                    guard let child = factory.views[childId] else { return }
-                    child.removeFromSuperview()
+            { _, childId, ud in
+                MainActor.assumeIsolated {
+                    factoryFrom(ud)?.views[childId]?.removeFromSuperview()
                 }
             },
             { nodeId, ud in
-                guard let factory = factory(from: ud) else { return }
-                DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let factory = factoryFrom(ud) else { return }
                     factory.views[nodeId]?.removeFromSuperview()
                     factory.views.removeValue(forKey: nodeId)
                 }
@@ -86,25 +101,18 @@ public final class UIKitViewFactory {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rects = obj["nodes"] as? [[String: Any]]
         else { return }
-        DispatchQueue.main.async {
-            for rect in rects {
-                guard let id = (rect["node_id"] as? NSNumber)?.uint64Value,
-                      let x = rect["x"] as? Double, let y = rect["y"] as? Double,
-                      let w = rect["width"] as? Double, let h = rect["height"] as? Double,
-                      let view = self.views[id]
-                else { continue }
-                view.frame = CGRect(x: CGFloat(x), y: CGFloat(y),
-                                    width: CGFloat(w), height: CGFloat(h))
-            }
+        for rect in rects {
+            guard let id = (rect["node_id"] as? NSNumber)?.uint64Value,
+                  let x = rect["x"] as? Double, let y = rect["y"] as? Double,
+                  let w = rect["width"] as? Double, let h = rect["height"] as? Double,
+                  let view = views[id]
+            else { continue }
+            view.frame = CGRect(x: CGFloat(x), y: CGFloat(y),
+                                width: CGFloat(w), height: CGFloat(h))
         }
     }
 
     // MARK: - Private helpers
-
-    private func factory(from ud: UnsafeMutableRawPointer?) -> UIKitViewFactory? {
-        guard let ud else { return nil }
-        return Unmanaged<UIKitViewFactory>.fromOpaque(ud).takeUnretainedValue()
-    }
 
     private func makeView(viewType: String) -> UIView {
         switch viewType {
@@ -153,8 +161,8 @@ public final class UIKitViewFactory {
                 label.textColor = UIColor(hex: str)
             }
         case "fontSize":
-            if let ns = value as? NSNumber, let label = view as? UILabel {
-                label.font = label.font.withSize(CGFloat(ns.floatValue))
+            if let size = cgFloat(value), let label = view as? UILabel {
+                label.font = label.font.withSize(size)
             }
         case "fontWeight":
             if let str = value as? String, let label = view as? UILabel {
@@ -162,13 +170,22 @@ public final class UIKitViewFactory {
                 if str == "normal" { label.font = UIFont.systemFont(ofSize: label.font.pointSize) }
             }
         case "opacity":
-            if let ns = value as? NSNumber { view.alpha = CGFloat(ns.floatValue) }
+            if let alpha = cgFloat(value) { view.alpha = alpha }
         case "visibility":
             if let str = value as? String { view.isHidden = str == "hidden" }
         case "cornerRadius":
-            if let ns = value as? NSNumber { view.layer.cornerRadius = CGFloat(ns.floatValue) }
+            if let radius = cgFloat(value) { view.layer.cornerRadius = radius }
         default: break
         }
+    }
+
+    /// Rust serialises styles as strings (`"12px"`, `"0.5"`); accept numbers too.
+    private func cgFloat(_ value: Any) -> CGFloat? {
+        if let ns = value as? NSNumber { return CGFloat(ns.doubleValue) }
+        guard let str = value as? String else { return nil }
+        let trimmed = str.trimmingCharacters(in: .whitespaces)
+        let numeric = trimmed.hasSuffix("px") ? String(trimmed.dropLast(2)) : trimmed
+        return Double(numeric).map { CGFloat($0) }
     }
 
     private func setText(_ text: String, on nodeId: UInt64) {
@@ -177,6 +194,13 @@ public final class UIKitViewFactory {
         else if let button = view as? UIButton { button.setTitle(text, for: .normal) }
         else if let field = view as? UITextField { field.text = text }
     }
+}
+
+/// Recover the factory from the C `user_data` pointer. A free function, since
+/// `@convention(c)` closures cannot capture context.
+private func factoryFrom(_ ud: UnsafeMutableRawPointer?) -> UIKitViewFactory? {
+    guard let ud else { return nil }
+    return Unmanaged<UIKitViewFactory>.fromOpaque(ud).takeUnretainedValue()
 }
 
 // MARK: - UIColor hex helper

@@ -18,7 +18,7 @@
   <a href="https://github.com/moidiqbal/angnative/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
-> **Latest release: [`v0.3.0`](docs/releases/v0.3.0.md)** — Rust core, Angular renderer, Android + desktop + web adapters, production AOT, 10 native showcase APKs, physical-device benchmarks, and a **socket-only MarketPulse** feed with host-backed async JS capabilities. iOS shell is code-complete but Mac build verification is still pending.
+> **Latest release: [`v0.3.0`](docs/releases/v0.3.0.md)** — Rust core, Angular renderer, Android + desktop + web adapters, production AOT, 10 native showcase APKs, physical-device benchmarks, and a **socket-only MarketPulse** feed with host-backed async JS capabilities. iOS shell now builds and passes 8 XCTests in the iOS Simulator, including a real Angular bundle rendering into UIKit ([evidence](docs/evidence/IOS-SIMULATOR.md)); physical iPhone run pending.
 
 ---
 
@@ -43,7 +43,7 @@ Full evidence: [`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md) · [`docs/VE
 | MarketPulse socket-only demo | ✅ | Coinbase `matches` → match-derived 30m OHLC + volume; physical `bars=0 → bars=1 state=live`, painted `Custom:na-candlestick`, ABI pass and 11-app sustained repeat 33/33 valid. No real-time guarantee; see [`docs/evidence/ANDROID-MARKETPULSE.md`](docs/evidence/ANDROID-MARKETPULSE.md) section 11 |
 | Desktop shell (winit + wgpu) | ✅ | 11 tests; window opens; interactive button; shader fix |
 | Web adapter (`@angnative/web`) | ✅ | DOM backend + Playwright verified render/click |
-| iOS shell | 🟡 bindings statically verified | Swift 6 package + UIKit + runtime bridge bindings; **Mac/Xcode build/test not run** |
+| iOS shell | ✅ Simulator / 🟡 device | Xcode 27.2, iPhone 17 Pro sim: `build-ios-native.sh simulator --test` → **8 passed** (Angular AOT bundle → QuickJS → UIKit, click → `UILabel`); demo app launched + screenshot; device build compiles unsigned, **physical iPhone not run**. [Evidence](docs/evidence/IOS-SIMULATOR.md) |
 | Size budget gate | ✅ | `GATE EXIT=0`, 203 B gzip / 60 KB |
 
 ### Performance (real hardware, OnePlus Open, Android 16)
@@ -157,8 +157,8 @@ Run Android demo: `pwsh -File scripts/build-android-stack.ps1 -Stack latest` the
 
 iOS (requires a Mac):
 ```bash
-./scripts/build-ios-native.sh simulator
-cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost
+./scripts/build-ios-native.sh simulator --test   # Rust staticlib + xcodebuild + XCTest in the Simulator
+./scripts/run-ios-simulator.sh                     # install + launch the demo, save a screenshot
 ```
 
 ---
@@ -169,10 +169,10 @@ cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeH
 [![Sponsor](https://img.shields.io/badge/Sponsor-Open%20Collective-3385FF?style=for-the-badge&logo=opencollective&logoColor=white)](https://opencollective.com/angnative)
 · Details & transparency: [`docs/SPONSORS.md`](docs/SPONSORS.md)
 
-The iOS shell is **code-complete** (Swift 6 SwiftPM package, legacy-host + runtime-bridge C ABI bindings with `UInt64` node ids, 8 UIKit view-factory callbacks, demo + tests). `python scripts/check-ffi-declarations.py` statically verifies the bindings and unified staticlib wiring, but we do not have a Mac/Xcode in the current development environment, so no Swift compile or simulator run has happened.
+The iOS shell now **builds and runs in the iOS Simulator**: 8 XCTests pass, including a real Angular AOT bundle booting in QuickJS and rendering into UIKit, and the demo app launches (see [`docs/evidence/IOS-SIMULATOR.md`](docs/evidence/IOS-SIMULATOR.md)). It has not yet run on a physical iPhone or in CI.
 
 We are looking for:
-- **A Mac with Xcode** (even a macOS CI runner or a short loan/test session) to run [`scripts/build-ios-native.sh`](scripts/build-ios-native.sh), `swift test`, and the Simulator demo.
+- **A macOS CI runner** to run `./scripts/build-ios-native.sh simulator --test` on every change, and **a physical iPhone + Apple Developer Program** to verify and release on device.
 - **Sponsorship** for a macOS mini / GitHub Actions macOS runner / Apple Developer Program so iOS can be verified and released with the same evidence bar as Android.
 
 If you can help, open an issue titled **"iOS Mac verification"** or reach out via the repository. Contributors who provide Mac time will be credited in `docs/CONTRIBUTORS.md` and the release notes.

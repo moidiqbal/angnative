@@ -21,6 +21,8 @@ let package = Package(
         .target(
             name: "AngNativeHost",
             path: "Sources/AngNativeHost",
+            // Staged build outputs, linked below (not Swift sources).
+            exclude: ["libangnative_runtime_bridge.a", "include"],
             linkerSettings: [
                 .linkedLibrary("angnative_runtime_bridge")
             ]

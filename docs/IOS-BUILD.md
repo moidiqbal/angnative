@@ -41,61 +41,59 @@ platforms/ios/
 
 ### Prerequisites
 
-- macOS with Xcode 15+ installed
-- Rust toolchain with iOS target: `rustup target add aarch64-apple-ios`
-- `Xcode_27.2.zip` (or newer) downloaded from Apple Developer portal
+- macOS with **Xcode** (not just the command line tools) and an iOS Simulator runtime
+- The pinned Rust nightly from `rust-toolchain.toml`; the script adds the iOS
+  target (`aarch64-apple-ios-sim`, `aarch64-apple-ios` or `x86_64-apple-ios`)
 
-### Build Steps
+> `swift build` / `swift test` do **not** work for this package: they compile
+> for macOS, where UIKit does not exist. Build through `xcodebuild` with an iOS
+> destination; the scripts below do that.
 
-#### 1. Install Rust iOS target
-
-```bash
-rustup target add aarch64-apple-ios
-```
-
-#### 2. Build the unified Rust runtime library
+### Build and test (Simulator)
 
 ```bash
-cargo build --release --target aarch64-apple-ios -p angnative-runtime-bridge
+./scripts/build-ios-native.sh simulator --test
 ```
 
-This produces
-`target/aarch64-apple-ios/release/libangnative_runtime_bridge.a`. Prefer
-`./scripts/build-ios-native.sh device`, which also stages the archive and the
-C header into `platforms/ios/Sources/AngNativeHost/`. Do **not** link the old
-`libangnative_host_ffi.a` alone: it does not contain the
-`angnative_runtime_bridge_*` symbols used by `NativeRuntimeBridge`. The
-unified staticlib bundles host-ffi, host-engine and QuickJS, so iOS links one
-archive (configured in `platforms/ios/Package.swift`).
+This:
 
-#### 3. Build iOS app
+1. builds `angnative-runtime-bridge` as a staticlib for the simulator. The
+   archive bundles host-ffi, host-engine and QuickJS. `rquickjs-sys` ships no
+   pregenerated iOS bindings, so bindgen runs against the iOS SDK using Xcode's
+   libclang (`crates/angnative-host-engine/Cargo.toml`, `cfg(target_os = "ios")`);
+2. stages `libangnative_runtime_bridge.a` and the C header into
+   `platforms/ios/Sources/AngNativeHost/` (gitignored);
+3. runs `xcodebuild build-for-testing` for the first available iPhone simulator
+   (override with `IOS_SIM_DESTINATION='platform=iOS Simulator,name=…'`) with
+   `IPHONEOS_DEPLOYMENT_TARGET=17.0`, matching `Package.swift`;
+4. with `--test`, runs the XCTest suite in the Simulator.
+
+### Run the demo app in the Simulator
 
 ```bash
-cd platforms/ios
-
-# Simulator build
-./../../scripts/build-ios-native.sh simulator
-
-# Device build
-./../../scripts/build-ios-native.sh device
+./scripts/run-ios-simulator.sh [screenshot.png]
 ```
 
-Or use `swift build` directly:
+SwiftPM executables are bare Mach-O files, so the script wraps
+`AngNativeDemo` in a minimal `.app` (Info.plist + ad-hoc signature), installs
+and launches it with `simctl`, prints the app log and saves a screenshot. No
+Xcode project or Apple Developer account is needed.
+
+### Device build
 
 ```bash
-swift build
-swift test
+./scripts/build-ios-native.sh device
 ```
+
+Builds the `aarch64-apple-ios` archive and an unsigned Release build of the
+package for `generic/platform=iOS`. Installing on a phone still needs signing
+(see below).
 
 ## Running on Device
 
-### Option 1: SwiftPM / xcodebuild (requires Apple Developer ID)
+### Option 1: xcodebuild (requires Apple Developer ID)
 
 ```bash
-# Build and run on connected device
-swift run --device <device-udid>
-
-# Or via xcodebuild
 xcodebuild -scheme AngNativeDemo -destination 'platform=iOS,name=<device-name>' -configuration Release
 ```
 
@@ -107,97 +105,32 @@ xcodebuild -scheme AngNativeDemo -destination 'platform=iOS,name=<device-name>' 
 4. Enter Apple ID and click Start
 5. Trust the developer certificate on iPhone: Settings → General → VPN & Device Management
 
-## Runtime bridge smoke test on macOS (NOT executed here)
+## Threading model
 
-`SwiftFFI.swift` now binds the unified runtime bridge
-(`angnative_runtime_bridge_create`, `get_host`, `load_script`,
-`dispatch_event`, `destroy`) and wraps it in `NativeRuntimeBridge`. Bindings
-and iOS build wiring are verified **statically** on Windows/macOS without Xcode:
+The Rust host calls the view-factory callbacks **synchronously** inside
+`angnative_host_process_batch` / `run_layout`, on the calling thread. The host
+and runtime bridge are thread-affine and must be driven from the main thread,
+so `UIKitViewFactory` is `@MainActor` and every callback asserts that with
+`MainActor.assumeIsolated` (a call from another thread traps instead of racing
+UIKit). The UIKit tree therefore exists as soon as `processBatch` returns.
+Dispatching from a background queue is rejected by the C ABI with
+`UInt32.max`; iOS has no UI-thread marshalling layer.
 
-```bash
-python scripts/check-ffi-declarations.py
-# FFI declaration check OK: 11 JNI methods, 14 Swift bindings (5 runtime bridge),
-# 20 header declarations; iOS unified staticlib wiring OK
-```
+## Status (2026-11-28) — verified on a Mac
 
-That check proves the Swift symbols/signatures exist in the shared C header and
-that `Package.swift` / `build-ios-native.sh` link the unified staticlib. It does
-**not** prove `swift build`, `swift test`, or a Simulator/device run passes.
-
-On the Mac, after `./scripts/build-ios-native.sh simulator`, run the existing
-Swift tests, then use this manual smoke checklist on the **main thread**:
-
-```bash
-# Generate a self-contained bundle first (from the repo root):
-pnpm --filter @angnative/core build && pnpm --filter @angnative/testing build &&
-pnpm --filter @angnative/platform build
-pnpm compile:aot && pnpm bundle:quickjs
-
-cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost
-```
-
-In a Swift debug snippet or a temporary XCTest (main thread only):
-
-```swift
-let bridge = try NativeRuntimeBridge()
-let host = try bridge.hostHandle()          // borrowed; never call host.destroy()
-let source = try String(
-    contentsOfFile: "/absolute/path/to/dist/aot/quickjs-bundle.js",
-    encoding: .utf8
-)
-assert(try bridge.loadScript(source) == 0)
-assert(angnative_host_node_count(host) > 0)
-let result = bridge.dispatchEvent(
-    nodeId: <node-id-with-a-press-listener>,
-    eventName: "press",
-    payloadJson: "{\"source\":\"native\"}"
-)
-assert(!result.rejectedForWrongThread)
-bridge.destroy()                            // same (main/owner) thread
-```
-
-Also verify on-device: zero `WebViews`, live Angular listener after bundle
-load, and a UIKit tap that updates a native node through `SetTextContent`. Do
-not dispatch from a background queue: the C ABI now rejects wrong-thread calls
-with `UInt32.max`, but iOS has no UI-thread marshalling layer.
-
-## Status (2026-11-22)
+Evidence: [`docs/evidence/IOS-SIMULATOR.md`](evidence/IOS-SIMULATOR.md).
 
 | Feature | Status |
 |---------|--------|
-| Swift wrapper around C ABI (`SwiftFFI.swift`, UInt64 node ids, free_string, 5 runtime bridge bindings) | ✅ Implemented; static FFI check passes; Swift compile pending on Mac |
-| UIKit view factory (8 PlatformOp callbacks, real `user_data`) | ✅ Implemented |
-| Demo command batch + Taffy layout + click → Rust batch | ✅ Implemented |
-| SwiftPM package (Swift 6 tools version, links `libangnative_runtime_bridge.a`) | ✅ Implemented; static wiring check passes |
-| Mac build / Simulator run (including Swift compile and runtime bridge smoke test) | ⚠️ **Not verified** — no Mac in this environment |
+| Rust runtime bridge staticlib for `aarch64-apple-ios-sim` and `aarch64-apple-ios` | ✅ built (bindgen against the iOS SDK) |
+| Swift package compile + link for iOS Simulator and iOS device (unsigned) | ✅ `xcodebuild` BUILD SUCCEEDED |
+| XCTest suite in the iOS Simulator (8 tests) | ✅ 8 passed, 0 failures |
+| Real Angular AOT bundle → QuickJS → Rust → UIKit, native click → Angular listener → `UILabel` | ✅ XCTest `testRuntimeBridgeBootsAngularBundleIntoUIKit` |
+| Demo app installed and launched in the Simulator | ✅ screenshot `docs/assets/ios-simulator-demo.png`, `nodeCount=7` |
+| Physical iPhone run | ⚠️ not verified (needs signing / a device) |
+| Angular bundle as the demo app's UI (instead of the hand-built Rust batch) | ❌ not yet; covered only by XCTest |
 | wgpu GPU rendering | ❌ Not applicable (UIKit used instead) |
 | Hot reload / App Store distribution | ❌ Not yet |
-
-### Mac verification checklist (do this first on the Mac)
-
-```bash
-# 0. Static binding/wiring check (runs anywhere)
-python scripts/check-ffi-declarations.py
-
-# 1. Build + stage the unified Rust library and run Swift build/tests
-./scripts/build-ios-native.sh simulator
-cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost
-
-# 2. Runtime bridge smoke test: see the section above; generate a bundle and
-#    assert load_script == 0, nodeCount > 0, dispatchEvent not rejected.
-
-# 3. What to verify in Simulator
-#    - "ANGNATIVE • IOS SHELL" badge, "Hello World Demo" title, subtitle
-#    - "Click Me!" and "Reset" buttons visible
-#    - Tapping a button updates the output text via a Rust SetTextContent op
-#    - Xcode console shows nodeCount > 0 and non-empty ops JSON
-```
-
-Known fixes applied during preparation: duplicate `swift-tools-version` lines
-removed, ABI node ids corrected from `UInt32` to `UInt64`, `UIViewFactory`
-type-name mismatch fixed to `UIKitViewFactory`, `UIColor(hex:)` initializer
-corrected, duplicate `layoutJson` binding removed, and the demo now uses
-explicit node heights (Rust intrinsic text measurement is still a stub).
 
 ## Notes
 
