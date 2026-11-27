@@ -12,9 +12,18 @@ public final class DemoViewController: UIViewController {
     private let containerView = UIView(frame: .zero)
     private var pressCount = 0
 
-    public init() throws {
-        self.host = try NativeHost()
-        self.factory = try UIKitViewFactory(host: host.handle)
+    /// Create the Rust host and register the UIKit view factory.
+    /// (A throwing `init()` cannot override UIViewController's non-throwing
+    /// `init()`, so construction goes through this factory method.)
+    public static func make() throws -> DemoViewController {
+        let host = try NativeHost()
+        let factory = try UIKitViewFactory(host: host.handle)
+        return DemoViewController(host: host, factory: factory)
+    }
+
+    private init(host: NativeHost, factory: UIKitViewFactory) {
+        self.host = host
+        self.factory = factory
         super.init(nibName: nil, bundle: nil)
     }
 

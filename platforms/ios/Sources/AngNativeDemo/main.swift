@@ -21,7 +21,7 @@ struct AngNativeDemoApp: App {
 struct DemoViewControllerWrapper: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         do {
-            return try DemoViewController()
+            return try DemoViewController.make()
         } catch {
             print("Failed to create DemoViewController: \(error)")
             return UIViewController()
