@@ -20,3 +20,9 @@ anyhow = "1.0"
 # in scripts/build-android-native.{sh,ps1}.
 [target.'cfg(target_os = "android")'.dependencies]
 rquickjs = { version = "0.14", features = ["bindgen", "classes", "chrono"] }
+
+# iOS device/simulator targets (aarch64-apple-ios, aarch64-apple-ios-sim,
+# x86_64-apple-ios) are not in the pregenerated set either. bindgen uses
+# Xcode's libclang; scripts/build-ios-native.sh points it at the iOS SDK.
+[target.'cfg(target_os = "ios")'.dependencies]
+rquickjs = { version = "0.14", features = ["bindgen", "classes", "chrono"] }

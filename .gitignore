@@ -37,6 +37,7 @@ local.properties
 # Staged by scripts/build-ios-native.sh (do not commit native build outputs)
 platforms/ios/Sources/AngNativeHost/*.a
 platforms/ios/Sources/AngNativeHost/include/
+platforms/ios/.build/
 
 # Generated test fixtures
 packages/testing/fixtures/out/
