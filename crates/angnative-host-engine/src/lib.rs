@@ -18,6 +18,8 @@ pub mod engine;
 pub mod errors;
 pub mod quickjs;
 pub mod reference_engine;
+#[cfg(feature = "engine-stub")]
+pub mod stub_engine;
 pub mod runtime;
 pub mod quickjs_shims;
 pub mod runtime_controller;
