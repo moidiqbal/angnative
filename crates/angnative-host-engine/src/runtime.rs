@@ -291,6 +291,16 @@ impl<E: JsEngine> AngNativeRuntime<E> {
         Ok(result)
     }
 
+    /// Load a versioned bytecode artifact with the AngNative API available.
+    ///
+    /// Mirrors `load_script`: the engine drains its queues before returning.
+    /// Engines without bytecode support report `EngineError::Unsupported`.
+    pub fn load_bytecode(&mut self, bytes: &[u8]) -> Result<JsValue, EngineError> {
+        let result = self.engine.load_bytecode(bytes)?;
+        self.engine.drain_microtasks()?;
+        Ok(result)
+    }
+
     /// Drain pending microtasks explicitly (useful after manual `eval` calls).
     pub fn drain_microtasks(&mut self) -> Result<u32, EngineError> {
         self.engine.drain_microtasks()

@@ -491,6 +491,25 @@ impl<E: JsEngine + 'static> RuntimeBridge<E> {
         }
     }
 
+    /// Load a versioned bytecode artifact through the same lifecycle, metrics
+    /// and error-reporting path as `load_script`. No C ABI entry point is added.
+    pub fn load_bytecode(&mut self, bytes: &[u8]) -> Result<JsValue, AngNativeError> {
+        self.assert_owner_thread();
+        self.require_running()?;
+        let started = Instant::now();
+        let result = self.runtime.load_bytecode(bytes);
+        self.metrics.record_script_load(started);
+        self.drain_js_reported_error();
+        match result {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                let error = AngNativeError::from(error);
+                self.report_error("load_bytecode", &error, None);
+                Err(error)
+            }
+        }
+    }
+
     /// Drain every host capability task queued by this bridge's JS shims.
     /// Returns a JSON array of task objects; an empty queue returns `[]`.
     pub fn take_host_tasks(&mut self) -> String {
@@ -1033,6 +1052,18 @@ mod tests {
 
         assert_eq!(bridge.runtime_mut().eval("_loaded").unwrap(), JsValue::Number(42.0));
         assert_eq!(bridge.runtime_mut().eval("_tick").unwrap(), JsValue::Number(1.0));
+    }
+
+    /// Invalid bytecode is rejected explicitly through the bridge error path;
+    /// there is no silent fallback to text loading.
+    #[test]
+    fn test_load_bytecode_rejects_invalid_header() {
+        let mut bridge = create_runtime_bridge().unwrap();
+        let err = bridge.load_bytecode(b"not-bytecode").unwrap_err();
+        assert!(err.to_string().contains("Bytecode"), "{err:?}");
+        let info = bridge.last_error().expect("error must be reported");
+        assert_eq!(info.phase, "load_bytecode");
+        assert_eq!(bridge.metrics().reported_error_count, 1);
     }
 
     /// Host capabilities are queued (never called back into JS from the Rust
@@ -1728,6 +1759,112 @@ mod tests {
             }),
             "native tree must end at opacity 1; got {:?}",
             snapshot.nodes.iter().map(|n| n.styles.clone()).collect::<Vec<_>>()
+        );
+    }
+
+    /// QuickJS module bytecode path. Requires:
+    ///   pnpm compile:aot:animations && pnpm bundle:framework && pnpm bundle:bytecode
+    #[test]
+    #[ignore = "requires generated dist/aot/animations-app-bundle.qjsbc"]
+    fn angular_aot_bytecode_loads_and_mutates_native_tree() {
+        let handle = std::thread::Builder::new()
+            .name("bytecode-test-thread".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(run_angular_aot_bytecode_loads_and_mutates_native_tree)
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    fn run_angular_aot_bytecode_loads_and_mutates_native_tree() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../dist/aot/animations-app-bundle.qjsbc"
+        );
+        let bytes = std::fs::read(path).expect(
+            "run `pnpm compile:aot:animations && pnpm bundle:framework && pnpm bundle:bytecode` first",
+        );
+        assert_eq!(&bytes[..9], b"ANGNQJSB1", "bytecode artifact header must match");
+
+        let mut bridge = create_runtime_bridge().unwrap();
+        bridge
+            .load_bytecode(&bytes)
+            .expect("AOT bytecode bundle must bootstrap");
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("typeof __animationsError === 'undefined' ? null : __animationsError")
+                .unwrap(),
+            JsValue::Null,
+            "bytecode AOT bootstrap rejected"
+        );
+        assert_eq!(
+            bridge.runtime_mut().eval("typeof __setAnimationState").unwrap(),
+            JsValue::String("function".to_string()),
+            "bytecode bundle must expose the Angular driver"
+        );
+
+        let snapshot = bridge.host_mut().engine().snapshot();
+        let texts = snapshot
+            .nodes
+            .iter()
+            .filter_map(|node| node.text_content.clone())
+            .collect::<Vec<_>>();
+        assert!(
+            texts.iter().any(|text| text == "animated")
+                && texts.iter().any(|text| text == "eased"),
+            "native tree from bytecode must contain the AOT template nodes; got {texts:?}"
+        );
+
+        // Live mutation: the loaded bytecode must still drive the real Angular
+        // animation trigger through the native renderer.
+        bridge
+            .load_script("__resetAnimationEvents(); __setAnimationState('visible'); 0;")
+            .expect("state transition must run after bytecode load");
+        bridge.runtime_mut().drain_microtasks().unwrap();
+        let style_values = bridge
+            .runtime_mut()
+            .eval(
+                r#"(function () {
+                    var values = [];
+                    for (var i = 0; i < __angnativeBatches.length; i++) {
+                        var batch = JSON.parse(__angnativeBatches[i]);
+                        for (var j = 0; j < batch.commands.length; j++) {
+                            var command = batch.commands[j];
+                            if (command.kind === 'SetStyle' && command.key === 'opacity') {
+                                values.push(command.value);
+                            }
+                        }
+                    }
+                    return values.join(',');
+                })()"#,
+            )
+            .unwrap();
+        let style_values = match style_values {
+            JsValue::String(value) => value,
+            other => panic!("expected opacity style history, got {other:?}"),
+        };
+        let midpoint = style_values
+            .find("0.5")
+            .unwrap_or_else(|| panic!("no intermediate opacity mutation; history={style_values}"));
+        assert!(
+            style_values[..midpoint].contains('0') && style_values[midpoint..].contains('1'),
+            "bytecode-loaded animation must sample 0 / 0.5 / 1; history={style_values}"
+        );
+        assert_eq!(
+            bridge
+                .runtime_mut()
+                .eval("__animationEvents().join(',')")
+                .unwrap(),
+            JsValue::String("start,done".to_string()),
+            "bytecode-loaded Angular trigger callbacks must fire"
+        );
+        let final_snapshot = bridge.host_mut().engine().snapshot();
+        assert!(
+            final_snapshot
+                .nodes
+                .iter()
+                .any(|node| node.styles.get("opacity").map(String::as_str) == Some("1")),
+            "native tree must end at opacity 1 after bytecode load"
         );
     }
 

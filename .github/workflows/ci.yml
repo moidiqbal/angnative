@@ -103,6 +103,9 @@ jobs:
           pnpm run bundle:framework
           pnpm run bundle:third-party
 
+      - name: Generate QuickJS bytecode artifact
+        run: pnpm run bundle:bytecode
+
       - name: Run Angular-in-QuickJS acceptance tests
         run: cargo test -p angnative-runtime-bridge -- --ignored
 

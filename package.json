@@ -29,6 +29,7 @@
     "bundle:forms": "node scripts/bundle-forms.mjs",
     "bundle:framework": "node scripts/bundle-framework.mjs",
     "bundle:third-party": "node scripts/bundle-third-party.mjs",
+    "bundle:bytecode": "cargo run -p angnative-host-engine --bin dump-bytecode -- dist/aot/animations-app-bundle.js dist/aot/animations-app-bundle.qjsbc",
     "bundle:fixtures": "node -e \"import('./packages/cli/dist/bundle.js').then(m => m.bundleApp('packages/testing/fixtures/out/app.js', 'packages/testing/fixtures/out/bundle.js'))\"",
     "start": "pnpm --filter @angnative/web run build && pnpm compile:aot:web && pnpm bundle:aot:web && node scripts/serve-web.mjs"
   },

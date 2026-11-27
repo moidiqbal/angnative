@@ -7,6 +7,7 @@
  *
  * Modules:
  *   - engine       — `JsEngine` trait + `JsValue` + `EngineError`
+ *   - bytecode     — versioned bytecode container + compile-only dump helper
  *   - quickjs      — QuickJS-ng (rquickjs) implementation
  *   - runtime      — AngNative JS runtime API exposed to scripts
  *   - quickjs_shims — DOM/platform shims for QuickJS
@@ -14,6 +15,7 @@
  *   - errors — workspace error boundary + runtime metrics (P1-11 / P3-04)
  *   - reference_engine — second in-repo JsEngine for abstraction tests (Gate F)
  */
+pub mod bytecode;
 pub mod engine;
 pub mod errors;
 pub mod quickjs;

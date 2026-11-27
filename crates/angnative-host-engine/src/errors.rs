@@ -118,7 +118,9 @@ impl From<EngineError> for AngNativeError {
             EngineError::NotInitialized
             | EngineError::CallError(_)
             | EngineError::ConversionError(_)
-            | EngineError::Internal(_) => Self::Engine(error.to_string()),
+            | EngineError::Internal(_)
+            | EngineError::Unsupported(_)
+            | EngineError::Bytecode(_) => Self::Engine(error.to_string()),
         }
     }
 }

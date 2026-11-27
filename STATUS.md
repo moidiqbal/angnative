@@ -2,7 +2,7 @@
 
 **Last verified:** 2026-11-27
 **Repo / worktree:** `C:\Users\Moid Iqbal\Projects\angnative` (feature worktree `C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\priority-4-easing`)
-**Branch:** `master` (priority #4 on local branch `feat/real-time-easing-scheduler`, based on `aa8f2bc`; not merged)
+**Branch:** `master` (priority #4 on local branch `feat/real-time-easing-scheduler`, based on `aa8f2bc`, and priority #5 on local branch `feat/quickjs-bytecode-loader`, based on `93932bf`; neither merged)
 
 > This file exists because an older status list claimed that `@angnative/web`,
 > the iOS shell and the Windows desktop app "were not created". That list is
@@ -25,7 +25,7 @@ Get-ChildItem packages\web\src -File          # shows all files above
 pnpm compile:aot:web                          # Ivy definitions verified
 pnpm bundle:aot:web                           # JIT packages absent from metafile
 pnpm --filter @angnative/web test             # 2 files / 6 tests passed
-pnpm test                                     # 17 files / 260 tests passed
+pnpm test                                     # 18 files / 266 tests passed
 ```
 
 Browser verification (Playwright/Chromium) — no console or page errors:
@@ -39,8 +39,8 @@ Screenshot: `docs/assets/web-aot-demo.png` (SHA-256
 Bundle: `dist/web-demo/app.js` 353,854 bytes, SHA-256
 `832465B703BDE83C563A5D1DFCE5FA29523AF006D8627C373851D9C42C2B245B`.
 Automation: `scripts/verify-web-aot.py` + `scripts/serve-web.mjs` (`pnpm start`).
-Evidence: `docs/evidence/WEB-AOT-MIGRATION.md`. Web size-budget gate remains a
-separate follow-up.
+Evidence: `docs/evidence/WEB-AOT-MIGRATION.md`. The web size-budget gate is now
+implemented and verified; see the verification summary and `docs/evidence/WEB-SIZE-BUDGET.md`.
 
 ---
 
@@ -142,14 +142,14 @@ elevation (error 740). Git's copy does not. Workaround:
 ```powershell
 $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
 cargo build --workspace
-cargo test --workspace   # 154 tests pass, 17 ignored; includes host-engine and desktop (11)
+cargo test --workspace   # 166 pass, 0 failed, 19 ignored; includes host-engine and desktop (11)
 ```
 
 ## Verification summary
 
 | Item | Status |
 |---|---|
-| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **154 tests pass**, 18 ignored (with Git `patch.exe` on PATH — see note above); the three relevant ignored animation/MarketPulse acceptance tests each passed on the priority #4 worktree (evidence `docs/evidence/REAL-TIME-EASING.md`) |
+| Rust core (all workspace crates incl. host-engine + runtime-bridge + desktop) | ✅ **166 passed / 0 failed / 19 ignored** (with Git `patch.exe` on PATH — see note above); all 19 ignored acceptance tests also passed with generated `dist/aot` bundles, including the AOT bytecode load-and-mutate test (evidence `docs/evidence/QUICKJS-BYTECODE-LOADER.md`) |
 | JS/TS (18 spec files) | ✅ 266 tests pass |
 | Android JNI + emulator/physical run | ✅ verified: wrong-thread JNI instrumentation passed 2/2 and full Android suite passed 4/4 on Android 14 emulator and OnePlus Open (Android 16, arm64-v8a); real tap reached a live Angular listener on both |
 | Generic `platforms/android` AOT shell | ✅ build + device verified: two staged AOT assets (`market-pulse-bundle.js` 1,180,071 bytes), runtime-bridge JNI, UI from native ops, physical socket boot `nodes=213`, no WebView node in UI dumps, `Custom:na-candlestick` bounds `[168,826][1064,1134]` with painted red candle pixels, post-change ABI instrumentation passed on OnePlus, FFI checker covers both shells (36 JNI / 22 Swift / 29 headers). The final socket APK passed the generic nine-test suite on the API 34 emulator (`OK (9 tests)`, 4.77 s); physical rerun not done. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11 and `docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`. |
@@ -159,8 +159,9 @@ cargo test --workspace   # 154 tests pass, 17 ignored; includes host-engine and 
 | Web adapter (browser) | ✅ verified — AOT/JIT-free bundle (`app.js` 353,854 bytes, SHA-256 `832465B703BDE83C563A5D1DFCE5FA29523AF006D8627C373851D9C42C2B245B`), Playwright click and request check; evidence `docs/evidence/WEB-AOT-MIGRATION.md` |
 | Web size-budget gate | ✅ `pnpm check:web-size`: 112,461 B gzip / 128,000 B budget, 15,539 B headroom, exit 0 on the priority #4 worktree with the core easing change; 9 negative/positive tests; CI `size` job wired; evidence `docs/evidence/WEB-SIZE-BUDGET.md` and `docs/evidence/REAL-TIME-EASING.md` §5 |
 | iOS shell | ⚠️ Swift runtime-bridge bindings + unified staticlib wiring statically verified; Swift compile / Simulator / device run NOT verified (no Mac/Xcode here). Runbook in `docs/IOS-BUILD.md`. |
-| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; one delivery per event (canonical JS thread-local path + legacy FFI fallback); 18 ignored tests are present; the Angular acceptance set (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/timed easing/http/router app/i18n + MarketPulse) passes once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; shipping shell tap verified on emulator and OnePlus (`docs/EVENT-BRIDGE.md`) |
-| Real-time easing scheduler (priority #4) | ✅ Implemented on local `feat/real-time-easing-scheduler` branch (not merged to `master`): recognized non-linear easing names use `na_nowMs()` + rAF host frames; linear/empty easing keeps deterministic `0 → 0.5 → 1`; no JNI/FFI/protocol/platform additions. Verified by 5 fake-clock unit tests, a timed renderer test, ignored AOT acceptance test, `pnpm test` 18 files / 266 tests, `cargo test --workspace` 154 pass / 18 ignored, FFI check 36 JNI / 22 Swift / 29 headers, web gate 112,461 B gzip / 128,000 B. Evidence: `docs/evidence/REAL-TIME-EASING.md`. |
+| Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; one delivery per event (canonical JS thread-local path + legacy FFI fallback); 19 ignored tests are present; the Angular acceptance set (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/timed easing/http/router app/i18n + AOT bytecode + MarketPulse) passes once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; shipping shell tap verified on emulator and OnePlus (`docs/EVENT-BRIDGE.md`) |
+| Real-time easing scheduler (priority #4) | ✅ Implemented on local `feat/real-time-easing-scheduler` branch (not merged to `master`): recognized non-linear easing names use `na_nowMs()` + rAF host frames; linear/empty easing keeps deterministic `0 → 0.5 → 1`; no JNI/FFI/protocol/platform additions. Verified by 5 fake-clock unit tests, a timed renderer test, ignored AOT acceptance test, `pnpm test` 18 files / 266 tests, current worktree `cargo test --workspace` 166 pass / 0 failed / 19 ignored, FFI check 36 JNI / 22 Swift / 29 headers, web gate 112,461 B gzip / 128,000 B. Evidence: `docs/evidence/REAL-TIME-EASING.md`. |
+| QuickJS bytecode loader (priority #5) | ✅ Implemented on local `feat/quickjs-bytecode-loader` branch (from `93932bf`, not merged): versioned `ANGNQJSB1` container with length/empty/oversize validation, `JsEngine::load_bytecode()` with an `Unsupported` default, QuickJS module-bytecode load + evaluate + job/microtask drain, matching `AngNativeRuntime`/`RuntimeBridge` methods, and a Rust `dump-bytecode` generator wired through `pnpm bundle:bytecode` and CI. AOT artifact `dist/aot/animations-app-bundle.qjsbc` is 1,412,561 B with SHA-256 `174F0B970E1BC0F295208FC3FD0AB169AE09332496704C9AE07C05A812AD9172`; the ignored acceptance test boots it and verifies live native `opacity` mutation plus `start,done`. Gates: 37 host-engine tests, 12 bridge tests / 19 ignored, 19/19 ignored suite, workspace 166 pass / 0 failed / 19 ignored, `pnpm test` 18 files / 266 tests, web gate 112,461 B gzip / 128,000 B, FFI counts unchanged. No C ABI/JNI/Swift/header, startup-speed, signature, ES-module-loader or platform-shell claim. Evidence: `docs/evidence/QUICKJS-BYTECODE-LOADER.md`. |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |
 | Template-driven `ngModel` in QuickJS | ✅ verified by ignored acceptance test `angular_template_driven_forms_round_trip_in_quickjs`: AOT `FormsAppComponent` uses `FormsModule`/`ngModel` on `<input>`; JS model changes emit native `SetProperty`/text mutations, and a Rust-dispatched native `input` event updates the model. `<input>` now maps to the `na-text-input` primitive; `navigator.userAgent` shim added for Angular's DefaultValueAccessor. |
 | AOT i18n markers in QuickJS | ✅ verified by ignored acceptance test `angular_aot_i18n_translated_text_in_native_tree`: `tsconfig.aot.i18n.json` compiles `<na-text i18n>Hello {{ name }}!</na-text>` to `$localize` + `ɵɵi18n`/`ɵɵi18nExp`; a registered translation renders `Assalam-o-Alaikum AngNative!` in the native tree. Root causes: `$localize` placeholder self-substitution loop and missing `Node` DOM constants. |

@@ -74,6 +74,10 @@ pub enum EngineError {
     ConversionError(String),
     #[error("Engine internal error: {0}")]
     Internal(String),
+    #[error("Feature unsupported by engine: {0}")]
+    Unsupported(&'static str),
+    #[error("Bytecode load failed: {0}")]
+    Bytecode(String),
 }
 
 /// Convert host mutation errors into engine errors (used by the runtime
@@ -93,6 +97,14 @@ pub trait JsEngine {
     ///
     /// Returns the result as a `JsValue`, or an `EngineError` on failure.
     fn eval(&mut self, source: &str) -> Result<JsValue, EngineError>;
+
+    /// Load engine-neutral versioned bytecode produced by the matching tool.
+    ///
+    /// The default reports `Unsupported`; engines that implement bytecode
+    /// loading must validate the payload before any unsafe decode.
+    fn load_bytecode(&mut self, _bytes: &[u8]) -> Result<JsValue, EngineError> {
+        Err(EngineError::Unsupported("bytecode loading"))
+    }
 
     /// Call a registered JS function by name with the given arguments.
     fn call_function(&mut self, name: &str, args: &[JsValue]) -> Result<JsValue, EngineError>;

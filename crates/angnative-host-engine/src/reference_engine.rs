@@ -127,6 +127,14 @@ mod tests {
     }
 
     #[test]
+    fn reference_engine_reports_bytecode_unsupported() {
+        let mut engine = ReferenceEngine::new();
+        let err = engine.load_bytecode(b"anything").unwrap_err();
+        assert!(matches!(err, EngineError::Unsupported("bytecode loading")));
+        assert!(err.to_string().contains("unsupported"));
+    }
+
+    #[test]
     fn reference_engine_dispatches_registered_functions() {
         let mut engine = ReferenceEngine::new();
         engine.register_function("sum", |args| {

@@ -14,7 +14,7 @@ header, Android asset or iOS change is part of this priority.
 
 ## 1. Artifact format and generator
 
-The artifact is `ANGNQJSB1` (8 bytes), followed by a fixed little-endian `u32`
+The artifact is `ANGNQJSB1` (9 bytes), followed by a fixed little-endian `u32`
 payload length, followed by raw rquickjs module bytecode. The loader rejects
 wrong magic, truncated/mismatched length, empty payload, and payloads over
 `64 * 1024 * 1024` bytes before calling the one unsafe `Module::load` API.
