@@ -5,7 +5,7 @@
  * Checks:
  *   - Node >= 22.12 (hard floor)
  *   - Node within Angular 22 engine range (^22.22.3 || ^24.15.0 || >=26.0.0)
- *   - @angular/core == 22.2.5
+ *   - @angular/core == 22.3.0
  *   - TypeScript == 6.0.3
  *
  * Exit codes:
@@ -18,7 +18,7 @@ import { readFileSync, existsSync } from 'fs';
 const HARD_MIN_NODE = '22.12';
 const ANGULAR_ENGINE_NODE = '22.22.3';
 const ANGULAR_ENGINE_RANGE = `^${ANGULAR_ENGINE_NODE} || ^24.15.0 || >=26.0.0`;
-const REQUIRED_ANGULAR = '22.2.5';
+const REQUIRED_ANGULAR = '22.3.0';
 const REQUIRED_TYPESCRIPT = '6.0.3';
 
 function parse(v) {

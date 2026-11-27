@@ -10,7 +10,7 @@
 
 | Item | Version / value |
 |---|---|
-| Angular | `@angular/core` 22.2.5, `@angular/compiler-cli` 22.2.5 |
+| Angular | `@angular/core` 22.3.0, `@angular/compiler-cli` 22.3.0 |
 | TypeScript | 6.0.3 |
 | Rust | nightly-2026-11-14 (cargo 1.102.0-nightly) |
 | Taffy | 0.16.0 (workspace `Cargo.toml`) |

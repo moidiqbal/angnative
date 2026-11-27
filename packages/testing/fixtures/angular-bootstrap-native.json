@@ -3,7 +3,7 @@
   "description": "A real Angular AOT bootstrap batch: the renderer emits CreateNode for the root view, an attr:ng-version property, a child text node and SetTextContent. This is the batch shape produced by angnative-bundle.js and dispatched through na_dispatchBatch into Host::process_batch_json. The same fixture is run by the TS conformance suite and by the Rust host-ffi pipeline test.",
   "commands": [
     { "kind": "CreateNode", "id": 1, "nodeType": "Custom" },
-    { "kind": "SetProperty", "id": 1, "key": "attr:ng-version", "value": "22.2.5" },
+    { "kind": "SetProperty", "id": 1, "key": "attr:ng-version", "value": "22.3.0" },
     { "kind": "CreateNode", "id": 2, "nodeType": "View" },
     { "kind": "InsertChild", "parentId": 1, "childId": 2, "index": 0 },
     { "kind": "CreateNode", "id": 3, "nodeType": "Text" },
@@ -14,7 +14,7 @@
     "nodes": {
       "1": {
         "children": [2],
-        "properties": { "attr:ng-version": "22.2.5" }
+        "properties": { "attr:ng-version": "22.3.0" }
       },
       "2": {
         "parentId": 1,

@@ -25,10 +25,10 @@ describe('doctor — toolchain checks', () => {
     expect(c.required).toContain('22.12');
   });
 
-  it('checkAngular: requires exactly 22.2.5', () => {
+  it('checkAngular: requires exactly 22.3.0', () => {
     const c = checkAngular();
     expect(c.name).toBe('@angular/core');
-    expect(c.required).toBe('22.2.5');
+    expect(c.required).toBe('22.3.0');
   });
 
   it('checkTypeScript: requires exactly 6.0.3', () => {

@@ -58,7 +58,7 @@ Selected verified rows:
 | Check | Result |
 |---|---|
 | `node --version` / `pnpm --version` | PASS — v26.13.1 / 10.34.9 |
-| `@angular/core` / `@angular/compiler-cli` | PASS — both `22.2.5` (aligned) |
+| `@angular/core` / `@angular/compiler-cli` | PASS — both `22.3.0` (aligned) |
 | `typescript` / `vitest` | PASS — `6.0.3` / `3.2.4` |
 | Root + per-package tsconfigs | PASS — 3 root configs, 8 packages covered |
 | `pnpm-workspace.yaml` | PASS — all 8 packages matched by `[packages/*, apps/*]` |

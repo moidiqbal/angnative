@@ -23,7 +23,7 @@ export interface DoctorResult {
 }
 
 /** Angular version floor (pinned). */
-export const REQUIRED_ANGULAR = '22.2.5';
+export const REQUIRED_ANGULAR = '22.3.0';
 /** TypeScript version floor (pinned). */
 export const REQUIRED_TYPESCRIPT = '6.0.3';
 /** Node version floor (hard). */
@@ -106,7 +106,7 @@ export function checkNode(): DoctorCheck {
 }
 
 /**
- * Check Angular version (pinned exactly 22.2.5).
+ * Check Angular version (pinned exactly 22.3.0).
  */
 export function checkAngular(): DoctorCheck {
   const raw = versionOf('npx ng version 2>/dev/null || node -e "console.log(require(\'@angular/core/package.json\').version)" 2>/dev/null');
