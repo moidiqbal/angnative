@@ -68,11 +68,13 @@ pipeline; versioned ANB1 binary framing with JSON fallback; borrowed direct
   browser save-to-screen measurement.
   Fixture: `packages/testing/fixtures/hmr/counter.component.ts` +
   `tsconfig.aot.hmr.json`, compiled by real ngc.
-- Web client `packages/web/src/hmr.ts`: subscribes to SSE, imports a fresh blob
-  module, replaces DOM content. `pnpm --filter @angnative/web test` →
-  **7 passed** (happy-dom with injected subscribe/loadModule). A real browser
-  Playwright save→SSE→DOM measurement under 1 s is **not verified**; the
-  `< 1 s` end-to-end budget is therefore not claimed.
+- Web client `packages/web/src/hmr.ts`: subscribes to the **named** `event: hmr`
+  SSE message (the previous `source.onmessage` default silently missed every
+  DevServer update), imports a fresh blob module, replaces DOM content. The
+  regression guard is `packages/web/src/hmr.spec.ts` → **2 passed**, including
+  `subscribes to the named "hmr" SSE event by default`. The remaining
+  happy-dom test injects `subscribe`/`loadModule`, so it cannot catch the SSE
+  wiring bug; the browser harness below is the real-client proof.
 - Native QuickJS: idempotent `crates/angnative-runtime-bridge/src/hmr_shim.js`
   installed into the existing realm (also at bridge creation),
   `RuntimeBridge::hmr_reload`, C ABI
@@ -84,6 +86,31 @@ pipeline; versioned ANB1 binary framing with JSON fallback; borrowed direct
   mutation batch is committed to the Host tree. Runtime-bridge lib suite:
   **12 passed / 0 failed / 17 ignored**.
 - Event delivery wording is unchanged and exact: **one delivery per event (canonical JS thread-local path + legacy FFI fallback)**.
+
+### 3.1 Real-browser web HMR harness (`web HMR client under a harness`)
+
+`scripts/verify-hmr-browser.py` + `scripts/hmr-browser/harness-entry.ts`
+exercise the **real** `DevServer` (no `compileHook`), the real `startWebHmr`
+(no `subscribe`, `loadModule` or `fetchImpl` override), a real Chromium
+`EventSource`, real `fetch` + blob-module import, and a real DOM mutation
+across 10 measured save→SSE→DOM cycles. Retained evidence:
+
+- `docs/evidence/hmr-browser-save-sse-dom-2026-11-27.json` — 10 raw runs,
+  environment/provenance, exact commands and hashes.
+- `docs/assets/hmr-browser-dev-server.log`, `docs/assets/hmr-browser-sse.txt`,
+  `docs/assets/hmr-browser-before.png`, `docs/assets/hmr-browser-after.png`.
+
+**Verified by that evidence:** named SSE delivery reaches the real client,
+local counter state `7` survives every measured replacement, the realm token
+and navigation count stay unchanged (no full page reload), and the browser
+receives a versioned bundle URL for every applied update.
+
+**Not verified:** save→SSE→DOM under 1 s. Measured save→DOM was
+**6,548–6,571 ms** (p50 6,562 ms), dominated by real `ngc` compilation and the
+duplicate `fs.watch` reload events; SSE→DOM was 1,616–2,378 ms. The `< 1 s`
+end-to-end budget is therefore **not claimed**. This is harness-level proof,
+not shipping dev-app auto-reload (the dev root HTML does not wire the client),
+and ANB1 is not used on the web SSE path.
 
 ## 4. Physical-device proof (OnePlus `b6640c8f`)
 
@@ -152,7 +179,9 @@ code behavior was changed by that fix.
 
 ## 7. Explicitly not verified
 
-- Real browser save→SSE→DOM `< 1 s` Playwright timing.
+- Real browser save→SSE→DOM `< 1 s` Playwright timing: **not verified**. The
+  harness measured 6,548–6,571 ms save→DOM (see §3.1); only delivery, state
+  preservation and no-reload are claimed.
 - iOS/macOS build, simulator or device execution (static FFI wiring only).
 - Emulator execution of this round's binary/HMR instrumentation.
 - Zero-copy throughput comparison against JSON; no performance superiority claim.

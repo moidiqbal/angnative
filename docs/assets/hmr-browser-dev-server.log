@@ -1,0 +1,70 @@
+2026-11-27T20:17:55.834962+00:00 harness esbuild command: node C:\Users\Moid Iqbal\Projects\angnative\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\bin\esbuild scripts/hmr-browser/harness-entry.ts --bundle --outfile=dist\hmr-browser-evidence\harness.js --format=esm --target=es2022 --platform=browser --define:ngDevMode=true --log-level=warning
+2026-11-27T20:17:55.834962+00:00 harness bundle sha256: 5018B4AE2D567CF6A753C9EBAC379C268E6B255C108BECEC4C697554A89D04EC
+[angnative dev] server running on http://localhost:49741
+2026-11-27T20:18:01.655901+00:00 dev server port: 49741
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4919 ms (compile 4367 ms, bundle 552 ms), reload v1
+[angnative dev] component compile 4367 ms exceeds 200 ms budget
+[angnative dev] inner loop 4919 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5129 ms (compile 4406 ms, bundle 723 ms), reload v2
+[angnative dev] component compile 4406 ms exceeds 200 ms budget
+[angnative dev] inner loop 5129 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4873 ms (compile 4364 ms, bundle 509 ms), reload v3
+[angnative dev] component compile 4364 ms exceeds 200 ms budget
+[angnative dev] inner loop 4873 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5096 ms (compile 4433 ms, bundle 663 ms), reload v4
+[angnative dev] component compile 4433 ms exceeds 200 ms budget
+[angnative dev] inner loop 5096 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4942 ms (compile 4421 ms, bundle 520 ms), reload v5
+[angnative dev] component compile 4421 ms exceeds 200 ms budget
+[angnative dev] inner loop 4942 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5142 ms (compile 4580 ms, bundle 562 ms), reload v6
+[angnative dev] component compile 4580 ms exceeds 200 ms budget
+[angnative dev] inner loop 5142 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4904 ms (compile 4364 ms, bundle 540 ms), reload v7
+[angnative dev] component compile 4364 ms exceeds 200 ms budget
+[angnative dev] inner loop 4904 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5096 ms (compile 4472 ms, bundle 625 ms), reload v8
+[angnative dev] component compile 4472 ms exceeds 200 ms budget
+[angnative dev] inner loop 5096 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4787 ms (compile 4278 ms, bundle 509 ms), reload v9
+[angnative dev] component compile 4278 ms exceeds 200 ms budget
+[angnative dev] inner loop 4787 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4993 ms (compile 4307 ms, bundle 685 ms), reload v10
+[angnative dev] component compile 4307 ms exceeds 200 ms budget
+[angnative dev] inner loop 4993 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4733 ms (compile 4217 ms, bundle 517 ms), reload v11
+[angnative dev] component compile 4217 ms exceeds 200 ms budget
+[angnative dev] inner loop 4733 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4951 ms (compile 4403 ms, bundle 548 ms), reload v12
+[angnative dev] component compile 4403 ms exceeds 200 ms budget
+[angnative dev] inner loop 4951 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4922 ms (compile 4418 ms, bundle 503 ms), reload v13
+[angnative dev] component compile 4418 ms exceeds 200 ms budget
+[angnative dev] inner loop 4922 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5133 ms (compile 4479 ms, bundle 654 ms), reload v14
+[angnative dev] component compile 4479 ms exceeds 200 ms budget
+[angnative dev] inner loop 5133 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4899 ms (compile 4387 ms, bundle 512 ms), reload v15
+[angnative dev] component compile 4387 ms exceeds 200 ms budget
+[angnative dev] inner loop 4899 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5125 ms (compile 4429 ms, bundle 695 ms), reload v16
+[angnative dev] component compile 4429 ms exceeds 200 ms budget
+[angnative dev] inner loop 5125 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4865 ms (compile 4344 ms, bundle 521 ms), reload v17
+[angnative dev] component compile 4344 ms exceeds 200 ms budget
+[angnative dev] inner loop 4865 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5098 ms (compile 4394 ms, bundle 704 ms), reload v18
+[angnative dev] component compile 4394 ms exceeds 200 ms budget
+[angnative dev] inner loop 5098 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4795 ms (compile 4286 ms, bundle 509 ms), reload v19
+[angnative dev] component compile 4286 ms exceeds 200 ms budget
+[angnative dev] inner loop 4795 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 5013 ms (compile 4325 ms, bundle 688 ms), reload v20
+[angnative dev] component compile 4325 ms exceeds 200 ms budget
+[angnative dev] inner loop 5013 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4152 ms (compile 3941 ms, bundle 211 ms), reload v21
+[angnative dev] component compile 3941 ms exceeds 200 ms budget
+[angnative dev] inner loop 4152 ms exceeds 500 ms budget
+[angnative dev] C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\src\counter.component.ts: inner loop 4222 ms (compile 3992 ms, bundle 229 ms), reload v22
+[angnative dev] component compile 3992 ms exceeds 200 ms budget
+[angnative dev] inner loop 4222 ms exceeds 500 ms budget
