@@ -44,7 +44,7 @@ separate follow-up.
 
 ---
 
-## 2. iOS shell — CODE COMPLETE, MAC TEST PENDING ⚠️
+## 2. iOS shell — SIMULATOR VERIFIED ✅, DEVICE PENDING ⚠️
 
 **Files** (`platforms/ios/`): `Package.swift`, `Sources/AngNativeHost/SwiftFFI.swift`,
 `Sources/AngNativeApp/{UIViewFactory,DemoViewController}.swift`,
@@ -61,12 +61,17 @@ QuickJS; the old host-only archive is not linked.
 across 2 Android shells, 22 Swift bindings (13 runtime bridge), 29 header
 declarations and the unified staticlib wiring.
 
-**Honest status:** no Mac here → Swift compile, `swift test`, Simulator/device
-run and the runtime-bridge smoke test are **NOT performed**. First action on the
-Mac: `python scripts/check-ffi-declarations.py`, then
-`./scripts/build-ios-native.sh simulator` and
-`cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost`.
-See `docs/IOS-BUILD.md` for the full runtime-bridge smoke checklist.
+**Verified on a Mac (2026-11-28, Xcode 27.2, iPhone 17 Pro simulator, iOS 26.4):**
+`./scripts/build-ios-native.sh simulator --test` → 8 XCTests passed, including
+`testRuntimeBridgeBootsAngularBundleIntoUIKit`: the AOT counter bundle boots in
+QuickJS, 13 nodes become 13 UIKit views, and a native click reaches the Angular
+listener (`Count: 0 -> Count: -1`, `even -> odd`). `./scripts/run-ios-simulator.sh`
+installs and launches the demo (`nodeCount=7`, `docs/assets/ios-simulator-demo.png`).
+`./scripts/build-ios-native.sh device` compiles unsigned for arm64 iOS.
+**Not verified:** physical iPhone, a real UIKit touch, and the Angular bundle as
+the demo app's UI. Evidence and the fixes needed: `docs/evidence/IOS-SIMULATOR.md`.
+Note: `swift build`/`swift test` cannot build this package (they target macOS,
+which has no UIKit); use the scripts, which drive `xcodebuild`.
 
 ---
 
@@ -158,7 +163,7 @@ cargo test --workspace   # 154 tests pass, 17 ignored; includes host-engine and 
 | Desktop window | ✅ verified |
 | Web adapter (browser) | ✅ verified — AOT/JIT-free bundle (`app.js` 353,854 bytes, SHA-256 `832465B703BDE83C563A5D1DFCE5FA29523AF006D8627C373851D9C42C2B245B`), Playwright click and request check; evidence `docs/evidence/WEB-AOT-MIGRATION.md` |
 | Web size-budget gate | ✅ `pnpm check:web-size`: 111,977 B gzip / 128,000 B budget, 16,023 B headroom, exit 0; 9 negative/positive tests; CI `size` job wired; evidence `docs/evidence/WEB-SIZE-BUDGET.md` |
-| iOS shell | ⚠️ Swift runtime-bridge bindings + unified staticlib wiring statically verified; Swift compile / Simulator / device run NOT verified (no Mac/Xcode here). Runbook in `docs/IOS-BUILD.md`. |
+| iOS shell | ✅ Simulator: build + 8 XCTests (incl. Angular bundle → UIKit, click round trip) + demo launch/screenshot, `docs/evidence/IOS-SIMULATOR.md`. ⚠️ physical iPhone NOT verified. |
 | Native event bridge + runtime bridge | ✅ `angnative-runtime-bridge` owns Host + QuickJS; one delivery per event (canonical JS thread-local path + legacy FFI fallback); 17 ignored tests are present; the Angular acceptance set (bootstrap + click round trip + forms/ngModel/router/animations load + animations engine/http/router app/i18n + MarketPulse) passes once `dist/aot` bundles exist, plus 1 third-party RxJS spot-check via `pnpm bundle:third-party`; shipping shell tap verified on emulator and OnePlus (`docs/EVENT-BRIDGE.md`) |
 | Angular HttpClient DI (`NG0201`) in QuickJS | ✅ verified by ignored acceptance test `angular_http_platform_loads_in_quickjs`: `provideHttpClient()` + `INJECTOR_SCOPE: 'root'` resolve `HttpClient`, and `get('/api/x')` delivers the native fetch body (`hello-from-native|GET`) plus `HttpResponse.status === 200`. Exact root cause and commands in `docs/architecture/ARCHITECTURE-VERIFIED-2026-11-22.md`. |
 | Template-driven `ngModel` in QuickJS | ✅ verified by ignored acceptance test `angular_template_driven_forms_round_trip_in_quickjs`: AOT `FormsAppComponent` uses `FormsModule`/`ngModel` on `<input>`; JS model changes emit native `SetProperty`/text mutations, and a Rust-dispatched native `input` event updates the model. `<input>` now maps to the `na-text-input` primitive; `navigator.userAgent` shim added for Angular's DefaultValueAccessor. |

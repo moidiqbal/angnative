@@ -8,14 +8,15 @@ Rule: nothing below is "done" without execution evidence. No fabricated claims.
 ONGOING / IMPORTANT — kya abhi karna hai (priority order)
 --------------------------------------------------------------------------------
 
-[P0] iOS / Mac verification — LAST BLOCKER
-     Status  : code complete, NOT built/tested (no macOS/Xcode here)
-     Files   : platforms/ios/Package.swift, Sources/**, Tests/**, scripts/build-ios-native.sh
-     Command : ./scripts/build-ios-native.sh simulator
-               cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost
-     Proof   : swift build + swift test pass, Simulator screenshot, nodeCount > 0
-     Blocker : Mac needed — sponsors being collected (README + docs/SPONSORS.md)
-     Note    : user said "iOS/Mac abhi chor dain" — keep parked, do not claim done
+[P0] iOS / Mac verification — SIMULATOR DONE 2026-11-28, DEVICE PENDING
+     Status  : Simulator verified on a Mac (Xcode 27.2, iPhone 17 Pro, iOS 26.4)
+     Files   : platforms/ios/**, scripts/build-ios-native.sh, scripts/run-ios-simulator.sh
+     Command : ./scripts/build-ios-native.sh simulator --test
+               ./scripts/run-ios-simulator.sh
+     Proof   : 8 XCTests pass (incl. Angular bundle -> UIKit + click round trip),
+               docs/assets/ios-simulator-demo.png, nodeCount=7
+               (docs/evidence/IOS-SIMULATOR.md)
+     Remaining: physical iPhone run (signing), macOS CI job, Angular bundle as demo UI
 
 [P0/P1] Native JS runtime wiring — flagship device-verified; generic shell device-verified
      Status  : runtime bridge implemented; real AOT bundles boot in QuickJS and
