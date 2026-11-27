@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * check-size-budget.mjs — CI gate for the JS size budget.
  *

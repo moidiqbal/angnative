@@ -35,10 +35,10 @@
   },
   "files": ["dist/**"],
   "scripts": {
-    "build": "tsc -b",
+    "build": "node ../../scripts/tsc7.mjs -b",
     "test": "vitest run"
   },
   "devDependencies": {
-    "vitest": "3.2.4"
+    "vitest": "5.1.2"
   }
 }

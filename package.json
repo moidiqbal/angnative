@@ -8,7 +8,8 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "tsc -b packages/cli/tsconfig.json",
+    "build": "pnpm run build:packages",
+    "build:packages": "pnpm -r --filter \"!@angnative/native-ui-core\" build",
     "test": "vitest run",
     "lint": "pnpm --recursive run lint",
     "check:toolchain": "node scripts/check-toolchain.mjs",
@@ -51,9 +52,10 @@
     "@angular/platform-browser": "22.3.0",
     "@angular/platform-browser-dynamic": "22.3.0",
     "@angular/router": "22.3.0",
-    "@types/node": "22.19.0",
+    "@types/node": "26.6.11",
     "esbuild": "0.28.2",
     "typescript": "6.0.3",
-    "vitest": "3.2.4"
+    "typescript7": "npm:typescript@7.0.2",
+    "vitest": "5.1.2"
   }
 }

@@ -19,7 +19,7 @@
   },
   "files": ["dist/**"],
   "scripts": {
-    "build": "tsc -b",
+    "build": "node ../../scripts/tsc7.mjs -b",
     "test": "vitest run"
   },
   "peerDependencies": {
@@ -34,7 +34,7 @@
     "@angular/core": "22.3.0",
     "@angular/common": "22.3.0",
     "@angular/platform-browser": "22.3.0",
-    "vitest": "3.2.4"
+    "vitest": "5.1.2"
   },
   "dependencies": {
     "@angnative/core": "0.1.0",
