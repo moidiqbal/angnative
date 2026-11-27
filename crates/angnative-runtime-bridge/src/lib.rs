@@ -1427,6 +1427,7 @@ mod tests {
                 node_id: node.id,
                 styles: node.styles.clone(),
                 children: node.children.clone(),
+                text_content: node.text_content.clone(),
             })
             .collect();
         let request = LayoutRequestJson {

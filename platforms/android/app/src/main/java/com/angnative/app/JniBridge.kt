@@ -345,7 +345,7 @@ class JniBridge(private val context: Context) {
    * shadow-tree snapshot. Snapshot node shape (from host-core):
    *   { "nodes": [ { "id", "tag", "node_type", "parent_id", "children",
    *                  "styles", "properties", "text_content" } ] }
-   * LayoutNodeInputJson shape: { "node_id", "styles", "children" }.
+   * LayoutNodeInputJson shape: { "node_id", "styles", "children", "text_content?" }.
    */
   fun buildLayoutRequest(snapshotJson: String, width: Float, height: Float): String {
     val nodes = JSONArray()
@@ -378,6 +378,15 @@ class JniBridge(private val context: Context) {
         input.put("node_id", id)
         input.put("styles", styles)
         input.put("children", children)
+        val nodeType = node.optString("node_type", "")
+        val tag = node.optString("tag", "").lowercase()
+        val isTextNode = nodeType == "Text" ||
+          nodeType.startsWith("Custom:na-text") ||
+          tag.startsWith("na-text") || tag.startsWith("native-text") ||
+          tag == "text" || tag == "span" || tag == "p"
+        if (isTextNode && !node.isNull("text_content")) {
+          input.put("text_content", node.getString("text_content"))
+        }
         nodes.put(input)
       }
     } catch (e: Exception) {

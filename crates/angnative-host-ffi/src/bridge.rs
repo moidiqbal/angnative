@@ -54,7 +54,7 @@ pub fn clear_js_runtime_dispatch_for_thread(owner: usize) {
 
 use angnative_host_core::command::CommandBatch;
 use angnative_host_core::mutation::MutationEngine;
-use angnative_host_layout::{LayoutEngine, LayoutNodeInput};
+use angnative_host_layout::{IntrinsicContent, LayoutEngine, LayoutNodeInput};
 use angnative_host_view::op_emitter::OpEmitter;
 use angnative_host_view::ops::ViewProps;
 use angnative_host_view::view_factory::{ViewFactory, ViewFactoryError, ViewFactoryResult};
@@ -229,6 +229,9 @@ pub struct LayoutNodeInputJson {
     pub node_id: u64,
     pub styles: HashMap<String, String>,
     pub children: Vec<u64>,
+    /// Intrinsic text content supplied by the platform snapshot, when present.
+    #[serde(default)]
+    pub text_content: Option<String>,
 }
 
 /** Full layout request. */
@@ -470,9 +473,15 @@ impl Host {
             .as_mut()
             .ok_or_else(|| "Layout engine not initialized".to_string())?;
 
-        // Convert JSON inputs to LayoutNodeInput.
+        // Convert JSON inputs to LayoutNodeInput and retain text for intrinsic
+        // measurement. Text is supplied by the platform snapshot; the layout
+        // engine decides its measured size using the configured TextMeasurer.
         let mut nodes = HashMap::new();
+        let mut intrinsic_content = HashMap::new();
         for input in &request.nodes {
+            if let Some(text) = input.text_content.as_ref() {
+                intrinsic_content.insert(input.node_id, IntrinsicContent::Text(text.clone()));
+            }
             nodes.insert(
                 input.node_id,
                 LayoutNodeInput {
@@ -483,11 +492,12 @@ impl Host {
             );
         }
 
-        let result = layout_engine.layout(
+        let result = layout_engine.layout_with_intrinsic_content(
             request.root_id,
             &nodes,
             request.available_width,
             request.available_height,
+            &intrinsic_content,
         )?;
 
         let response = LayoutResponseJson {

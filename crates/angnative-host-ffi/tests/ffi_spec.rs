@@ -18,6 +18,7 @@ use angnative_host_core::command::{Command, CommandBatch};
 use angnative_host_ffi::bridge::{LayoutNodeInputJson, LayoutRequestJson, set_js_runtime_dispatch_for_thread, clear_js_runtime_dispatch_for_thread};
 use angnative_host_ffi::ffi;
 use angnative_host_view::ops::PlatformOp;
+use std::collections::HashMap;
 use angnative_host_view::view_factory::RecordingViewFactory;
 use serde_json::Value;
 use std::ffi::{c_char, c_void, CStr, CString};
@@ -491,6 +492,7 @@ fn run_layout_single_node() {
             .into_iter()
             .collect(),
             children: vec![],
+            text_content: None,
         }],
         available_width: 500.0,
         available_height: 500.0,
@@ -517,6 +519,43 @@ fn run_layout_single_node() {
     assert!((node.get("width").and_then(|v| v.as_f64()).unwrap() - 200.0).abs() < 1.0);
 
     unsafe { ffi::angnative_host_destroy(handle) };
+}
+
+#[test]
+fn run_layout_uses_snapshot_text_content_for_intrinsic_measurement() {
+    let handle = ffi::angnative_host_create();
+    assert!(!handle.is_null());
+
+    // No explicit width: only the snapshot's text_content can make this node
+    // wider than zero. The host must forward it to the layout engine.
+    let request = serde_json::to_string(&LayoutRequestJson {
+        root_id: 7,
+        nodes: vec![LayoutNodeInputJson {
+            node_id: 7,
+            styles: HashMap::new(),
+            children: vec![],
+            text_content: Some("intrinsic snapshot text".to_string()),
+        }],
+        available_width: 500.0,
+        available_height: 500.0,
+    })
+    .unwrap();
+
+    let mut out_len: u32 = 0;
+    let result_ptr =
+        unsafe { ffi::angnative_host_run_layout(handle, cstr(&request).as_ptr(), &mut out_len) };
+    assert!(!result_ptr.is_null());
+    let layout_json = unsafe { CStr::from_ptr(result_ptr) }
+        .to_str()
+        .unwrap()
+        .to_owned();
+    unsafe { free_cstr(result_ptr) };
+    unsafe { ffi::angnative_host_destroy(handle) };
+
+    let layout: Value = serde_json::from_str(&layout_json).unwrap();
+    let node = &layout["nodes"][0];
+    let width = node.get("width").and_then(|v| v.as_f64()).unwrap();
+    assert!(width > 0.0, "text-only node must be intrinsically measured");
 }
 
 #[test]
