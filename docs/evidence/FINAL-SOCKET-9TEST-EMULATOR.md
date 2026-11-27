@@ -164,7 +164,7 @@ package:/data/app/~~ymdS6J4JQvntexssyXHj6A==/com.angnative.app-J4jXSu_MyNgrvflpA
 | Emulator API / ABI | ✅ Android 14, x86_64 (`sdk_gphone64_x86_64`) |
 | Full generic instrumentation suite | ✅ `OK (9 tests)`, exit 0, 4.77 s |
 | Raw log retained | ✅ `docs/assets/market-pulse-final-socket-9test-emulator.log` |
-| Physical OnePlus rerun | ⚠️ not performed; no device attached |
+| Physical OnePlus rerun | ⚠️ not performed in this document; later passed on `b6640c8f` (`OK (9 tests)`, 1.89 s) — see `docs/evidence/FINAL-SOCKET-9TEST-ONEPLUS.md` |
 
 ## Scope limits
 
