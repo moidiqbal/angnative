@@ -51,8 +51,8 @@ pipeline; versioned ANB1 binary framing with JSON fallback; borrowed direct
   This is static consistency only; iOS execution remains **not verified**.
 - Physical-device lifetime proof: the instrumentation test zeroes the caller's
   direct buffer after the call and asserts the committed tree is unchanged
-  (see §4). No throughput/benchmark comparison against JSON was run, so no
-  "faster than JSON" claim is made.
+  (see §4). A JSON-vs-ANB1 measurement was run separately (see §8); it makes no
+  "faster than JSON" claim.
 
 ## 3. HMR — one pipeline, web + native, state preserved
 
@@ -152,13 +152,14 @@ same-realm marker, disposed old instance and advanced generation.
 installed the same APKs and ran the same test on `emulator-5554`
 (`sdk_gphone64_x86_64`, Android 14 / SDK 34, `x86_64`). Raw output is retained
 in `docs/assets/hmr-zerocopy-binary-emulator.log`: UTC timestamps, exact `adb`
-commands, device properties, both APK hashes and `OK (1 test)` in 0.102 s.
+commands, device properties, both APK hashes and `OK (1 test)` in 0.096 s.
 APK identity used for that run:
 
 - `app-debug.apk` — 22,805,896 bytes, SHA-256
   `D7BE870A73F646FD7ED17C9BD29DE47FF4EE08B15615F2EA139CA9F6B500584A`
-- `app-debug-androidTest.apk` — 413,350 bytes, SHA-256
-  `35F6C0A6C1FB980B8802F191D3D348F214D029BA22A5C10285843109E0371E86`
+- `app-debug-androidTest.apk` — 443,429 bytes, SHA-256
+  `696A6E3D42303FA098EAAE4D7318318418F2412151FDA60EA060B0138A7EDC6F`
+  (rebuilt after adding the separately reported device benchmark test)
 
 **Physical-device rerun with these identical hashes is not verified**: the
 `adb devices -l` transcript at the time of the emulator run listed only
@@ -168,27 +169,32 @@ superiority claim is made.
 
 ## 5. APK size cap (non-negotiable ≤ 20 MB)
 
-Built with `.\gradlew.bat clean assembleRelease assembleDebugAndroidTest --no-daemon`
-from `showcases/ecosystem-core` after the 3-ABI Rust rebuild
+Re-measured with `.\gradlew.bat assembleRelease --no-daemon` from
+`showcases/ecosystem-core` on this host after the benchmark test was added.
+The retained measurement is `docs/assets/apk-cap-remeasure-2026-11-28.log`
+(exact command, UTC timestamp, workspace head, bytes, SHA-256 and margin).
+Earlier round: `.\gradlew.bat clean assembleRelease assembleDebugAndroidTest
+--no-daemon` after the 3-ABI Rust rebuild
 (`pwsh -File scripts/build-android-native.ps1`: `arm64-v8a`, `armeabi-v7a`,
 `x86_64`, all "Android Rust libraries rebuilt (unified runtime bridge).").
 
 - `app/build/outputs/apk/release/app-release.apk`
-- Bytes: **17,752,298** (16.930 MiB / 17.752 decimal MB)
-- SHA-256: `164EE6CB84F2ACC7AD49DCD719770539F903B4B0E2F678C4E06B9E26FBAC48D2`
-- Under the 20,000,000-byte cap by **2,247,702** bytes.
-- Prior retained APK was 17,539,306 bytes (16.727 MiB); this round adds
-  212,992 bytes and remains under the cap.
-- androidTest APK SHA-256:
-  `35F6C0A6C1FB980B8802F191D3D348F214D029BA22A5C10285843109E0371E86`.
+- Bytes: **17,749,974** (16.927 MiB / 17.750 decimal MB)
+- SHA-256: `1AEA5A3516915A36BC7D3A38BCD536623D21A8475B74D1D66EB00CB73A1D0D86`
+- Under the 20,000,000-byte cap by **2,250,026** bytes.
+- Prior retained APK was 17,752,298 bytes; this rebuild is 2,324 bytes smaller
+  and remains under the cap. No new app code was introduced by the benchmark
+  work; the release artifact was rebuilt to re-verify the cap.
+- androidTest APK SHA-256 (after adding the separately reported benchmark
+  test): `696A6E3D42303FA098EAAE4D7318318418F2412151FDA60EA060B0138A7EDC6F`.
 
 ## 6. Full gate (after all final edits)
 
 | Command | Exact result |
 |---|---|
-| `cargo test --workspace` | **167 passed / 0 failed / 17 ignored** |
+| `cargo test --workspace` | **172 passed / 0 failed / 17 ignored** |
 | `cargo test -p angnative-runtime-bridge -- --ignored` | **17 passed / 0 failed / 12 filtered out** |
-| `pnpm test` | **20 test files passed / 276 tests passed** |
+| `pnpm test` | **21 test files passed / 280 tests passed** |
 | `python scripts/check-ffi-declarations.py` | `FFI declaration check OK: 40 JNI methods across 2 Android shells, 22 Swift bindings (13 runtime bridge), 31 header declarations; iOS unified staticlib wiring OK` |
 
 One root-cwd-only failure was found and fixed during the gate: the CLI dev spec
@@ -204,5 +210,45 @@ code behavior was changed by that fix.
 - iOS/macOS build, simulator or device execution (static FFI wiring only).
 - Physical-device rerun of this round's binary/HMR instrumentation with the
   documented APK hashes (`b6640c8f` was not attached; see §4.1).
-- Zero-copy throughput comparison against JSON; no performance superiority claim.
+- Physical-device JNI benchmark arm (`b6640c8f` was not attached); see §8.
+- Cross-arm or format superiority claims; none are made from §8 samples.
 - WebView, Hermes/V8, SSR/hydration and unchanged DOM-library parity (out of scope).
+
+## 8. ANB1 vs JSON measurement — two separately reported arms
+
+No superiority claim is made. These are measurements of one input shape and one
+toolchain/device, not a general throughput property of either format.
+
+**Host Rust arm** — `crates/angnative-host-ffi/examples/anb1_vs_json.rs`,
+retained at `docs/benchmarks/anb1-vs-json/host-2026-11-28.json`. Inputs were
+precomputed once; every iteration used a fresh `Host` with only the
+`process_batch_json` / `process_batch_binary` call timed; both formats were
+verified to produce identical ops before timing. `x86_64-windows`, release
+profile (`opt-level=z`, `lto=fat`), 24 warmup + 160 measured iterations,
+alternating order. 509 commands; JSON 29,480 bytes, ANB1 12,519 bytes.
+
+| Host arm | p50 | p95 | max |
+|---|---:|---:|---:|
+| JSON | 1,859.5 µs | 2,211.7 µs | 3,443.3 µs |
+| ANB1 | 2,450.3 µs | 2,988.1 µs | 3,944.0 µs |
+
+**Device JNI arm** — `showcases/ecosystem-core/app/src/androidTest/java/com/angnative/app/Anb1VsJsonBenchmarkTest.kt`,
+collected by `scripts/collect-android-benchmark-evidence.py`, retained at
+`docs/benchmarks/anb1-vs-json/device-emulator-5554-2026-11-28.json` with raw
+`docs/assets/anb1-vs-json-emulator.log`. `emulator-5554`,
+`sdk_gphone64_x86_64` / Android 14 / SDK 34 / `x86_64`, 16 warmup + 64 measured
+iterations, fresh Host per iteration with lifecycle outside the timed region,
+and an exact-sized direct buffer (`capacity()` equals payload size) for ANB1.
+509 commands; JSON 29,988 bytes, ANB1 12,519 bytes. The largest ANB1 sample
+(167,527.4 µs) is retained verbatim as an outlier.
+
+| Device JNI arm | p50 | p95 | max |
+|---|---:|---:|---:|
+| JSON | 3,066.3 µs | 10,580.9 µs | 22,256.5 µs |
+| ANB1 | 3,377.8 µs | 11,358.9 µs | 167,527.4 µs |
+
+**Not verified:** physical-device JNI arm, cross-arm comparison, sustained-load
+throughput, pooled/reused buffers, and end-to-end zero-copy. Inputs for the two
+arms were generated independently in Rust and Kotlin with the same command
+shape; the small JSON byte difference comes from escaping, not from a different
+workload.

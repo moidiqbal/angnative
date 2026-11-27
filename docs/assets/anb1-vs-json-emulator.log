@@ -1,0 +1,88 @@
+captured_at_utc: 2026-11-27T20:36:03.059277+00:00
+claim: device JNI ANB1 vs JSON batch measurement, reported separately from host
+claim_boundary: execution on adb serial emulator-5554 only
+workspace_head: 7e66cb6344315182065e9d7990574cf9184fe5e6
+adb_path: C:\Android\Sdk\platform-tools\adb.exe
+serial: emulator-5554
+app_apk_bytes: 22805896
+app_apk_sha256: D7BE870A73F646FD7ED17C9BD29DE47FF4EE08B15615F2EA139CA9F6B500584A
+test_apk_bytes: 443429
+test_apk_sha256: 696A6E3D42303FA098EAAE4D7318318418F2412151FDA60EA060B0138A7EDC6F
+
+# devices — 2026-11-27T20:36:03.218194+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe devices -l
+--- stdout+stderr ---
+List of devices attached
+emulator-5554          device product:sdk_gphone64_x86_64 model:sdk_gphone64_x86_64 device:emu64xa transport_id:1
+exit_code: 0
+
+# clear logcat — 2026-11-27T20:36:04.573900+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 logcat -c
+--- stdout+stderr ---
+
+exit_code: 0
+
+# getprop ro.product.manufacturer — 2026-11-27T20:36:04.912967+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.manufacturer
+value: Google
+exit_code: 0
+
+# getprop ro.product.model — 2026-11-27T20:36:05.059857+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.model
+value: sdk_gphone64_x86_64
+exit_code: 0
+
+# getprop ro.product.device — 2026-11-27T20:36:05.200625+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.device
+value: emu64xa
+exit_code: 0
+
+# getprop ro.build.version.release — 2026-11-27T20:36:05.327655+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.build.version.release
+value: 14
+exit_code: 0
+
+# getprop ro.build.version.sdk — 2026-11-27T20:36:05.449966+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.build.version.sdk
+value: 34
+exit_code: 0
+
+# getprop ro.product.cpu.abi — 2026-11-27T20:36:05.573172+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell getprop ro.product.cpu.abi
+value: x86_64
+exit_code: 0
+
+# install app APK — 2026-11-27T20:36:05.573172+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 install -r C:\Users\Moid Iqbal\Projects\angnative\showcases\ecosystem-core\app\build\outputs\apk\debug\app-debug.apk
+--- stdout+stderr ---
+Performing Streamed Install
+Success
+exit_code: 0
+
+# install test APK — 2026-11-27T20:36:07.023809+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 install -r C:\Users\Moid Iqbal\Projects\angnative\showcases\ecosystem-core\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+--- stdout+stderr ---
+Performing Streamed Install
+Success
+exit_code: 0
+
+# instrument benchmark — 2026-11-27T20:36:09.375565+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 shell am instrument -w -e class com.angnative.app.Anb1VsJsonBenchmarkTest com.angnative.demo.ecosystem.core.test/androidx.test.runner.AndroidJUnitRunner
+--- stdout+stderr ---
+
+com.angnative.app.Anb1VsJsonBenchmarkTest:.
+
+Time: 2.451
+
+OK (1 test)
+exit_code: 0
+
+# read logcat — 2026-11-27T20:36:14.576360+00:00
+$ C:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 logcat -d -s System.out:I
+--- stdout+stderr ---
+--------- beginning of main
+11-28 01:36:12.981  6576  6596 I System.out: ANB1_VS_JSON_RESULT:{"title":"Device JNI ANB1 vs JSON batch processing (no superiority claim)","platform":{"manufacturer":"Google","model":"sdk_gphone64_x86_64","device":"emu64xa","release":"14","sdk":34,"abi":"x86_64"},"method":{"inputs_precomputed_once":true,"fresh_host_per_iteration":true,"host_lifecycle_outside_timed_region":true,"timed_region":"JniBridge.processBatch \/ processBatchDirect on the Android main thread","exact_sized_direct_buffer":true,"warmup_iterations":16,"measured_iterations":64,"alternating_order":true,"units":"microseconds from System.nanoTime"},"input":{"commands":509,"json_bytes":29988,"anb1_bytes":12519,"ops_json_bytes":35865},"json":{"samples":64,"min_us":1042.533,"p50_us":3066.28,"p95_us":10580.866,"max_us":22256.457,"mean_us":4047.438,"raw_us":[1042.533,1076.063,1088.229,1185.215,1408.444,1411.292,1511.961,1608.882,1635.412,1656.554,1680.797,1683.759,1706.769,1759.644,1856.59,1921.46,1927.8,2075.573,2083.857,2120.734,2132.844,2153.473,2177.585,2305.487,2490.012,2552.033,2653.824,2692.198,2752.504,2786.432,2880.414,2888.629,3066.28,3117.946,3123.81,3173.218,3242.63,3288.681,3319.283,3327.696,3399.366,3606.667,3644.922,3657.275,3781.773,3787.952,3803.812,3806.436,3911.142,4018.797,4209.392,4307.932,4604.119,4661.526,4979.094,6133.617,7420.637,8008.761,8585.598,9519.422,10580.866,17072.556,20711.377,22256.457]},"anb1":{"samples":64,"min_us":1369.194,"p50_us":3377.788,"p95_us":11358.855,"max_us":167527.405,"mean_us":6497.143,"raw_us":[1369.194,1453.527,1564.571,1728.533,1729.74,1786.941,1864.266,1923.713,1930.239,1956.682,2004.46,2031.485,2124.571,2257.524,2268.224,2268.629,2290.413,2322.678,2369.123,2377.634,2408.172,2458.761,2464.415,2490.062,2833.298,2848.134,2917.858,3069.027,3100.771,3125.623,3200.273,3357.173,3377.788,3423.687,3462.63,3479.803,3517.265,3848.159,3888.024,4001.735,4119.715,4164.992,4265.089,4281.764,4319.771,4364.571,4497.245,4736.646,4749.635,4834.994,4877.02,4901.857,4902.212,5017.554,5033.714,6197.666,6288.304,6467.86,7671.373,9255.9,11358.855,13685.182,15403.044,167527.405]},"claim_boundary":{"device_jni_arm":true,"host_rust_arm":"reported separately","superiority_claim":"none","end_to_end_zero_copy":"not claimed; decode produces an owned batch"}}
+exit_code: 0
+
+captured_at_utc_end: 2026-11-27T20:36:14.802888+00:00
+command_failures: 0
