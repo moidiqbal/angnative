@@ -13,6 +13,9 @@
 # Env:
 #   IOS_SIM_DEVICE  simulator name or UDID (default: first available iPhone)
 #   SKIP_RUST=1     reuse the already-staged Rust static library
+#   CONFIGURATION   Debug (default) or Release
+#   APP_VERSION     CFBundleShortVersionString (default 0.4.0)
+#   NO_LAUNCH=1     only build the .app (used by package-ios-release.sh)
 
 set -euo pipefail
 
@@ -27,6 +30,8 @@ SCREENSHOT="${1:-${IOS_DIR}/.build/ios-simulator-demo.png}"
 # The script cds into platforms/ios below; resolve a relative path first.
 [[ "${SCREENSHOT}" = /* ]] || SCREENSHOT="${PWD}/${SCREENSHOT}"
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.0}"
+CONFIGURATION="${CONFIGURATION:-Debug}"
+APP_VERSION="${APP_VERSION:-0.4.0}"
 
 DEVICE="${IOS_SIM_DEVICE:-$(
   xcrun simctl list devices available | sed -n 's/^ *\(iPhone[^(]*\) (.*/\1/p' | head -1 | sed 's/ *$//'
@@ -47,11 +52,12 @@ xcodebuild build \
   -scheme AngNativeDemo \
   -destination "platform=iOS Simulator,name=${DEVICE}" \
   -derivedDataPath "${DERIVED_DATA}" \
+  -configuration "${CONFIGURATION}" \
   LIBRARY_SEARCH_PATHS="${HOST_LIB_DIR}" \
   IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET}" \
   -quiet
 
-EXECUTABLE="${DERIVED_DATA}/Build/Products/Debug-iphonesimulator/AngNativeDemo"
+EXECUTABLE="${DERIVED_DATA}/Build/Products/${CONFIGURATION}-iphonesimulator/AngNativeDemo"
 
 # 3. Wrap in a minimal .app bundle
 rm -rf "${APP_DIR}"
@@ -67,7 +73,7 @@ cat > "${APP_DIR}/Info.plist" <<PLIST
   <key>CFBundleName</key><string>AngNative</string>
   <key>CFBundleDisplayName</key><string>AngNative</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.3.0</string>
+  <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
   <key>MinimumOSVersion</key><string>${IPHONEOS_DEPLOYMENT_TARGET}</string>
@@ -78,6 +84,11 @@ cat > "${APP_DIR}/Info.plist" <<PLIST
 </plist>
 PLIST
 codesign --force --sign - "${APP_DIR}" >/dev/null
+
+if [[ "${NO_LAUNCH:-}" == "1" ]]; then
+  echo "  ✓ built ${APP_DIR} (${CONFIGURATION}, v${APP_VERSION})"
+  exit 0
+fi
 
 # 4. Boot, install, launch
 xcrun simctl boot "${DEVICE}" 2>/dev/null || true   # already booted is fine
