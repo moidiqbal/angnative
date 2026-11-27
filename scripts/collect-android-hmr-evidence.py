@@ -1,8 +1,10 @@
 """Collect provenance-bearing Android instrumentation evidence.
 
 Usage:
-    python scripts/collect-android-hmr-evidence.py <serial> <log-path>
+    python scripts/collect-android-hmr-evidence.py <serial> <log-path> [test-class] [claim]
 
+Defaults to HmrZeroCopyBinaryTest and the ANB1/HMR claim. Pass a different
+class and claim to retain provenance for another instrumentation test.
 The log records UTC timestamps, the exact adb command lines, device identity
 and properties, both APK hashes and the raw stdout/stderr of every command.
 It makes no claim beyond what adb actually prints.
@@ -45,10 +47,16 @@ def sha256(path: Path) -> str:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4, 5):
         print(__doc__, file=sys.stderr)
         return 2
     serial, log_arg = sys.argv[1], Path(sys.argv[2])
+    test_class = sys.argv[3] if len(sys.argv) >= 4 else TEST_CLASS
+    claim = (
+        sys.argv[4]
+        if len(sys.argv) == 5
+        else "Android instrumentation of ANB1, borrowed JNI buffer and HMR"
+    )
     log_arg.parent.mkdir(parents=True, exist_ok=True)
 
     lines: list[str] = []
@@ -74,7 +82,7 @@ def main() -> int:
         return result.returncode
 
     emit(f"captured_at_utc: {utc()}")
-    emit("claim: Android instrumentation of ANB1, borrowed JNI buffer and HMR")
+    emit(f"claim: {claim}")
     emit(f"claim_boundary: execution on adb serial {serial} only; no other device is claimed")
     emit(f"workspace_head: {subprocess.run(['git','rev-parse','HEAD'],cwd=REPO,text=True,capture_output=True).stdout.strip()}")
     emit(f"adb_path: {ADB}")
@@ -87,7 +95,7 @@ def main() -> int:
     emit(f"test_apk_bytes: {TEST_APK.stat().st_size}")
     emit(f"test_apk_sha256: {sha256(TEST_APK)}")
     emit(f"runner: {RUNNER}")
-    emit(f"test_class: {TEST_CLASS}")
+    emit(f"test_class: {test_class}")
 
     command("devices", ["devices", "-l"])
     for prop in PROPS:
@@ -107,7 +115,7 @@ def main() -> int:
     failures += command("install test APK", ["-s", serial, "install", "-r", str(TEST_APK)])
     failures += command(
         "instrument test",
-        ["-s", serial, "shell", "am", "instrument", "-w", "-e", "class", TEST_CLASS, RUNNER],
+        ["-s", serial, "shell", "am", "instrument", "-w", "-e", "class", test_class, RUNNER],
     )
     emit()
     emit(f"captured_at_utc_end: {utc()}")
