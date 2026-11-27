@@ -91,4 +91,54 @@ describe('web HMR client', () => {
     stop();
     expect(emit).toBeUndefined();
   });
+
+  it('subscribes to the named "hmr" SSE event by default', () => {
+    const added: string[] = [];
+    const removed: string[] = [];
+    let closed = 0;
+    let onmessageAssigned = false;
+
+    class FakeEventSource {
+      readonly url: string;
+      private messageHandler: ((event: MessageEvent<string>) => void) | null = null;
+      constructor(url: string) {
+        this.url = url;
+      }
+      set onmessage(handler: ((event: MessageEvent<string>) => void) | null) {
+        onmessageAssigned = true;
+        this.messageHandler = handler;
+      }
+      get onmessage(): ((event: MessageEvent<string>) => void) | null {
+        return this.messageHandler;
+      }
+      addEventListener(type: string): void {
+        added.push(type);
+      }
+      removeEventListener(type: string): void {
+        removed.push(type);
+      }
+      close(): void {
+        closed += 1;
+      }
+    }
+
+    const original = (globalThis as { EventSource?: unknown }).EventSource;
+    (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+    try {
+      const runtime = new HmrRuntime();
+      runtime.register('counter', factory(0, 'v1'), hooks);
+      const stop = startWebHmr<Counter>({ runtime, moduleId: 'counter' });
+
+      // DevServer publishes `event: hmr`; a default `onmessage` subscription
+      // would silently miss every update. This guard fails if that regresses.
+      expect(added).toEqual(['hmr']);
+      expect(onmessageAssigned).toBe(false);
+
+      stop();
+      expect(removed).toEqual(['hmr']);
+      expect(closed).toBe(1);
+    } finally {
+      (globalThis as { EventSource?: unknown }).EventSource = original;
+    }
+  });
 });

@@ -53,19 +53,30 @@ export async function loadWebHmrModule<T>(
   }
 }
 
-/** Subscribe to the dev server's SSE stream. */
+/**
+ * Subscribe to the dev server's SSE stream.
+ *
+ * DevServer publishes a NAMED `event: hmr`, not an unnamed `message`, so
+ * `source.onmessage` never fires. Listening to the named event is required for
+ * the real browser client to receive updates at all; happy-dom unit tests that
+ * inject `subscribe` cannot catch this.
+ */
 function defaultSubscribe(handler: (update: HmrUpdate) => void): () => void {
   const source = new EventSource('/hmr');
-  source.onmessage = (event: MessageEvent<string>) => {
+  const onHmr = (event: Event) => {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(event.data);
+      parsed = JSON.parse((event as MessageEvent<string>).data);
     } catch {
       return;
     }
     if (isHmrUpdate(parsed)) handler(parsed);
   };
-  return () => source.close();
+  source.addEventListener('hmr', onHmr);
+  return () => {
+    source.removeEventListener('hmr', onHmr);
+    source.close();
+  };
 }
 
 /** Start listening for HMR updates; returns an unsubscribe function. */
