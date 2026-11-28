@@ -151,9 +151,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libclang-dev
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/27.2.12479018" >> "$GITHUB_ENV"
-          LIBCLANG_PATH="$(dirname "$(readlink -f "$(find /usr/lib -name 'libclang.so*' | head -n 1)")")"
-          test -n "$LIBCLANG_PATH"
+          export ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/27.2.12479018"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" >> "$GITHUB_ENV"
+          LIBCLANG_CANDIDATE="$(find /usr/lib -name 'libclang.so*' -print -quit)"
+          test -n "$LIBCLANG_CANDIDATE"
+          export LIBCLANG_PATH="$(dirname "$(readlink -f "$LIBCLANG_CANDIDATE")")"
           echo "LIBCLANG_PATH=${LIBCLANG_PATH}" >> "$GITHUB_ENV"
           bash scripts/build-android-native.sh all
 
