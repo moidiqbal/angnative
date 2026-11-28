@@ -1,0 +1,24 @@
+COMMAND: pnpm test
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 test C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> vitest run
+
+
+ RUN  v5.1.2 C:/Users/Moid Iqbal/.local/share/opencode/worktree/73380c/phase-0.5-fresh
+
+stdout | packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > watches source files, rebundles and publishes a versioned HMR event
+[angnative dev] server running on http://localhost:52068
+
+ Γ¥» packages/cli/src/dev.spec.ts (6 tests | 1 failed) 11874ms
+   Γ¥» DevServer ΓÇö incremental AOT + fast refresh (6)
+     ├ù watches source files, rebundles and publishes a versioned HMR event 10057ms
+
+ Test Files  1 failed | 21 passed (22)
+      Tests  1 failed | 286 passed (287)
+   Start at  20:13:27
+   Duration  12.94s (import 55%, tests 26%, transform 18%, worker 1%)
+
+ΓÇëELIFECYCLEΓÇë Test failed. See above for more details.
+EXIT CODE: 1

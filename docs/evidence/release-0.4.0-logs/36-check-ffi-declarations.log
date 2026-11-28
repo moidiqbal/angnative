@@ -1,0 +1,5 @@
+COMMAND: python scripts/check-ffi-declarations.py
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+FFI declaration check OK: 40 JNI methods across 2 Android shells, 22 Swift bindings (13 runtime bridge), 31 header declarations; iOS unified staticlib wiring OK
+EXIT CODE: 0

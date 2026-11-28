@@ -1,0 +1,11 @@
+COMMAND: Write-Output "node=$(node --version)"; Write-Output "pnpm=$(pnpm --version)"; Write-Output "cargo=$(cargo --version)"; Write-Output "rustc=$(rustc --version)"; Write-Output "commit=$(git rev-parse HEAD)"; Write-Output "node_modules=$(Test-Path node_modules)"; Write-Output "target=$(Test-Path target)"
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+node=v26.13.1
+pnpm=10.34.9
+cargo=cargo 1.102.0-nightly (ede6cefea 2026-11-11)
+rustc=rustc 1.102.0-nightly (5f4effd57 2026-11-13)
+commit=29af2487c1cdcd3a854d33618db8ef6916bc7a4e
+node_modules=False
+target=False
+EXIT CODE: 0

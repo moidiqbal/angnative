@@ -1,0 +1,9 @@
+COMMAND: pnpm run bundle:quickjs
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 bundle:quickjs C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/bundle-quickjs.mjs
+
+Wrote C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\dist\aot\quickjs-bundle.js
+EXIT CODE: 0

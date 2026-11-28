@@ -1,0 +1,9 @@
+COMMAND: pnpm run compile:fixtures
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 compile:fixtures C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/compile-fixtures.mjs
+
+Wrote C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\packages\testing\fixtures\out\app.js
+EXIT CODE: 0

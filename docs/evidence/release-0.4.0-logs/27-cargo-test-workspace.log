@@ -1,0 +1,340 @@
+COMMAND: cargo test --workspace
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+running 11 tests
+test renderer::tests::node_colors_are_distinct_across_groups ... ok
+test renderer::tests::rect_to_ndc_handles_zero_sized_surface ... ok
+test renderer::tests::rect_to_ndc_maps_layout_space_to_clip_space ... ok
+test app::tests::demo_batch_uses_wire_protocol_fields ... ok
+test view_tree::tests::frame_before_create_is_not_lost ... ok
+test view_tree::tests::insert_honors_index_and_reparenting_detaches_old_parent ... ok
+test view_tree::tests::remove_and_destroy_prune_tree ... ok
+test renderer::tests::rect_uniform_is_32_bytes ... ok
+test view_tree::tests::create_insert_frame_text_and_props_build_retained_tree ... ok
+test app::tests::demo_batch_round_trips_through_serde ... ok
+test app::tests::layout_inputs_cover_every_demo_node ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test bridge_ops_build_retained_tree_and_layout_frames_are_applied_without_gpu ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test mutation::tests::unknown_node_types_are_still_rejected ... ok
+test node::tests::plain_custom_is_untagged_and_unknown_types_are_rejected ... ok
+test node::tests::tagged_custom_wire_names_preserve_suffix ... ok
+test mutation::tests::tagged_custom_create_nodes_are_preserved ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test decoder_output_is_owned_and_survives_the_input_buffer ... ok
+test refuses_unsupported_protocol_version_on_encode ... ok
+test decodes_shared_golden_vector ... ok
+test rejects_bad_magic_and_unsupported_version ... ok
+test rejects_invalid_utf8 ... ok
+test rejects_invalid_json_property_value ... ok
+test encodes_shared_golden_vector_byte_for_byte ... ok
+test rejects_truncated_frames_and_trailing_bytes ... ok
+test rejects_unknown_opcode ... ok
+test round_trips_all_command_kinds ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test create_node_rejects_unknown_type ... ok
+test duplicate_node_id_returns_error_without_panicking ... ok
+test protocol_version_validation_rejects_unsupported ... ok
+test set_property_null_removes_property ... ok
+test insert_child_respects_index ... ok
+test create_append_and_remove_produces_expected_tree ... ok
+test remove_child_requires_membership ... ok
+test missing_node_reference_returns_error_without_panicking ... ok
+test reparent_detaches_from_old_parent ... ok
+test set_text_content_is_not_a_noop ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 45 tests
+test bytecode::tests::decode_rejects_missing_fingerprint ... ok
+test bytecode::tests::encode_decode_round_trip ... ok
+test bytecode::tests::decode_rejects_empty_payload ... ok
+test bytecode::tests::decode_rejects_legacy_magic_with_migration_message ... ok
+test bytecode::tests::decode_rejects_length_mismatch ... ok
+test bytecode::tests::decode_rejects_non_utf8_fingerprint ... ok
+test bytecode::tests::decode_rejects_truncated_header ... ok
+test bytecode::tests::decode_rejects_unknown_fingerprint_format ... ok
+test bytecode::tests::encode_rejects_empty_payload ... ok
+test bytecode::tests::runtime_fingerprint_is_deterministic_and_descriptive ... ok
+test bytecode::tests::decode_rejects_oversized_declared_fingerprint_length ... ok
+test bytecode::tests::decode_rejects_oversized_declared_length ... ok
+test bytecode::tests::decode_rejects_wrong_magic ... ok
+test quickjs::tests::engine_name ... ok
+test bytecode::tests::decode_rejects_wrong_fingerprint ... ok
+test bytecode::tests::compile_module_bytecode_is_compile_only ... ok
+test quickjs::tests::quickjs_engine_eval ... ok
+test quickjs::tests::quickjs_engine_set_get_global ... ok
+test quickjs::tests::quickjs_engine_gc ... ok
+test quickjs::tests::quickjs_engine_string ... ok
+test quickjs::tests::quickjs_engine_register_and_call ... ok
+test quickjs::tests::quickjs_engine_cyclic_value_does_not_overflow ... ok
+test quickjs::tests::quickjs_load_bytecode_rejects_invalid_container ... ok
+test reference_engine::tests::reference_engine_satisfies_runtime_api ... ok
+test reference_engine::tests::reference_engine_dispatches_registered_functions ... ok
+test reference_engine::tests::reference_engine_reports_bytecode_unsupported ... ok
+test tests::test_runtime_controller_integration ... ok
+test quickjs::tests::quickjs_load_bytecode_round_trip ... ok
+test quickjs_shims::tests::test_install_module_system ... ok
+test quickjs_shims::tests::test_navigator_user_agent_shim ... ok
+test quickjs_shims::tests::test_dom_node_constants_shim ... ok
+test quickjs_shims::tests::test_abort_controller_cycle_free ... ok
+test quickjs_shims::tests::test_host_timers_schedule_tick_and_cancel ... ok
+test quickjs_shims::tests::test_self_is_a_safe_getter ... ok
+test quickjs_shims::tests::test_history_and_location_routing_shims ... ok
+test quickjs_shims::tests::test_dom_text_content_and_insert_before ... ok
+test quickjs_shims::tests::test_web_animations_noop_driver ... ok
+test quickjs_shims::tests::test_async_fetch_host_result_resolves_angular_response ... ok
+test quickjs_shims::tests::test_fetch_response_readable_stream_and_text_decoder ... ok
+test quickjs_shims::tests::test_install_dom_shims ... ok
+test quickjs_shims::tests::test_text_encoder_decoder_roundtrip ... ok
+test quickjs_shims::tests::test_queue_microtask_and_drain ... ok
+test quickjs_shims::tests::test_localize_i18n_translations ... ok
+test quickjs_shims::tests::test_dom_tree_operations ... ok
+test quickjs::tests::quickjs_load_bytecode_rejects_never_settling_module_promise ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test tier_a_api_shape_reference_engine ... ok
+test tier_a_engine_names_are_unique ... ok
+test tier_a_api_shape_quickjs ... ok
+test tier_b_quickjs_evaluates_and_rejects_invalid_syntax ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 18 tests
+test host_destroy_null_is_safe ... ok
+test process_batch_null_handle_returns_error ... ok
+test host_create_destroy_round_trip ... ok
+test js_runtime_dispatch_callback_is_invoked ... ok
+test native_event_bridge_dispatches_to_registered_listener ... ok
+test js_dispatch_returning_zero_does_not_trigger_legacy_fallback ... ok
+test failed_batch_leaves_shadow_tree_unchanged ... ok
+test process_batch_bytes_rejects_malformed_frames ... ok
+test host_free_string_null_is_safe ... ok
+test process_batch_updates_shadow_tree ... ok
+test free_string_round_trip ... ok
+test process_batch_bytes_borrows_only_for_the_synchronous_call ... ok
+test run_layout_single_node ... ok
+test angular_bootstrap_fixture_drives_real_host_pipeline ... ok
+test run_layout_uses_snapshot_text_content_for_intrinsic_measurement ... ok
+test run_layout_invalid_json_returns_error ... ok
+test process_batch_invalid_json_returns_error ... ok
+test register_view_factory_and_process_batch ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 18 tests
+test styles::tests::maps_flex_alignment_and_rtl ... ok
+test layout_engine::tests::rejects_invalid_graphs_and_bad_constraints ... ok
+test styles::tests::position_offsets_do_not_change_static_positioning ... ok
+test styles::tests::maps_sizing_fields_to_their_taffy_types ... ok
+test styles::tests::parses_four_value_margin_and_padding_shorthands ... ok
+test styles::tests::rejects_bad_and_non_finite_values ... ok
+test styles::tests::style_input_is_hash_map_compatible ... ok
+test text_measurer::tests::cache_reuses_exact_measurement_inputs ... ok
+test text_measurer::tests::naive_measurer_scales_with_font_size_and_wraps ... ok
+test layout_engine::tests::text_and_image_measurement_callbacks_are_used ... ok
+test layout_engine::tests::zero_size_and_constrained_containers_are_stable ... ok
+test layout_engine::tests::padding_margin_and_gaps_affect_child_frames ... ok
+test layout_engine::tests::percentage_auto_and_min_max_sizing_work ... ok
+test layout_engine::tests::nested_flex_layout_preserves_order_and_parent_relative_frames ... ok
+test layout_engine::tests::rtl_direction_reverses_row_visual_order ... ok
+test layout_engine::tests::absolute_positioning_uses_relative_containing_block ... ok
+test layout_engine::tests::flex_grow_shrink_and_wrap_are_applied ... ok
+test layout_engine::tests::same_engine_handles_insertion_removal_style_update_and_relayout ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 20 tests
+test op_emitter::tests::listener_promotes_flattened_node ... ok
+test op_emitter::tests::custom_node_with_text_is_promoted ... ok
+test op_emitter::tests::create_then_append_emits_correct_ops ... ok
+test op_emitter::tests::candlestick_bars_string_is_emitted_as_set_props ... ok
+test op_emitter::tests::child_of_flattened_node_attaches_to_grandparent ... ok
+test op_emitter::tests::remove_child_releases_to_recycle_pool ... ok
+test op_emitter::tests::custom_node_with_style_is_promoted ... ok
+test op_emitter::tests::flattened_node_with_children_then_promoted ... ok
+test op_emitter::tests::custom_node_without_styles_stays_flattened ... ok
+test op_emitter::tests::remove_child_emits_remove_op ... ok
+test op_emitter::tests::view_flattening_is_lazy ... ok
+test op_emitter::tests::set_style_emits_set_props ... ok
+test view_tree::tests::register_and_attach ... ok
+test op_emitter::tests::tagged_custom_primitives_emit_real_create_ops ... ok
+test op_emitter::tests::untagged_custom_still_stays_flattened_without_create_op ... ok
+test op_emitter::tests::layout_produces_set_frame_ops ... ok
+test view_tree::tests::detach_and_destroy ... ok
+test op_emitter::tests::insert_child_reuses_recycle_slot ... ok
+test op_emitter::tests::reparenting_emits_remove_then_insert ... ok
+test op_emitter::tests::set_text_emits_set_text ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 15 tests
+test error_bad_protocol_version_throws ... ok
+test error_remove_child_requires_membership ... ok
+test error_unknown_node_type_throws ... ok
+test op_emitter_remove_child_produces_remove_op ... ok
+test op_emitter_create_insert_produces_ordered_ops ... ok
+test conformance_set_property_and_style ... ok
+test conformance_multiple_listeners_per_event ... ok
+test conformance_view_flattening ... ok
+test conformance_reparent ... ok
+test conformance_native_primitives_tagged_custom ... ok
+test conformance_create_append_remove ... ok
+test conformance_set_text_content ... ok
+test conformance_list_recycling ... ok
+test conformance_capability_degradation ... ok
+test conformance_runs_all_shared_fixtures ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 32 tests
+test tests::angular_animation_engine_interpolates_native_styles ... ignored, requires generated dist/aot/animations-app-bundle.js
+test tests::angular_animations_load_in_quickjs ... ignored, requires generated dist/aot/animations-bundle.js
+test tests::angular_aot_bytecode_loads_and_mutates_native_tree ... ignored, requires generated dist/aot/animations-app-bundle.qjsbc
+test tests::angular_aot_i18n_translated_text_in_native_tree ... ignored, requires generated dist/aot/i18n-app-bundle.js
+test tests::angular_bootstrap_runs_in_quickjs ... ignored, requires generated dist/aot/quickjs-bundle.js
+test tests::angular_counter_layout_has_non_overlapping_frames ... ignored, requires generated dist/aot/quickjs-bundle.js
+test tests::angular_error_handler_receives_aot_runtime_throw ... ignored, requires generated dist/aot/quickjs-bundle.js
+test tests::angular_forms_work_in_quickjs ... ignored, requires generated dist/aot/forms-bundle.js
+test tests::angular_http_platform_loads_in_quickjs ... ignored, requires generated dist/aot/http-bundle.js
+test tests::angular_router_bootstraps_with_outlet ... ignored, requires generated dist/aot/router-app-bundle.js
+test tests::angular_router_loads_in_quickjs ... ignored, requires generated dist/aot/router-bundle.js
+test tests::angular_template_driven_forms_round_trip_in_quickjs ... ignored, requires generated dist/aot/forms-app-bundle.js
+test tests::angular_timed_easing_drives_native_styles ... ignored, requires generated dist/aot/animations-app-bundle.js
+test tests::market_pulse_bundle_drives_candlestick_and_animation ... ignored, requires generated dist/aot/market-pulse-bundle.js
+test tests::memory_growth_analysis_registry_returns_to_baseline ... ignored, memory-growth analysis: registry baseline after 200 cycles
+test tests::stress_10000_dispatches_keep_one_delivery_per_event ... ignored, stress suite: 10k dispatches
+test tests::stress_1000_create_destroy_cycles_do_not_leak_handles ... ignored, stress suite: 1k bridge create/destroy cycles
+test tests::third_party_rxjs_interval_runs_on_host_timers ... ignored, requires generated dist/aot/rxjs-bundle.js
+test tests::third_party_rxjs_runs_unchanged_in_quickjs ... ignored, requires generated dist/aot/rxjs-bundle.js
+test tests::test_reference_engine_proves_bridge_engine_abstraction ... ok
+test tests::test_load_script_and_drain_microtasks ... ok
+test tests::test_dispatch_event_returns_zero_when_no_listeners ... ok
+test tests::test_create_runtime_bridge ... ok
+test tests::test_event_dispatches_exactly_once_end_to_end ... ok
+test tests::native_callback_cannot_reenter_the_same_bridge_handle ... ok
+test tests::test_metrics_error_handler_and_native_callback ... ok
+test tests::test_lifecycle_transitions_are_deterministic ... ok
+test tests::hmr_reload_preserves_counter_state_in_same_quickjs_realm ... ok
+test tests::test_thread_affinity_and_validated_handles ... ok
+test tests::test_load_bytecode_rejects_invalid_header ... ok
+test tests::two_bridges_on_one_thread_do_not_cross_route ... ok
+test tests::test_take_host_tasks_queue_and_wrong_thread_sentinel ... ok
+
+test result: ok. 13 passed; 0 failed; 19 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 19 tests
+test capability::tests::declared_capabilities_list ... ok
+test capability::tests::resolve_degrades_to_fallback ... ok
+test diagnostics::tests::buffer_evicts_oldest ... ok
+test capability::tests::resolve_unavailable_without_fallback ... ok
+test diagnostics::tests::performance_diagnostics_default ... ok
+test diagnostics::tests::filter_by_type ... ok
+test diagnostics::tests::publish_and_retrieve_events ... ok
+test capability::tests::resolve_available_capability ... ok
+test serialization::tests::serialize_generic_helper ... ok
+test diagnostics::tests::filter_by_level ... ok
+test diagnostics::tests::subscriber_count ... ok
+test serialization::tests::serialize_deserialize_json_round_trip ... ok
+test sync::tests::conflict_detection ... ok
+test sync::tests::acknowledged_ops_are_durable ... ok
+test sync::tests::enqueue_and_acknowledge ... ok
+test sync::tests::fail_increments_retry ... ok
+test serialization::tests::serialize_json_error_type ... ok
+test sync::tests::conflict_resolution ... ok
+test serialization::tests::serialization_format_enum ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test capability_and_diagnostics_work_together ... ok
+test offline_sync_with_conflict_and_resolution ... ok
+test serialization_round_trip_with_sync_queue ... ok
+test full_r7_integration ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+EXIT CODE: 0

@@ -1,0 +1,170 @@
+=== DEVICE IDENTITY ===
+List of devices attached
+b6640c8f               device product:CPH2551 model:CPH2551 device:OP5973L1 transport_id:7
+emulator-5554          device product:sdk_gphone64_x86_64 model:sdk_gphone64_x86_64 device:emu64xa transport_id:1
+
+CPH2551
+16
+arm64-v8a
+=== APK HASHES ===
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7 C:\Users\Moid Iqbal\.local\share\opencode\wo…
+SHA256    A88961CDE3F229E6160EE0F32AF0774DF3C7A728582426E16CD82847A084F7FD C:\Users\Moid Iqbal\.local\share\opencode\wo…
+
+
+=== INSTALL APP ===
+Performing Streamed Install
+Success
+install_app_exit=0
+=== INSTALL TEST ===
+Performing Streamed Install
+Success
+install_test_exit=0
+=== INSTRUMENTATION ===
+INSTRUMENTATION_STATUS: class=com.angnative.app.AngularCounterLayoutTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+com.angnative.app.AngularCounterLayoutTest:
+INSTRUMENTATION_STATUS: test=angularCounterViewsDoNotOverlap
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.AngularCounterLayoutTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=angularCounterViewsDoNotOverlap
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.CandlestickViewFactoryTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+com.angnative.app.CandlestickViewFactoryTest:
+INSTRUMENTATION_STATUS: test=taggedCandlestickCreatesNativeViewAndParsesBarsString
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.CandlestickViewFactoryTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=taggedCandlestickCreatesNativeViewAndParsesBarsString
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeLifecycleTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+com.angnative.app.RuntimeBridgeLifecycleTest:
+INSTRUMENTATION_STATUS: test=lifecycleWrappersTrackSuspendResumeAndStop
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeLifecycleTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=lifecycleWrappersTrackSuspendResumeAndStop
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeLifecycleTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=staleU64HandleReturnsSafeSentinels
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeLifecycleTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=staleU64HandleReturnsSafeSentinels
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeLifecycleTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=taggedCustomPrimitivesMaterializeWithCanonicalTags
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeLifecycleTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=taggedCustomPrimitivesMaterializeWithCanonicalTags
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeThreadAffinityTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+com.angnative.app.RuntimeBridgeThreadAffinityTest:
+INSTRUMENTATION_STATUS: test=wrongThreadDestroyIsANoOpAndDoesNotAbortTheProcess
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeThreadAffinityTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=wrongThreadDestroyIsANoOpAndDoesNotAbortTheProcess
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeThreadAffinityTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=wrongThreadDispatchLoadAndGetHostReturnSentinelsAndBridgeStaysAlive
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.RuntimeBridgeThreadAffinityTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=wrongThreadDispatchLoadAndGetHostReturnSentinelsAndBridgeStaysAlive
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.ViewFactoryMainThreadTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+com.angnative.app.ViewFactoryMainThreadTest:
+INSTRUMENTATION_STATUS: test=dispatchNativeEventFromWorkerRunsOnMainAndReachesAngularListener
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.ViewFactoryMainThreadTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=dispatchNativeEventFromWorkerRunsOnMainAndReachesAngularListener
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.angnative.app.ViewFactoryMainThreadTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=viewFactoryCallbacksFromWorkerEntryAreMarshalledToMainLooper
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.angnative.app.ViewFactoryMainThreadTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=9
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=viewFactoryCallbacksFromWorkerEntryAreMarshalledToMainLooper
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 1.89
+
+OK (9 tests)
+
+
+INSTRUMENTATION_CODE: -1
+instrument_exit=0
+=== INSTALLED APK ROUND TRIP ===
+device_path=/data/app/~~cH7iaLeLTg22f_mZAC6TGQ==/com.angnative.app-wwO5z5D3fL3kKfcT42dHyA==/base.apk
+/data/app/~~cH7iaLeLTg22f_mZAC6TGQ==/com.angnative.app-wwO5z5D3fL3kKfcT42dHyA==/base.apk: 1 file pulled, 0 skipped. 38.3 MB/s (33149157 bytes in 0.825s)
+pulled_sha256=EDD184C13205029483389F2B20FA2BCB3EFDB6C5D4BEB3E107C32A17EEB387B7
+pulled_length=33149157

@@ -1,0 +1,13 @@
+COMMAND: pnpm check:web-size
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 check:web-size C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/check-web-size-budget.mjs
+
+[angnative web] raw bundle: 354434 B
+[angnative web] gzip bundle: 112263 B (budget 128000 B / 125.0 KB, headroom 15737 B)
+[angnative web] forbidden packages: 0
+[angnative web] unlinked partial declarations: 0
+WEB GATE EXIT=0
+EXIT CODE: 0

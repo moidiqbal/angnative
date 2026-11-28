@@ -1,0 +1,26 @@
+COMMAND: pnpm run build:packages
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-master-probe
+
+
+> angnative-monorepo@0.1.0 build:packages C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-master-probe
+> pnpm -r --filter "!@angnative/native-ui-core" build
+
+Scope: 8 of 10 workspace projects
+packages/cli build$ node ../../scripts/tsc7.mjs -b
+packages/contract build$ node ../../scripts/tsc7.mjs -b
+packages/contract build: Done
+packages/cli build: Done
+packages/core build$ node ../../scripts/tsc7.mjs -b
+packages/core build: Done
+packages/platform build$ node ../../scripts/tsc7.mjs -b
+packages/common build$ node ../../scripts/compile-library-ngc.mjs tsconfig.ngc.json
+packages/common build: [angnative library ngc] Angular compiler-cli: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-master-probe\node_modules\.pnpm\@angular+compiler-cli@22.3._8cb191225387b3c4b416fdf0845da551\node_modules\@angular\compiler-cli\bundles\src\bin\ngc.js
+packages/common build: [angnative library ngc] compiling with tsconfig.ngc.json...
+packages/platform build: Done
+packages/common build: [angnative library ngc] partial compilation complete (Ivy metadata verified).
+packages/common build: Done
+packages/testing build$ node ../../scripts/tsc7.mjs -b
+packages/web build$ node ../../scripts/tsc7.mjs -b
+packages/testing build: Done
+packages/web build: Done
+EXIT CODE: 0

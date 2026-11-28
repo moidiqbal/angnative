@@ -1,0 +1,4 @@
+COMMAND: git checkout -- scripts/check-size-budget.mjs scripts/check-size-budget.spec.ts
+EXIT CODE: 0
+restored=scripts/check-size-budget.mjs hasCRLF=True
+restored=scripts/check-size-budget.spec.ts hasCRLF=True

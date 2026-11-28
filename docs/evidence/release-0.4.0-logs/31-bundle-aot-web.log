@@ -1,0 +1,10 @@
+COMMAND: pnpm run bundle:aot:web
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 bundle:aot:web C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/bundle-web-aot.mjs
+
+[angnative web] AOT bundle written to C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\dist\web-demo\app.js
+[angnative web] JIT compiler packages absent from metafile inputs
+EXIT CODE: 0

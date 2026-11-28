@@ -1,0 +1,9 @@
+COMMAND: pnpm run bundle:marketpulse
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 bundle:marketpulse C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/bundle-marketpulse.mjs
+
+Wrote C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\dist\aot\market-pulse-bundle.js
+EXIT CODE: 0

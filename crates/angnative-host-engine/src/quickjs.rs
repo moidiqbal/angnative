@@ -15,9 +15,10 @@ use rquickjs::function::Rest;
  * named `name`, so no dispatcher indirection is needed. QjsValue borrows the
  * Ctx lifetime, so all conversions happen inside `Context::with`.
  */
-use rquickjs::{Array, Context, Exception, Function, Object, Runtime, Value as QjsValue};
+use rquickjs::{Array, Context, Exception, Function, Module, Object, Runtime, Value as QjsValue};
 use std::sync::Arc;
 
+use crate::bytecode::decode;
 use crate::engine::{EngineError, JsEngine, JsValue};
 
 /// QuickJS-ng engine implementation.
@@ -57,6 +58,14 @@ impl Default for QuickJsEngine {
     }
 }
 
+fn bytecode_qjs_error(ctx: &rquickjs::Ctx<'_>, phase: &str, error: rquickjs::Error) -> EngineError {
+    let mut detail = format!("{phase}: {error}");
+    if matches!(error, rquickjs::Error::Exception) && ctx.has_exception() {
+        detail.push_str(&format!(": {:?}", ctx.catch()));
+    }
+    EngineError::Bytecode(detail)
+}
+
 impl JsEngine for QuickJsEngine {
     fn eval(&mut self, source: &str) -> Result<JsValue, EngineError> {
         self.context.with(|ctx| {
@@ -72,6 +81,52 @@ impl JsEngine for QuickJsEngine {
             })?;
             Ok(qjs_value_to_js_value(&result))
         })
+    }
+
+    fn load_bytecode(&mut self, bytes: &[u8]) -> Result<JsValue, EngineError> {
+        let payload = decode(bytes)?;
+        let loaded: Result<(), EngineError> = self.context.with(|ctx| {
+            // SAFETY: the versioned container was validated in `decode`.
+            // Bytecode is still trusted build output, not user input; the
+            // header only guards against accidental misuse.
+            let module = unsafe { Module::load(ctx.clone(), payload) }
+                .map_err(|e| bytecode_qjs_error(&ctx, "module load", e))?;
+            let (_, promise) = module
+                .eval()
+                .map_err(|e| bytecode_qjs_error(&ctx, "module eval", e))?;
+
+            // Match `load_script`: module evaluation returns a promise, so
+            // drive native jobs before checking whether it rejected.
+            for _ in 0..1024 {
+                if !ctx.execute_pending_job() {
+                    break;
+                }
+            }
+            match promise.result::<()>() {
+                Some(Ok(())) => {}
+                Some(Err(e)) => {
+                    let mut detail = format!("module promise: {e}");
+                    if ctx.has_exception() {
+                        detail.push_str(&format!(": {:?}", ctx.catch()));
+                    }
+                    return Err(EngineError::Bytecode(detail));
+                }
+                // `None` means the module evaluation promise has not settled.
+                // Module eval resolves to `undefined`, so a still-pending
+                // async init must not be indistinguishable from success.
+                None => {
+                    return Err(EngineError::Bytecode(
+                        "module promise: still pending after draining up to 1024 context jobs"
+                            .to_string(),
+                    ));
+                }
+            }
+            Ok(())
+        });
+        loaded?;
+        // JS-level queueMicrotask shim + any jobs enqueued by those callbacks.
+        self.drain_microtasks()?;
+        Ok(JsValue::Null)
     }
 
     fn call_function(&mut self, name: &str, args: &[JsValue]) -> Result<JsValue, EngineError> {
@@ -372,5 +427,71 @@ mod tests {
     fn engine_name() {
         let engine = QuickJsEngine::new().unwrap();
         assert_eq!(engine.engine_name(), "QuickJS-ng");
+    }
+
+    #[test]
+    fn quickjs_load_bytecode_round_trip() {
+        use crate::bytecode::{compile_module_bytecode, encode, VIRTUAL_MODULE_NAME};
+
+        let runtime = rquickjs::Runtime::new().unwrap();
+        let context = rquickjs::Context::full(&runtime).unwrap();
+        let raw = context
+            .with(|ctx| {
+                compile_module_bytecode(
+                    &ctx,
+                    VIRTUAL_MODULE_NAME,
+                    "globalThis.__bytecodeProbe = 6 * 7;",
+                )
+            })
+            .unwrap();
+        let artifact = encode(&raw).unwrap();
+
+        let mut engine = QuickJsEngine::new().unwrap();
+        assert_eq!(engine.load_bytecode(&artifact).unwrap(), JsValue::Null);
+        assert_eq!(
+            engine.get_global("__bytecodeProbe"),
+            Some(JsValue::Number(42.0))
+        );
+    }
+
+    #[test]
+    fn quickjs_load_bytecode_rejects_never_settling_module_promise() {
+        use crate::bytecode::{compile_module_bytecode, encode, VIRTUAL_MODULE_NAME};
+
+        let runtime = rquickjs::Runtime::new().unwrap();
+        let context = rquickjs::Context::full(&runtime).unwrap();
+        // The recursive `.then` keeps native jobs available so the loader must
+        // hit its 1024-job drain cap; the top-level `await` never settles.
+        let raw = context
+            .with(|ctx| {
+                compile_module_bytecode(
+                    &ctx,
+                    VIRTUAL_MODULE_NAME,
+                    r#"
+                    Promise.resolve().then(function spin() {
+                        Promise.resolve().then(spin);
+                    });
+                    await new Promise(function () {});
+                    "#,
+                )
+            })
+            .unwrap();
+        let artifact = encode(&raw).unwrap();
+
+        let mut engine = QuickJsEngine::new().unwrap();
+        let err = engine.load_bytecode(&artifact).unwrap_err();
+        assert!(matches!(err, EngineError::Bytecode(_)));
+        assert!(
+            err.to_string().contains("still pending"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn quickjs_load_bytecode_rejects_invalid_container() {
+        let mut engine = QuickJsEngine::new().unwrap();
+        let err = engine.load_bytecode(b"not-bytecode").unwrap_err();
+        assert!(matches!(err, EngineError::Bytecode(_)));
+        assert!(err.to_string().contains("magic") || err.to_string().contains("short"));
     }
 }

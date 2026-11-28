@@ -1,0 +1,8 @@
+COMMAND: pnpm run bundle:fixtures
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 bundle:fixtures C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node -e "import('./packages/cli/dist/bundle.js').then(m => m.bundleApp('packages/testing/fixtures/out/app.js', 'packages/testing/fixtures/out/bundle.js'))"
+
+EXIT CODE: 0

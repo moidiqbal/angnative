@@ -1,0 +1,9 @@
+COMMAND: pnpm run check:toolchain
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 check:toolchain C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/check-toolchain.mjs
+
+node 26.13.1 ┬╖ npm pnpm/10.34.9 npm/? node/v26.13.1 win32 x64
+EXIT CODE: 0

@@ -1,0 +1,11 @@
+COMMAND: pnpm run compile:aot
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 compile:aot C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/compile-aot.mjs
+
+[angnative aot] Angular compiler-cli: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\node_modules\.pnpm\@angular+compiler-cli@22.3._8cb191225387b3c4b416fdf0845da551\node_modules\@angular\compiler-cli\bundles\src\bin\ngc.js
+[angnative aot] compiling with tsconfig.aot.json...
+[angnative aot] AOT compilation complete (Ivy definitions verified).
+EXIT CODE: 0

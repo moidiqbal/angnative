@@ -1,0 +1,33 @@
+COMMAND: cargo test -p angnative-runtime-bridge -- --ignored
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+running 19 tests
+test tests::third_party_rxjs_interval_runs_on_host_timers ... ok
+test tests::third_party_rxjs_runs_unchanged_in_quickjs ... ok
+test tests::stress_10000_dispatches_keep_one_delivery_per_event ... ok
+test tests::memory_growth_analysis_registry_returns_to_baseline ... ok
+test tests::angular_animations_load_in_quickjs ... ok
+test tests::angular_http_platform_loads_in_quickjs ... ok
+test tests::angular_aot_bytecode_loads_and_mutates_native_tree ... ok
+test tests::angular_counter_layout_has_non_overlapping_frames ... ok
+test tests::angular_error_handler_receives_aot_runtime_throw ... ok
+test tests::angular_aot_i18n_translated_text_in_native_tree ... ok
+test tests::angular_animation_engine_interpolates_native_styles ... ok
+test tests::angular_router_loads_in_quickjs ... ok
+test tests::angular_timed_easing_drives_native_styles ... ok
+test tests::angular_bootstrap_runs_in_quickjs ... ok
+test tests::angular_router_bootstraps_with_outlet ... ok
+test tests::market_pulse_bundle_drives_candlestick_and_animation ... ok
+test tests::angular_forms_work_in_quickjs ... ok
+test tests::angular_template_driven_forms_round_trip_in_quickjs ... ok
+test tests::stress_1000_create_destroy_cycles_do_not_leak_handles ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 8.70s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+EXIT CODE: 0

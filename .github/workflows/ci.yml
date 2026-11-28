@@ -91,7 +91,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Compile Angular AOT (main + router/forms/i18n/animations apps)
+      - name: Compile Angular AOT (main + router/forms/i18n/animations/marketpulse apps)
         run: |
           pnpm run compile:aot
           pnpm run compile:aot:router
@@ -105,8 +105,11 @@ jobs:
           pnpm run bundle:quickjs
           pnpm run bundle:forms
           pnpm run bundle:framework
-          pnpm run bundle:third-party
           pnpm run bundle:marketpulse
+          pnpm run bundle:third-party
+
+      - name: Generate QuickJS bytecode artifact
+        run: pnpm run bundle:bytecode
 
       - name: Run Angular-in-QuickJS acceptance tests
         run: cargo test -p angnative-runtime-bridge -- --ignored

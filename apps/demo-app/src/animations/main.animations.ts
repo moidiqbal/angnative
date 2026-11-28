@@ -43,6 +43,22 @@ import { NaViewComponent as NaView } from '@angnative/common';
         ),
       ]),
     ]),
+    // Second trigger opts into the host-clock scheduler through a named easing.
+    // It starts hidden and is only flipped by __setEasedAnimationState(), so the
+    // historical deterministic-samples test is unaffected.
+    trigger('easedFade', [
+      state('hidden', style({ opacity: 0 })),
+      state('visible', style({ opacity: 1 })),
+      transition('hidden => visible', [
+        animate(
+          '100ms ease-in-out',
+          keyframes([
+            style({ opacity: 0, offset: 0 }),
+            style({ opacity: 1, offset: 1 }),
+          ]),
+        ),
+      ]),
+    ]),
   ],
   template: `
     <na-view>
@@ -52,12 +68,20 @@ import { NaViewComponent as NaView } from '@angnative/common';
         (@fade.start)="onStart($event)"
         (@fade.done)="onDone($event)"
       >animated</div>
+      <div
+        id="eased"
+        [@easedFade]="easedState"
+        (@easedFade.start)="onEasedStart($event)"
+        (@easedFade.done)="onEasedDone($event)"
+      >eased</div>
     </na-view>
   `,
 })
 export class AnimationsAppComponent {
   state = 'hidden';
   events: string[] = [];
+  easedState = 'hidden';
+  easedEvents: string[] = [];
 
   constructor(private readonly cdr: ChangeDetectorRef) {}
 
@@ -69,8 +93,21 @@ export class AnimationsAppComponent {
     this.events.push('done');
   }
 
+  onEasedStart(_event: AnimationEvent): void {
+    this.easedEvents.push('start');
+  }
+
+  onEasedDone(_event: AnimationEvent): void {
+    this.easedEvents.push('done');
+  }
+
   setState(value: string): void {
     this.state = value;
+    this.flush();
+  }
+
+  setEasedState(value: string): void {
+    this.easedState = value;
     this.flush();
   }
 
@@ -88,6 +125,14 @@ declare global {
   var __animationEvents: (() => string[]) | undefined;
   // eslint-disable-next-line no-var
   var __resetAnimationEvents: (() => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __setEasedAnimationState: ((state: string) => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __easedAnimationEvents: (() => string[]) | undefined;
+  // eslint-disable-next-line no-var
+  var __resetEasedAnimationEvents: (() => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __flushEasedFrame: (() => void) | undefined;
 }
 
 bootstrapApplication(AnimationsAppComponent, {
@@ -102,6 +147,10 @@ bootstrapApplication(AnimationsAppComponent, {
     globalThis.__setAnimationState = (value: string) => app.setState(value);
     globalThis.__animationEvents = () => app.events.slice();
     globalThis.__resetAnimationEvents = () => { app.events.length = 0; };
+    globalThis.__setEasedAnimationState = (value: string) => app.setEasedState(value);
+    globalThis.__easedAnimationEvents = () => app.easedEvents.slice();
+    globalThis.__resetEasedAnimationEvents = () => { app.easedEvents.length = 0; };
+    globalThis.__flushEasedFrame = () => app.flush();
   })
   .catch((err: unknown) => {
     const error = err as { message?: string; stack?: string };

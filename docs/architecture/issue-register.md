@@ -1,7 +1,7 @@
 # AngNative Architectural Issue Register
 
 ## Audit Date: 2026-11-21
-## Reconciled: 2026-11-23 (P1/P2/P3 closure round)
+## Reconciled: 2026-11-23 (P1/P2/P3 closure round); 2026-11-28 (`release/v0.4.0` gate refresh)
 ## Auditor: Principal Framework Architect
 
 ---
@@ -12,9 +12,9 @@
 |----------|-------|
 | **P0 - Critical** | 8 |
 | **P1 - High** | 12 |
-| **P2 - Medium** | 16 |
+| **P2 - Medium** | 17 |
 | **P3 - Low** | 8 |
-| **Total** | **44** |
+| **Total** | **45** |
 
 ---
 
@@ -141,23 +141,23 @@
 **Remediation**: None for accessor-level metrics; no periodic-collection claim is made.
 
 ### P1-12: Android ViewFactory Incomplete — implemented (tagged custom conformance fixture + MarketPulse candlestick)
-**Evidence**: Tagged custom primitives (`na-list`, `na-switch`, `na-activity-indicator`) are covered by the `native-primitives-tagged-custom` conformance fixture. The MarketPulse round adds `na-candlestick` → `Custom:na-candlestick`, a shared `attr:bars` JSON-string fixture, the Rust op-emitter assertion, and `CandlestickViewFactoryTest` (`OK (1 test)` on `emulator-5554`). The UI dump shows `content-desc="Custom:na-candlestick"`; full instrumentation after the two-asset split was `OK (9 tests)` (`docs/evidence/ANDROID-MARKETPULSE.md`). The final socket-only APK (SHA-256 `EDD184C1…B387B7`) has its own `OK (9 tests)` rerun on the API 34 x86_64 emulator with a retained raw log (`docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`; `docs/assets/market-pulse-final-socket-9test-emulator.log`).
+**Evidence**: Tagged custom primitives (`na-list`, `na-switch`, `na-activity-indicator`) are covered by the `native-primitives-tagged-custom` conformance fixture. The MarketPulse round adds `na-candlestick` → `Custom:na-candlestick`, a shared `attr:bars` JSON-string fixture, the Rust op-emitter assertion, and `CandlestickViewFactoryTest` (`OK (1 test)` on `emulator-5554`). The UI dump shows `content-desc="Custom:na-candlestick"`; full instrumentation after the two-asset split was `OK (9 tests)` (`docs/evidence/ANDROID-MARKETPULSE.md`). The final socket-only APK (SHA-256 `EDD184C1…B387B7`) has `OK (9 tests)` reruns on the API 34 x86_64 emulator and physical OnePlus `b6640c8f`, both with retained raw logs (`docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`, `docs/evidence/FINAL-SOCKET-9TEST-ONEPLUS.md`, `docs/assets/market-pulse-final-socket-9test-{emulator,oneplus}.log`).
 **Files**: `platforms/android/app/src/main/java/com/angnative/app/NativeViewFactory.kt`, `CandlestickView.kt`, `packages/testing/fixtures/candlestick-bars-property.json`, conformance fixture
-**Remediation**: Retained. The final socket APK now has an emulator `OK (9 tests)` pass; the physical OnePlus rerun of that same generic suite remains outstanding and is not claimed. The active socket-only build shows `Custom:na-candlestick` at `[168,826][1064,1134]` with a painted match-derived candle on `b6640c8f`, and post-change ABI instrumentation passed there (`docs/evidence/ANDROID-MARKETPULSE.md` section 11; `docs/assets/market-pulse-abi-oneplus.log`).
+**Remediation**: Retained. The final socket APK now has `OK (9 tests)` passes on both the API 34 emulator and physical OnePlus `b6640c8f` (1.89 s, exit 0; `docs/evidence/FINAL-SOCKET-9TEST-ONEPLUS.md`). The active socket-only build shows `Custom:na-candlestick` at `[168,826][1064,1134]` with a painted match-derived candle on `b6640c8f`, and post-change ABI instrumentation passed there (`docs/evidence/ANDROID-MARKETPULSE.md` section 11; `docs/assets/market-pulse-abi-oneplus.log`).
 
 ---
 
 ## P2 - Medium Issues (Architectural Debt)
 
 ### P2-01: QuickJS Shim Maintenance — implemented (tagged custom conformance fixture + MarketPulse fixture)
-**Evidence**: The `native-primitives-tagged-custom` conformance fixture provides automated coverage for tagged custom primitives on the native path. The MarketPulse round adds a shared OHLC bars-string fixture used by TS, Rust and Android; the ignored `market_pulse_bundle_drives_candlestick_and_animation` test loads the real AOT bundle and asserts the `attr:bars` mutation, 200-row window and deterministic animation samples. The socket-only round expands the shim with `na_fetchAsyncStart`/`na_onFetchResult` and `na_timerSchedule`/`na_timerCancel`/`na_onTimerTick`; the owner-scoped Rust queue is drained by `angnative_runtime_bridge_take_host_tasks(handle)` with `fetch`, `timerSchedule` and `timerCancel` JSON tasks. `cargo test --workspace` totals 154 passed / 0 failed / 17 ignored; the ignored runtime-bridge suite reports 17 passed / 0 failed.
+**Evidence**: The `native-primitives-tagged-custom` conformance fixture provides automated coverage for tagged custom primitives on the native path. The MarketPulse round adds a shared OHLC bars-string fixture used by TS, Rust and Android; the ignored `market_pulse_bundle_drives_candlestick_and_animation` test loads the real AOT bundle and asserts the `attr:bars` mutation, 200-row window and deterministic animation samples. The socket-only round expands the shim with `na_fetchAsyncStart`/`na_onFetchResult` and `na_timerSchedule`/`na_timerCancel`/`na_onTimerTick`; the owner-scoped Rust queue is drained by `angnative_runtime_bridge_take_host_tasks(handle)` with `fetch`, `timerSchedule` and `timerCancel` JSON tasks. `cargo test --workspace` totals 192 passed / 0 failed / 19 ignored on the fresh reconciled tree; the ignored runtime-bridge suite reports 19 passed / 0 failed (`docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md`).
 **Files**: `crates/angnative-host-engine/src/quickjs_shims.rs`, `crates/angnative-runtime-bridge/src/lib.rs`, `crates/angnative-host-ffi/include/angnative_host_ffi.h`, `platforms/android/app/src/main/java/com/angnative/app/HostCapabilities.kt`, conformance fixture, `packages/testing/fixtures/candlestick-bars-property.json`
 **Remediation**: Fixtures retained; host-backed async fetch/timer capabilities are implemented and verified. No REST market-data path was added (see P2-16).
 
-### P2-02: No QuickJS Bytecode Loading — DEFERRED (feasibility spike only)
-**Evidence**: `rquickjs` 0.5.1 exposes dump-bytecode and module-bytecode traits behind feature flags, but no runtime bytecode loader exists in this repo. The supported path remains self-contained IIFE bundles loaded as text. Outcome: **deferred, not verified**; see `docs/evidence/BYTECODE-FEASIBILITY-SPIKE.md`. Do not claim bytecode loading works.
-**Files**: `crates/angnative-host-engine/src/runtime.rs`, `docs/evidence/BYTECODE-FEASIBILITY-SPIKE.md`
-**Remediation**: A future `RuntimeController.loadBytecode()` would require a real loader plus tests; none exists.
+### P2-02: No QuickJS Bytecode Loading — implemented (Rust/runtime scope only)
+**Evidence**: `JsEngine::load_bytecode()` now has an `EngineError::Unsupported` default, and `QuickJsEngine::load_bytecode()` validates a versioned `ANGNQJSB2` container with producer fingerprint before loading rquickjs module bytecode, evaluating it and draining jobs/microtasks. A still-pending module-eval promise is rejected instead of reported as success; legacy `ANGNQJSB1` artifacts are rejected with a regenerate message. `AngNativeRuntime` and `RuntimeBridge` expose matching methods; the bridge reports `phase = "load_bytecode"` on invalid input with no text fallback. CI now builds the MarketPulse AOT/bundle artifact before the ignored tests. The Rust `dump-bytecode` generator emits `dist/aot/animations-app-bundle.qjsbc` (1,404,074 B, SHA-256 `FA53851E9F63515CDD1C10B586FD2ECE373A0E75DE1C961B8FC1CE67A8030154`), and the ignored suite passes 19/19 against a freshly generated v2 artifact. Gates on the fresh reconciled `release/v0.4.0` tree (`29af248`): 45 host-engine tests, 12 bridge tests / 19 ignored, workspace 192 passed / 0 failed / 19 ignored, `pnpm test` 287 passed (22 files), web gate 112,263 B gzip / 128,000 B, FFI 40 JNI / 22 Swift / 31 headers. No checksum/signature, C ABI/JNI/Swift/header, startup-speed, ES-module-loader or platform-shell claim. See `docs/evidence/QUICKJS-BYTECODE-LOADER.md`.
+**Files**: `crates/angnative-host-engine/src/bytecode.rs`, `crates/angnative-host-engine/src/bin/dump-bytecode.rs`, `crates/angnative-host-engine/src/engine.rs`, `crates/angnative-host-engine/src/quickjs.rs`, `crates/angnative-host-engine/src/runtime.rs`, `crates/angnative-runtime-bridge/src/lib.rs`, `.github/workflows/ci.yml`, `package.json`, `docs/evidence/QUICKJS-BYTECODE-LOADER.md`
+**Remediation**: Deferral lifted in the reconciled `release/v0.4.0` tree (merge `29af248`, not merged to `master`). Platform asset/shell wiring, C ABI/JNI/Swift, Hermes/V8 and startup-speed work remain separate/out of scope.
 
 ### P2-03: Android JNI Global Ref Leaks — implemented (tests added this round)
 **Evidence**: RAII ownership, failure-path cleanup and `onDestroy` teardown are covered by the Android JNI/native-view-factory tests added in this round (including tagged `NativeViewFactory` cases); emulator instrumentation may be re-run separately.
@@ -228,6 +228,12 @@
 **Evidence**: The QuickJS fetch shim now keeps `fetch()` promises pending until the host calls `na_onFetchResult`; host tasks are exposed through `angnative_runtime_bridge_take_host_tasks(handle)` as `fetch`, `timerSchedule` and `timerCancel`, and the host drives `na_onTimerTick`. MarketPulse uses real RxJS `interval(30000)` for bounded refresh with one request in flight; `/marketpulse/quote` resolves from the host's Coinbase WebSocket-derived cache, not a REST market endpoint. Market data itself comes only from Coinbase Exchange `matches`: 30m OHLC and integer milli-BTC volume from executed `match` price/size/time. On physical OnePlus `b6640c8f` the retained log shows empty `bars=0 state=connecting` at boot followed by `bars=1 state=live` from the first real match; failures keep last-good data with `fresh:false`. Evidence: `docs/evidence/ANDROID-MARKETPULSE.md` section 11, `docs/UNSUPPORTED-FEATURES.md`.
 **Files**: `platforms/android/app/src/main/java/com/angnative/app/MarketPulseFeed.kt`, `HostCapabilities.kt`, `AngNativeView.kt`, `apps/demo-app/src/marketpulse/main.marketpulse.ts`, `crates/angnative-host-engine/src/quickjs_shims.rs`, `crates/angnative-runtime-bridge/src/lib.rs`
 **Remediation**: Closed for the host-backed async fetch/timer capability. SSE and REST market-data paths remain deliberately out of scope; no real-time guarantee is made.
+
+### P2-17: No Real-Time Animation Easing Driver — implemented (scope-limited)
+
+**Evidence**: The native animation player now has two modes. Linear/empty easing keeps the historical deterministic `0 → 0.5 → 1` samples; recognized non-linear easing (`ease`, `ease-in`, `ease-out`, `ease-in-out`) opts into a host-clock scheduler backed by `na_nowMs()` (Rust `Instant`) and `requestAnimationFrame`. Five fake-clock unit tests, a timed renderer test, and the ignored AOT test `angular_timed_easing_drives_native_styles` verify ease-in-out native opacity frames ending at `0.125 / 0.5 / 0.875 / 1` for controlled 25/50/75/100 ms frames, `start,done` callbacks and final native opacity `1`. Fresh reconciled-tree gates: `pnpm test` 287 passed (22 files), `cargo test --workspace` 192 passed / 0 failed / 19 ignored, web gate 112,263 B gzip / 128,000 B (`docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md`). No 60 FPS, vsync, GPU, new JNI/FFI method, mutation-protocol change or platform guarantee is claimed. Evidence: `docs/evidence/REAL-TIME-EASING.md`.
+**Files**: `packages/core/src/animation.ts`, `packages/core/src/animation.spec.ts`, `packages/core/src/renderer.spec.ts`, `crates/angnative-runtime-bridge/src/lib.rs`, `apps/demo-app/src/animations/main.animations.ts`.
+**Remediation**: Implemented in the reconciled `release/v0.4.0` tree (`29af248`, not merged to `master`); the prior deferral is lifted. Device pacing, web animation parity and HMR remain separate/out of scope.
 
 ---
 
@@ -300,7 +306,7 @@
 | P1-11 | ⚠️ Implemented (`RuntimeMetrics` accessors; no periodic-collection claim) | - | E |
 | P1-12 | ✅ Implemented and device-verified (`na-candlestick`; historical 9/9 CoinGecko suite, final socket-only emulator 9/9 rerun, active socket-only physical dump/pixels and post-change ABI pass) | - | D |
 | P2-01 | ✅ Implemented (tagged custom + MarketPulse fixtures + host-backed async fetch/timer shims and ABI drain) | - | C |
-| P2-02 | ⬜ Deferred (feasibility spike only; bytecode loading not implemented or verified) | - | C |
+| P2-02 | ✅ Implemented (QuickJS bytecode loader verified in Rust/runtime scope; no C ABI/JNI/Swift/platform claim; reconciled in `release/v0.4.0`, not merged to `master`) | - | C |
 | P2-03 | ⚠️ Implemented (JNI RAII/failure cleanup/onDestroy tests; emulator re-run may follow) | - | D |
 | P2-04 | ✅ Closed (UI-thread marshalling verified on emulator + OnePlus) | - | D |
 | P2-05 | ⚠️ Implemented (bridge 10k dispatch + 1k cycle stress tests) | - | E |
@@ -309,12 +315,13 @@
 | P2-08 | 🔴 Blocked (iOS static-only; no runtime verification) | - | - |
 | P2-09 | ⚠️ Implemented (GPU-free bridge/view-tree integration; real GPU not verified) | - | - |
 | P2-10 | ✅ Closed (AOT output load verified in QuickJS; browser demo AOT/JIT-free verified) | - | C |
-| P2-11 | ✅ Implemented (Rust CI gate wired; web bundle gate measured 111,977 B / 128,000 B gzip, 9 tests) | - | E |
+| P2-11 | ✅ Implemented (Rust CI gate wired; fresh reconciled-tree web bundle gate measured 112,263 B / 128,000 B gzip, 9 tests) | - | E |
 | P2-12 | ⚠️ Gate F implemented (generic `RuntimeBridge` over `JsEngine`) | - | F |
 | P2-13 | ⚠️ Gate F proof via in-repo `ReferenceEngine`; Hermes/V8 not integrated | - | F |
 | P2-14 | ✅ Closed (emulator + physical 11-app sustained artifacts retained; 33/33 physical valid) | - | G |
 | P2-15 | ✅ Done | - | A |
 | P2-16 | ✅ Implemented (host-backed async fetch/timer; real RxJS interval; socket-only market data, no REST market path) | - | C |
+| P2-17 | ✅ Implemented (host-clock easing scheduler, scope-limited; non-linear easing verified in QuickJS/native tree; no 60 FPS/platform claim; reconciled in `release/v0.4.0`, not merged to `master`) | - | C |
 | P3-01 | ✅ Closed (warning cleanup reconciled; no local count claimed) | - | - |
 | P3-02 | ✅ Closed (unused import removed in unified bridge) | - | - |
 | P3-03 | ✅ Closed (not dead — intentional concept UI) | - | D |
@@ -345,6 +352,6 @@
 - P0-01 through P0-05 addressed in runtime bridge refactor (thread-local, single Host, one delivery per event (canonical JS thread-local path + legacy FFI fallback))
 - P0-06 and P0-07 are closed (see `docs/CODE-REVIEW-2026-11-22.md`); P0-08 is closed as a flagship-only scope decision — the flagship has a verified live Angular E2E, while other shells remain imperative concept demos by design (ADR 0003).
 - 2026-11-23 reconciliation: P1-01, P1-04, P1-05, P3-01, P3-02 and P3-07 closed with retained evidence/reasoning above; Gate B and Gate F passed (see `docs/evidence/RUNTIME-BRIDGE-GATE-B.md` and `docs/evidence/RUNTIME-BRIDGE-GATE-F.md`).
-- P1-08 stays deferred (self-contained IIFE bundles; no ES module loader). P2-02 is deferred after a bytecode feasibility spike (`docs/evidence/BYTECODE-FEASIBILITY-SPIKE.md`); bytecode loading is not implemented or verified.
-- iOS (P2-08) remains BLOCKED pending macOS/Xcode access; iOS runtime is static-only in this repo. Hermes/V8 are not integrated — the Gate F engine is the in-repo `ReferenceEngine` only. Physical OnePlus `b6640c8f` now has three distinct recorded results: the historical CoinGecko runtime/polling/instrumentation run (`docs/evidence/ANDROID-MARKETPULSE.md` section 9), the post-change ABI instrumentation pass (`docs/assets/market-pulse-abi-oneplus.log`), and the active socket-only match-derived bar/candle run plus physical sustained repeat (`docs/evidence/ANDROID-MARKETPULSE.md` section 11; `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`). The final socket APK passed the generic nine-test suite on the API 34 emulator (`docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`); the physical-device nine-test rerun is not claimed. Desktop real window/GPU is not verified (GPU-free integration only).
+- P1-08 stays deferred (self-contained IIFE bundles; no ES module loader). P2-02 lifted the bytecode deferral in the reconciled `release/v0.4.0` tree: versioned QuickJS module bytecode loads and mutates the native tree in Rust/runtime scope, with no C ABI/JNI/Swift, startup-speed, signature or platform-shell claim (`docs/evidence/QUICKJS-BYTECODE-LOADER.md`). P2-17 lifted the real-time easing deferral in the same tree; no 60 FPS, vsync, GPU, protocol or platform claim is made (`docs/evidence/REAL-TIME-EASING.md`). Both workstreams plus HMR, ANB1 and zero-copy JNI were merged from pushed master into release commit `29af248` and are not merged to `master`.
+- iOS (P2-08) remains BLOCKED pending macOS/Xcode access; iOS runtime is static-only in this repo. Hermes/V8 are not integrated — the Gate F engine is the in-repo `ReferenceEngine` only. Physical OnePlus `b6640c8f` now has three distinct recorded results: the historical CoinGecko runtime/polling/instrumentation run (`docs/evidence/ANDROID-MARKETPULSE.md` section 9), the post-change ABI instrumentation pass (`docs/assets/market-pulse-abi-oneplus.log`), and the active socket-only match-derived bar/candle run plus physical sustained repeat (`docs/evidence/ANDROID-MARKETPULSE.md` section 11; `docs/benchmarks/sustained/b6640c8f-20261126-170816.json`). The final socket APK passed the generic nine-test suite on both the API 34 emulator (`docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md`) and physical OnePlus `b6640c8f` (`OK (9 tests)`, 1.89 s, exit 0; `docs/evidence/FINAL-SOCKET-9TEST-ONEPLUS.md`). Desktop real window/GPU is not verified (GPU-free integration only).
 - Documentation (P2-15) completed for research phase
