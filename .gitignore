@@ -40,6 +40,7 @@ platforms/ios/Sources/AngNativeHost/include/
 
 # Generated test fixtures
 packages/testing/fixtures/out/
+packages/testing/fixtures/hmr/out/
 
 # Local Research & Chat Logs
 research/
