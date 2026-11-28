@@ -198,11 +198,18 @@ jobs:
         run: |
           EMU_BIN="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/emulator/emulator"
           test -x "$EMU_BIN"
-          EMU_ARGS=(-avd angnative-ci -no-window -no-audio -no-snapshot -gpu swiftshader -no-boot-anim)
-          if [[ ! -r /dev/kvm ]]; then
-            echo "KVM unavailable; starting emulator with -no-accel"
-            EMU_ARGS+=(-no-accel)
+          if [[ ! -e /dev/kvm ]]; then
+            echo "/dev/kvm is missing; the x86_64 AVD cannot boot without acceleration"
+            exit 1
           fi
+          sudo chmod 666 /dev/kvm
+          if [[ ! -r /dev/kvm ]]; then
+            echo "/dev/kvm is still not readable"
+            ls -l /dev/kvm
+            exit 1
+          fi
+          ls -l /dev/kvm
+          EMU_ARGS=(-avd angnative-ci -no-window -no-audio -no-snapshot -gpu swiftshader -no-boot-anim)
           nohup "$EMU_BIN" "${EMU_ARGS[@]}" > /tmp/emulator.log 2>&1 &
           if ! timeout 600 adb wait-for-device; then
             echo "emulator did not reach adb; /tmp/emulator.log follows"
