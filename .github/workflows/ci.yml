@@ -155,7 +155,7 @@ jobs:
           LIBCLANG_PATH="$(dirname "$(readlink -f "$(find /usr/lib -name 'libclang.so*' | head -n 1)")")"
           test -n "$LIBCLANG_PATH"
           echo "LIBCLANG_PATH=${LIBCLANG_PATH}" >> "$GITHUB_ENV"
-          ./scripts/build-android-native.sh all
+          bash scripts/build-android-native.sh all
 
       - name: Create AVD
         run: |
