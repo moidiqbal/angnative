@@ -72,7 +72,7 @@ Selected verified rows:
 | Entry points | PASS — all 7 publishable packages resolved (on this host via built `dist/`; the `src/` fallback keeps this green on a clean checkout where `dist/` is absent) |
 | CI / root-referenced script files | PASS — all 15 exist |
 | CI `pnpm run` targets | PASS — all resolve to declared root scripts, including `build:packages` |
-| Fresh-checkout AOT bundle resolution | PASS — root `devDependencies` declare `@angnative/common`, `@angnative/platform` and `@angnative/web`; a clean worktree with `pnpm install --frozen-lockfile` resolves all bare AOT imports and builds every QuickJS/web bundle |
+| Fresh-checkout AOT bundle resolution | PASS — root `devDependencies` declare `@angnative/common`, `@angnative/platform`, `@angnative/web` and `rxjs`; a clean worktree with `pnpm install --frozen-lockfile` resolves all bare AOT imports and builds every QuickJS/web bundle |
 | CI `angular-runtime` MarketPulse preparation | PASS — CI now compiles and bundles MarketPulse before the ignored acceptance tests; the clean-worktree ignored suite reports 17 passed / 0 failed |
 
 ## Known gaps (reported as INFO, not failures)
