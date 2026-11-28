@@ -1,0 +1,8 @@
+COMMAND: pnpm --filter @angnative/web run build
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> @angnative/web@0.1.0 build C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\packages\web
+> node ../../scripts/tsc7.mjs -b
+
+EXIT CODE: 0

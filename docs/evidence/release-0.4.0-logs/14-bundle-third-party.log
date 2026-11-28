@@ -1,0 +1,9 @@
+COMMAND: pnpm run bundle:third-party
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 bundle:third-party C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> node scripts/bundle-third-party.mjs
+
+Wrote C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\dist\aot\rxjs-bundle.js
+EXIT CODE: 0

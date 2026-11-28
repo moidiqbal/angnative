@@ -119,6 +119,20 @@ The previous v1 artifact was 1412561 bytes with SHA-256
 `174F0B970E1BC0F295208FC3FD0AB169AE09332496704C9AE07C05A812AD9172`. v1 files
 are not auto-migrated; they fail with a regenerate message.
 
+**Reconciled `v0.4.0` tree (2026-11-28).** After merging pushed master, the AOT
+source changed (Angular 22.3.0 / dependency bumps), so the artifact had to be
+regenerated in the fresh-checkout proof:
+
+```text
+[angnative bytecode] 1404074 bytes from dist/aot/animations-app-bundle.js -> dist/aot/animations-app-bundle.qjsbc (fingerprint: qjsbc-v2/rquickjs-0.14.0/quickjs-ng-0.16.2/x86_64-windows-le-64)
+QJSBC_SHA256=FA53851E9F63515CDD1C10B586FD2ECE373A0E75DE1C961B8FC1CE67A8030154
+SOURCE_SHA256=82C51E6D97232311CB4E80A7DBD685AF584B0AF00BCDB2C353B690C07BD7D9A6
+```
+
+All 19 ignored acceptance tests passed with this freshly generated v2 artifact.
+See `docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md`. Hashes are target-specific;
+no cross-host equality is claimed.
+
 ## 4. Unit and bridge tests
 
 Command:

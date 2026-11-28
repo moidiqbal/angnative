@@ -1,0 +1,25 @@
+COMMAND: pnpm exec vitest run packages/cli/src/dev.spec.ts --reporter=verbose
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+ RUN  v5.1.2 C:/Users/Moid Iqbal/.local/share/opencode/worktree/73380c/phase-0.5-fresh
+
+ Γ£ô packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > has sensible default budgets (<= 200 ms component, <= 500 ms inner loop) 1ms
+ Γ£ô packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > constructs with custom config 0ms
+ Γ£ô packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > reports last compile as null before any compile 0ms
+ Γ£ô packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > stop on an unstarted server does not throw 0ms
+ Γ£ô packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > invokes the real ngc-backed script for an incremental compile 1675ms
+stdout | packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > watches source files, rebundles and publishes a versioned HMR event
+[angnative dev] server running on http://localhost:58068
+
+stdout | packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > watches source files, rebundles and publishes a versioned HMR event
+[angnative dev] C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh\dist\__dev_spec__\watched.ts: inner loop 16 ms (compile 0 ms, bundle 16 ms), reload v1
+
+ Γ£ô packages/cli/src/dev.spec.ts > DevServer ΓÇö incremental AOT + fast refresh > watches source files, rebundles and publishes a versioned HMR event 107ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  20:15:43
+   Duration  1.96s (tests 98%, import 1%, transform 1%)
+
+EXIT CODE: 0

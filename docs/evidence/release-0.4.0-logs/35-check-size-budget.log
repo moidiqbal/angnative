@@ -1,0 +1,9 @@
+COMMAND: node scripts/check-size-budget.mjs
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+JS payload: 203 B gzip (budget 61440 B / 60 KB)
+@angular/compiler and zone.js: 0 B in the bundle.
+     431 B  app
+The JS payload is within budget.
+GATE EXIT=0
+EXIT CODE: 0

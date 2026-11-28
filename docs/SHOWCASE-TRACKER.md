@@ -15,7 +15,7 @@
 | Build system | Gradle 9.9.2 / AGP 9.5.2 / JDK 25 (latest profile) **or** Gradle 8.2 / AGP 8.2 / JDK 17 (legacy) |
 | Android SDK | `C:\Android\Sdk`, API 34/36, NDK 27.2.12479018 |
 | Web adapter | `@angnative/web` — DOM path only, explicitly NOT used for native APKs |
-| Existing tests | `cargo test --workspace`: 174 passed / 0 failed / 19 ignored (ignored runtime-bridge suite 19 passed); `pnpm test`: 266 passed (18 files); Android emulator + physical OnePlus UI/tap/ABI verified |
+| Existing tests | Fresh reconciled `release/v0.4.0` tree (`29af248`): `cargo test --workspace` 192 passed / 0 failed / 19 ignored (ignored runtime-bridge suite 19 passed); `pnpm test` 287 passed (22 files); web gate 112,263 B gzip / 128,000 B; FFI 40 JNI / 22 Swift / 31 headers. Android emulator + physical OnePlus UI/tap/ABI results remain retained historical evidence (not repeated for this commit). Evidence: `docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md` |
 
 ### DOM-dependent libraries — verdict before implementation
 Angular Material, PrimeNG, NG-ZORRO, Taiga UI, Spartan UI, AG Grid, ECharts,

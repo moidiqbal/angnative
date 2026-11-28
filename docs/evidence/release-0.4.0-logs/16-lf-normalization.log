@@ -1,0 +1,3 @@
+COMMAND: temporarily rewrite CRLF -> LF in scripts/check-size-budget.mjs and scripts/check-size-budget.spec.ts
+normalized=scripts/check-size-budget.mjs hadCRLF=True
+normalized=scripts/check-size-budget.spec.ts hadCRLF=True

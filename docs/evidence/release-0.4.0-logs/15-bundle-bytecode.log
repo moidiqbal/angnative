@@ -1,0 +1,9 @@
+COMMAND: pnpm run bundle:bytecode
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 bundle:bytecode C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> cargo run -p angnative-host-engine --bin dump-bytecode -- dist/aot/animations-app-bundle.js dist/aot/animations-app-bundle.qjsbc
+
+[angnative bytecode] 1404074 bytes from dist/aot/animations-app-bundle.js -> dist/aot/animations-app-bundle.qjsbc (fingerprint: qjsbc-v2/rquickjs-0.14.0/quickjs-ng-0.16.2/x86_64-windows-le-64)
+EXIT CODE: 0

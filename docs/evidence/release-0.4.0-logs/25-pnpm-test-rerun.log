@@ -1,0 +1,17 @@
+COMMAND: pnpm test
+WORKDIR: C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+
+
+> angnative-monorepo@0.1.0 test C:\Users\Moid Iqbal\.local\share\opencode\worktree\73380c\phase-0.5-fresh
+> vitest run
+
+
+ RUN  v5.1.2 C:/Users/Moid Iqbal/.local/share/opencode/worktree/73380c/phase-0.5-fresh
+
+
+ Test Files  22 passed (22)
+      Tests  287 passed (287)
+   Start at  20:15:57
+   Duration  6.05s (tests 72%, import 24%, transform 3%, worker 1%)
+
+EXIT CODE: 0

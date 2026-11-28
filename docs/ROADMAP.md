@@ -73,9 +73,9 @@
 > evidence-backed release path. This is the next milestone after the pushed
 > `feat/quickjs-bytecode-loader` work; iOS/Mac verification is Ammar's scope.
 
-- [ ] Reconcile `feat/quickjs-bytecode-loader` with pushed `master` (`87e4eef`), preserving both the HMR/zero-copy/ANB1 work and the bytecode v2 + promise + CI fixes.
-- [ ] Prove a genuinely fresh checkout: frozen pnpm install → `build:packages` → AOT/bundles/bytecode → Rust workspace + ignored suite + web/FFI gates.
-- [ ] Refresh all stale trackers to the fresh numbers and write `docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md`.
+- [x] Reconcile `feat/quickjs-bytecode-loader` with pushed `master` (final `dea0beb`) in merge `29af248`, preserving both the HMR/zero-copy/ANB1 work and the bytecode v2 + promise + CI fixes.
+- [x] Prove a genuinely fresh checkout: frozen pnpm install → `build:packages` → AOT/bundles/bytecode → Rust workspace + ignored suite + web/FFI gates (`docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md`).
+- [x] Refresh all stale trackers to the fresh numbers and write `docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md` plus `docs/releases/v0.4.0.md`.
 - [ ] Cut annotated `v0.4.0` tag and push branch + tag; decide the `v0.3.0` remote tag gap.
 - Design: `docs/plans/2026-11-28-phase-0.5-release-engineering-design.md`.
 
