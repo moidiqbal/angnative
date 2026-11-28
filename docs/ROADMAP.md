@@ -65,3 +65,25 @@
 - [x] Re-export of canonical `na-*` primitives.
 - [x] DOM render + click event integration tests (6 tests).
 - [x] `pnpm start` serves a working browser demo — verified in headless Chromium via Playwright: no console errors, 11 `na-*` elements render, and clicking `+` updates `Count: 0 → 1` / `even → odd` (screenshots `docs/assets/web-demo*.png`).
+
+---
+
+## Phase 0.5: Release engineering + fresh-CI determinism 🟡 (added 2026-11-28)
+> Numbered `0.x` because it extends the Phase 0 foundations: a repeatable,
+> evidence-backed release path. This is the next milestone after the pushed
+> `feat/quickjs-bytecode-loader` work; iOS/Mac verification is Ammar's scope.
+
+- [ ] Reconcile `feat/quickjs-bytecode-loader` with pushed `master` (`87e4eef`), preserving both the HMR/zero-copy/ANB1 work and the bytecode v2 + promise + CI fixes.
+- [ ] Prove a genuinely fresh checkout: frozen pnpm install → `build:packages` → AOT/bundles/bytecode → Rust workspace + ignored suite + web/FFI gates.
+- [ ] Refresh all stale trackers to the fresh numbers and write `docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md`.
+- [ ] Cut annotated `v0.4.0` tag and push branch + tag; decide the `v0.3.0` remote tag gap.
+- Design: `docs/plans/2026-11-28-phase-0.5-release-engineering-design.md`.
+
+---
+
+## Phase 0.6: Developer and system capabilities 🟡 (added 2026-11-28)
+- [ ] **0.6.1** Node-only standalone component harness in `packages/testing` (3–5 fixtures, public runner API, negative test).
+- [ ] **0.6.2** Durable SQLite/KV backend for `angnative-services-core` sync queue with restart/crash-safe round-trip tests.
+- [ ] **0.6.3** Capability tokens + resolver + degradation tests for Camera, Biometrics, Geolocation and Push; no unverified device-API claim.
+- [ ] **0.6.4** Standing quality/docs agent: architecture-drift review, known nit fixes and tracker consistency after each sub-phase.
+- Design: `docs/plans/2026-11-28-phase-0.6-developer-and-system-capabilities-design.md`.
