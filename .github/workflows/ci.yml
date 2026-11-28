@@ -172,7 +172,9 @@ jobs:
 
       - name: Build ecosystem-core APK
         working-directory: showcases/ecosystem-core
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Boot emulator
         run: |
