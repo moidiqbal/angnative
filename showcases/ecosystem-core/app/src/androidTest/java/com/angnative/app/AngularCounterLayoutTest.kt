@@ -80,8 +80,24 @@ class AngularCounterLayoutTest {
                 assertNotNull("Reset button label missing", reset)
                 assertNotNull("Plus button label missing", plus)
 
+                // Exercise the complete native event path: Kotlin dispatches
+                // the native + node through JNI, RuntimeBridge routes the
+                // listenerId/payload to na_onEvent, Angular updates its
+                // signal, and the resulting SetText op updates the real view.
+                val plusNodeId = bridge.snapshot().nodes
+                    .firstOrNull { it.textContent == "+" }
+                    ?.id
+                    ?: throw AssertionError("Angular '+' node missing from host snapshot")
+                val invoked = bridge.dispatchNativeEvent(plusNodeId, "click")
+                assertTrue("Expected an Angular click listener, invoked=$invoked", invoked > 0)
+                assertEquals(
+                    "Angular signal update must reach the native TextView",
+                    "Count: 1",
+                    findTextView(container, "Count: 1")?.text?.toString(),
+                )
+
                 val rects = listOf(
-                    "Count" to screenRect(count!!),
+                    "Count" to screenRect(findTextView(container, "Count: 1")!!),
                     "minus" to screenRect(minus!!),
                     "reset" to screenRect(reset!!),
                     "plus" to screenRect(plus!!),

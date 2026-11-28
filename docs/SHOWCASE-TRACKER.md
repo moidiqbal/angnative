@@ -8,7 +8,7 @@
 |---|---|
 | Renderer | `packages/core` — custom Angular `Renderer2`, emits `CommandBatch` JSON |
 | Shadow tree | Rust `angnative-host-core` (`MutationEngine`) + `angnative-host-view` (`OpEmitter`) |
-| Layout | `angnative-host-layout`, **Taffy 0.15.1** (docs corrected from 0.5.2) |
+| Layout | `angnative-host-layout`, **Taffy 0.16.0** |
 | Native bridge | `angnative-host-ffi` C ABI + JNI (`platforms/android`) + Swift (`platforms/ios`) |
 | Android UI | `JniBridge.kt`, `NativeViewFactory.kt`, `AngNativeView.kt` — views created from Rust `PlatformOp`s, not hand-built |
 | Supported native widgets | `View`, `Text`, `Button`, `TextInput`, `Image`, `ScrollView`, `Switch`, `ActivityIndicator`, `List`, `Slot`, `Candlestick` (`na-candlestick` → `Custom:na-candlestick`, see `packages/contract/src/elements.ts` and `NativeViewFactory.kt`) |

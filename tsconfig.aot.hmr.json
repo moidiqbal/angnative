@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "packages/testing/fixtures/hmr/out",
+    "rootDir": "packages/testing/fixtures/hmr",
+    "declaration": false,
+    "sourceMap": false,
+    "inlineSources": false
+  },
+  "angularCompilerOptions": {
+    "enableIvy": true,
+    "enableResourceInlining": true,
+    "skipTemplateCodegen": false,
+    "strictMetadataEmit": true,
+    "fullTemplateTypeCheck": true
+  },
+  "files": ["packages/testing/fixtures/hmr/counter.component.ts"],
+  "include": ["packages/testing/fixtures/hmr/**/*.ts"],
+  "exclude": []
+}

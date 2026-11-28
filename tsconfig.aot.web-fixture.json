@@ -14,5 +14,5 @@
   "include": [
     "packages/testing/fixtures/web-aot/**/*.ts"
   ],
-  "exclude": []
+  "exclude": ["packages/testing/fixtures/web-aot/compiled"]
 }

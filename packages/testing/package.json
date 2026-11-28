@@ -15,20 +15,26 @@
   },
   "files": ["dist/**", "fixtures/**"],
   "scripts": {
-    "build": "tsc -b",
+    "build": "node ../../scripts/tsc7.mjs -b",
     "test": "vitest run"
   },
   "peerDependencies": {
     "@angnative/core": "0.1.0",
-    "@angnative/contract": "0.1.0"
+    "@angnative/contract": "0.1.0",
+    "@angnative/common": "0.1.0",
+    "@angnative/platform": "0.1.0"
   },
   "devDependencies": {
     "@angnative/core": "0.1.0",
     "@angnative/contract": "0.1.0",
-    "vitest": "3.2.4"
+    "@angnative/common": "0.1.0",
+    "@angnative/platform": "0.1.0",
+    "vitest": "5.1.2"
   },
   "dependencies": {
     "@angnative/core": "0.1.0",
-    "@angnative/contract": "0.1.0"
+    "@angnative/contract": "0.1.0",
+    "@angnative/common": "0.1.0",
+    "@angnative/platform": "0.1.0"
   }
 }

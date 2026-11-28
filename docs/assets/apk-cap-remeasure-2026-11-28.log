@@ -1,0 +1,9 @@
+captured_at_utc: 2026-11-27T20:38:42.0080836Z
+command: ./gradlew.bat assembleRelease --no-daemon (showcases/ecosystem-core)
+workspace_head: 7e66cb6344315182065e9d7990574cf9184fe5e6
+apk: C:\Users\Moid Iqbal\Projects\angnative\showcases\ecosystem-core\app\build\outputs\apk\release\app-release.apk
+bytes: 17749974
+sha256: 1AEA5A3516915A36BC7D3A38BCD536623D21A8475B74D1D66EB00CB73A1D0D86
+cap_bytes: 20000000
+margin_bytes: 2250026
+under_cap: True

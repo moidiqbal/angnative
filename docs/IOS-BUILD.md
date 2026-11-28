@@ -116,8 +116,9 @@ and iOS build wiring are verified **statically** on Windows/macOS without Xcode:
 
 ```bash
 python scripts/check-ffi-declarations.py
-# FFI declaration check OK: 11 JNI methods, 14 Swift bindings (5 runtime bridge),
-# 20 header declarations; iOS unified staticlib wiring OK
+# FFI declaration check OK: 40 JNI methods across 2 Android shells,
+# 22 Swift bindings (13 runtime bridge), 31 header declarations;
+# iOS unified staticlib wiring OK
 ```
 
 That check proves the Swift symbols/signatures exist in the shared C header and
@@ -129,8 +130,9 @@ Swift tests, then use this manual smoke checklist on the **main thread**:
 
 ```bash
 # Generate a self-contained bundle first (from the repo root):
-pnpm --filter @angnative/core build && pnpm --filter @angnative/testing build &&
-pnpm --filter @angnative/platform build
+# build:packages builds contract → core → common (ngc partial) → platform →
+# testing → web → cli in one deterministic entrypoint.
+pnpm run build:packages
 pnpm compile:aot && pnpm bundle:quickjs
 
 cd platforms/ios && swift test -Xlinker -L../../platforms/ios/Sources/AngNativeHost

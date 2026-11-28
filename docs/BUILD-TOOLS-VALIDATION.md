@@ -1,6 +1,6 @@
 # Build-Time Tool Validation
 
-**Status: 2026-11-21.** This document describes `scripts/validate-build-tools.mjs`,
+**Status: 2026-11-28.** This document describes `scripts/validate-build-tools.mjs`,
 a read-only suite that verifies the repository's build-time toolchain facts and
 fails loudly when something concrete is broken.
 
@@ -49,25 +49,31 @@ harmless commands (`node --version`, `pnpm --version`). It prints a
 Environment: **Node v26.13.1**, **pnpm 10.34.9**, Windows/PowerShell.
 
 ```
-SUMMARY: 25 PASS, 0 FAIL, 6 INFO
-RESULT: PASS        (exit code 0)
+SUMMARY: 24 PASS, 1 FAIL, 7 INFO
+RESULT: FAIL        (exit code 1)
 ```
+
+The single FAIL is pre-existing and unrelated to this build fix:
+`packages/native-ui-core` has no `tsconfig.json` (it is excluded from the
+TypeScript package build via `build:packages`).
 
 Selected verified rows:
 
 | Check | Result |
 |---|---|
 | `node --version` / `pnpm --version` | PASS — v26.13.1 / 10.34.9 |
-| `@angular/core` / `@angular/compiler-cli` | PASS — both `22.2.5` (aligned) |
-| `typescript` / `vitest` | PASS — `6.0.3` / `3.2.4` |
-| Root + per-package tsconfigs | PASS — 3 root configs, 8 packages covered |
+| `@angular/core` / `@angular/compiler-cli` | PASS — both `22.3.0` (aligned) |
+| `typescript` / `vitest` | PASS — `6.0.3` (resolved by Angular ngc) + `typescript7` alias `7.0.2` (workspace `tsc`) / `5.1.2` |
+| Root + per-package tsconfigs | FAIL — 3 root configs, 7 of 8 packages covered; `packages/native-ui-core` has no `tsconfig.json` (pre-existing) |
 | `pnpm-workspace.yaml` | PASS — all 8 packages matched by `[packages/*, apps/*]` |
 | Unique package names | PASS — 8 names across 8 packages |
 | Vitest configs | PASS — 6 packages (`cli` and `demo-app` delegate to the root runner) |
 | Playwright usage | PASS — `scripts/verify-web.py` imports `playwright.sync_api` |
 | Entry points | PASS — all 7 publishable packages resolved (on this host via built `dist/`; the `src/` fallback keeps this green on a clean checkout where `dist/` is absent) |
-| CI / root-referenced script files | PASS — all 6 exist (`check-toolchain`, `check-rust-size`, `check-size-budget`, `compile-fixtures`, `compile-aot`, `serve-web`) |
-| CI `pnpm run` targets | PASS — all resolve to declared root scripts |
+| CI / root-referenced script files | PASS — all 15 exist |
+| CI `pnpm run` targets | PASS — all resolve to declared root scripts, including `build:packages` |
+| Fresh-checkout AOT bundle resolution | PASS — root `devDependencies` declare `@angnative/common`, `@angnative/platform`, `@angnative/web` and `rxjs`; a clean worktree with `pnpm install --frozen-lockfile` resolves all bare AOT imports and builds every QuickJS/web bundle |
+| CI `angular-runtime` MarketPulse preparation | PASS — CI now compiles and bundles MarketPulse before the ignored acceptance tests; the clean-worktree ignored suite reports 17 passed / 0 failed |
 
 ## Known gaps (reported as INFO, not failures)
 
@@ -75,7 +81,15 @@ Selected verified rows:
   dependency. The workspace is plain pnpm + TypeScript project references
   (`tsconfig.json`) — see `tsconfig.json` and `pnpm-workspace.yaml`.
 - **No Angular CLI workspace.** `@angular/cli` is not a dependency and there is
-  no `angular.json`. Builds use `tsc -b` via the root `build` script.
+  no `angular.json`. Builds use the deterministic `pnpm run build:packages`
+  entrypoint (pnpm topological order; `@angnative/common` via real ngc partial
+  compilation).
+- **TypeScript 7 + Angular 22.3.0.** `@angular/compiler-cli@22.3.0` pins
+  `typescript >=6.0 <6.1` and calls TS APIs removed in 7, so the root
+  `typescript` dependency stays at `6.0.3` for ngc. `typescript7` is installed
+  as an alias, and `scripts/tsc7.mjs` invokes its declared `tsc` bin explicitly
+  for all non-Angular package builds. Both majors are declared; ngc and
+  workspace `tsc` resolve different versions by design.
 - **Jest is not present.** No `jest.config.*` and no `jest` dependency were
   found. JS/TS tests use Vitest; Rust tests use `cargo test`.
 - **Playwright is present but only as a Python tool.** `scripts/verify-web.py`

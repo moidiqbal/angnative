@@ -14,8 +14,28 @@ $sysroot = (Join-Path $ndk 'toolchains\llvm\prebuilt\windows-x86_64\sysroot').Re
 $binFwd = $bin.Replace('\', '/')
 $ar = Join-Path $bin 'llvm-ar.exe'
 $libclang = 'C:/Program Files/Microsoft Visual Studio/18/Enterprise/VC/Tools/Llvm/x64/bin'
+# rquickjs-sys needs GNU patch. Prefer one already on PATH; otherwise look in
+# the usual GnuWin32 locations instead of hard-requiring one machine's layout.
+$patchBin = $null
+$patchCommand = Get-Command patch -CommandType Application -ErrorAction SilentlyContinue
+if ($patchCommand -and $patchCommand.Source) {
+  $patchBin = Split-Path -Parent $patchCommand.Source
+} else {
+  foreach ($candidate in @(
+    'C:\Program Files (x86)\GnuWin32\bin',
+    'C:\Program Files\GnuWin32\bin'
+  )) {
+    if (Test-Path -LiteralPath (Join-Path $candidate 'patch.exe')) {
+      $patchBin = $candidate
+      break
+    }
+  }
+}
+if (-not $patchBin) {
+  throw "GNU patch not found. Install patch.exe and add it to PATH (or GnuWin32)."
+}
 
-$env:PATH = "C:\Program Files\Git\usr\bin;$bin;$env:PATH"
+$env:PATH = "$patchBin;C:\Program Files\Git\usr\bin;$bin;$env:PATH"
 $env:ANDROID_HOME = $sdk
 $env:ANDROID_SDK_ROOT = $sdk
 $env:ANDROID_NDK_HOME = $ndk

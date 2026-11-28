@@ -1,0 +1,36 @@
+2026-11-28T14:25:48.203378+00:00 event: ready
+2026-11-28T14:25:48.203378+00:00 data: {"version":0}
+2026-11-28T14:25:48.203378+00:00
+2026-11-28T14:25:51.574878+00:00 event: hmr
+2026-11-28T14:25:51.575001+00:00 data: {"type":"hmr","moduleId":"root","version":1,"bundles":{"web":"/dev-bundle.js?v=1","native":"/dev-bundle.native.js?v=1"}}
+2026-11-28T14:25:51.575001+00:00
+2026-11-28T14:25:54.961769+00:00 event: hmr
+2026-11-28T14:25:54.961769+00:00 data: {"type":"hmr","moduleId":"root","version":2,"bundles":{"web":"/dev-bundle.js?v=2","native":"/dev-bundle.native.js?v=2"}}
+2026-11-28T14:25:54.961769+00:00
+2026-11-28T14:25:57.461249+00:00 event: hmr
+2026-11-28T14:25:57.461249+00:00 data: {"type":"hmr","moduleId":"root","version":3,"bundles":{"web":"/dev-bundle.js?v=3","native":"/dev-bundle.native.js?v=3"}}
+2026-11-28T14:25:57.461249+00:00
+2026-11-28T14:26:00.814446+00:00 event: hmr
+2026-11-28T14:26:00.814446+00:00 data: {"type":"hmr","moduleId":"root","version":4,"bundles":{"web":"/dev-bundle.js?v=4","native":"/dev-bundle.native.js?v=4"}}
+2026-11-28T14:26:00.814446+00:00
+2026-11-28T14:26:04.170033+00:00 event: hmr
+2026-11-28T14:26:04.170033+00:00 data: {"type":"hmr","moduleId":"root","version":5,"bundles":{"web":"/dev-bundle.js?v=5","native":"/dev-bundle.native.js?v=5"}}
+2026-11-28T14:26:04.170033+00:00
+2026-11-28T14:26:07.374239+00:00 event: hmr
+2026-11-28T14:26:07.374239+00:00 data: {"type":"hmr","moduleId":"root","version":6,"bundles":{"web":"/dev-bundle.js?v=6","native":"/dev-bundle.native.js?v=6"}}
+2026-11-28T14:26:07.374239+00:00
+2026-11-28T14:26:10.514476+00:00 event: hmr
+2026-11-28T14:26:10.514476+00:00 data: {"type":"hmr","moduleId":"root","version":7,"bundles":{"web":"/dev-bundle.js?v=7","native":"/dev-bundle.native.js?v=7"}}
+2026-11-28T14:26:10.514476+00:00
+2026-11-28T14:26:13.861513+00:00 event: hmr
+2026-11-28T14:26:13.861513+00:00 data: {"type":"hmr","moduleId":"root","version":8,"bundles":{"web":"/dev-bundle.js?v=8","native":"/dev-bundle.native.js?v=8"}}
+2026-11-28T14:26:13.861513+00:00
+2026-11-28T14:26:17.175912+00:00 event: hmr
+2026-11-28T14:26:17.175912+00:00 data: {"type":"hmr","moduleId":"root","version":9,"bundles":{"web":"/dev-bundle.js?v=9","native":"/dev-bundle.native.js?v=9"}}
+2026-11-28T14:26:17.175912+00:00
+2026-11-28T14:26:20.238781+00:00 event: hmr
+2026-11-28T14:26:20.238781+00:00 data: {"type":"hmr","moduleId":"root","version":10,"bundles":{"web":"/dev-bundle.js?v=10","native":"/dev-bundle.native.js?v=10"}}
+2026-11-28T14:26:20.238781+00:00
+2026-11-28T14:26:22.487159+00:00 event: hmr
+2026-11-28T14:26:22.487159+00:00 data: {"type":"hmr","moduleId":"root","version":11,"bundles":{"web":"/dev-bundle.js?v=11","native":"/dev-bundle.native.js?v=11"}}
+2026-11-28T14:26:22.487159+00:00

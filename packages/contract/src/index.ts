@@ -50,3 +50,24 @@ export {
   decodeBatch,
   roundTrip,
 } from './protocol';
+
+export {
+  BINARY_MAGIC,
+  BINARY_VERSION,
+  BINARY_HEADER_SIZE,
+  OPCODE,
+  BinaryDecodeError,
+  encodeBinaryBatch,
+  decodeBinaryBatch,
+  binaryRoundTrip,
+} from './binary';
+
+export {
+  HmrRuntime,
+  applyHmrUpdate,
+  isHmrUpdate,
+  type HmrHooks,
+  type HmrModulePayload,
+  type HmrRegistration,
+  type HmrUpdate,
+} from './hmr';

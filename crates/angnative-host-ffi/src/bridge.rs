@@ -54,7 +54,7 @@ pub fn clear_js_runtime_dispatch_for_thread(owner: usize) {
 
 use angnative_host_core::command::CommandBatch;
 use angnative_host_core::mutation::MutationEngine;
-use angnative_host_layout::{LayoutEngine, LayoutNodeInput};
+use angnative_host_layout::{IntrinsicContent, LayoutEngine, LayoutNodeInput};
 use angnative_host_view::op_emitter::OpEmitter;
 use angnative_host_view::ops::ViewProps;
 use angnative_host_view::view_factory::{ViewFactory, ViewFactoryError, ViewFactoryResult};
@@ -229,6 +229,9 @@ pub struct LayoutNodeInputJson {
     pub node_id: u64,
     pub styles: HashMap<String, String>,
     pub children: Vec<u64>,
+    /// Intrinsic text content supplied by the platform snapshot, when present.
+    #[serde(default)]
+    pub text_content: Option<String>,
 }
 
 /** Full layout request. */
@@ -404,10 +407,25 @@ impl Host {
     pub fn process_batch_json(&mut self, batch_json: &str) -> Result<String, String> {
         self.clear_error();
 
-        // Decode the command batch from JSON.
+        // Decode the command batch from JSON. JSON remains the fallback path.
         let batch: CommandBatch = serde_json::from_str(batch_json)
             .map_err(|e| format!("Invalid command batch JSON: {e}"))?;
+        self.process_batch(batch)
+    }
 
+    /// Process a versioned ANB1 batch borrowed from a caller-owned byte slice.
+    ///
+    /// The slice is used only for the duration of this synchronous call; the
+    /// decoded batch is owned, so no pointer survives the call.
+    pub fn process_batch_binary(&mut self, bytes: &[u8]) -> Result<String, String> {
+        self.clear_error();
+        let batch = angnative_host_core::binary::decode_binary_batch(bytes)
+            .map_err(|e| format!("Invalid binary command batch: {e}"))?;
+        self.process_batch(batch)
+    }
+
+    /// Shared stage-then-commit pipeline for both JSON and ANB1 batches.
+    fn process_batch(&mut self, batch: CommandBatch) -> Result<String, String> {
         // Validate protocol version.
         angnative_host_core::command::validate_version(batch.protocol_version)
             .map_err(|e| format!("Protocol error: {e}"))?;
@@ -455,9 +473,15 @@ impl Host {
             .as_mut()
             .ok_or_else(|| "Layout engine not initialized".to_string())?;
 
-        // Convert JSON inputs to LayoutNodeInput.
+        // Convert JSON inputs to LayoutNodeInput and retain text for intrinsic
+        // measurement. Text is supplied by the platform snapshot; the layout
+        // engine decides its measured size using the configured TextMeasurer.
         let mut nodes = HashMap::new();
+        let mut intrinsic_content = HashMap::new();
         for input in &request.nodes {
+            if let Some(text) = input.text_content.as_ref() {
+                intrinsic_content.insert(input.node_id, IntrinsicContent::Text(text.clone()));
+            }
             nodes.insert(
                 input.node_id,
                 LayoutNodeInput {
@@ -468,11 +492,12 @@ impl Host {
             );
         }
 
-        let result = layout_engine.layout(
+        let result = layout_engine.layout_with_intrinsic_content(
             request.root_id,
             &nodes,
             request.available_width,
             request.available_height,
+            &intrinsic_content,
         )?;
 
         let response = LayoutResponseJson {

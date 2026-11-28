@@ -76,8 +76,29 @@ buttons are layout nodes 10/11/12 at parent-relative `x = 0/56/112`, each
 The worker-thread event dispatch test reached a live Angular listener; the
 verified property is one delivery per event (canonical JS thread-local path + legacy FFI fallback).
 
+## Emulator re-run with the native click path (2026-11-28)
+
+`AngularCounterLayoutTest.angularCounterViewsDoNotOverlap` was extended to also
+drive the complete native event path inside the same layout test: find the `+`
+node from the host snapshot, call `JniBridge.dispatchNativeEvent(id, "click")`
+through JNI, require at least one listener invocation, and assert that the
+Angular signal update reaches the real native `TextView` as `Count: 1` before
+the non-overlap assertions run against the updated label.
+
+Collected with `python scripts/collect-android-hmr-evidence.py emulator-5554
+docs/assets/angular-counter-native-event-emulator.log com.angnative.app.AngularCounterLayoutTest
+"Android instrumentation of the Angular counter native click event path (JNI -> RuntimeBridge -> na_onEvent -> signal -> TextView)"`.
+Retained log: `docs/assets/angular-counter-native-event-emulator.log` —
+`emulator-5554` (`sdk_gphone64_x86_64`, Android 14, SDK 34, `x86_64`),
+`OK (1 test)` in 0.946 s, `command_failures: 0`, workspace head `00562a4`,
+app APK SHA-256 `D7BE870A73F646FD7ED17C9BD29DE47FF4EE08B15615F2EA139CA9F6B500584A`,
+androidTest APK SHA-256 `696A6E3D42303FA098EAAE4D7318318418F2412151FDA60EA060B0138A7EDC6F`.
+This is an **emulator** claim only; the physical-device run above predates the
+extended assertion and no new physical-device claim is made from it.
+
 ## Retained artifacts
 
+- `docs/assets/angular-counter-native-event-emulator.log`
 - `docs/evidence/angular-counter-oneplus/TEST-b6640c8f.xml`
 - `docs/evidence/angular-counter-oneplus/html-report/`
 - `docs/evidence/angular-counter-oneplus/ui-before.xml`

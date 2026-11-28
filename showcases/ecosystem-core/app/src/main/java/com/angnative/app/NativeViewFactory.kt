@@ -102,6 +102,7 @@ class NativeViewFactory(
       if (!props.isNull("text") && view is TextView) {
         val text = props.optString("text", "")
         if (text.isNotEmpty()) view.text = text
+        markAngularPlus(view, text)
       }
     } catch (e: Exception) {
       // Malformed props payload — leave the view untouched.
@@ -111,7 +112,10 @@ class NativeViewFactory(
   /** PlatformOp::SetText */
   override fun onNativeSetText(nodeId: Long, text: String) {
     val view = views[nodeId] ?: return
-    if (view is TextView) view.text = text
+    if (view is TextView) {
+      view.text = text
+      markAngularPlus(view, text)
+    }
   }
 
   /** PlatformOp::Append */
@@ -158,6 +162,18 @@ class NativeViewFactory(
     } catch (e: Exception) {
       // Caller logs bridge.lastError(); report the failed apply explicitly.
       return false
+    }
+  }
+
+  /**
+   * Accessibility label for the Angular "+" produced by this factory. The
+   * device-side tap proof selects this label instead of relying on node order,
+   * because the screen also contains an imperative native "+" button.
+   */
+  private fun markAngularPlus(view: TextView, text: String) {
+    when {
+      text == "+" -> view.contentDescription = "angular-plus"
+      view.contentDescription == "angular-plus" -> view.contentDescription = null
     }
   }
 

@@ -6,6 +6,12 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+# Test-only, non-executing JsEngine template. Never enabled in the shipping
+# Android/iOS/desktop build; no Hermes/V8 code is linked by this flag.
+engine-stub = []
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true

@@ -1,0 +1,141 @@
+2026-11-28T14:25:38.430450+00:00 harness esbuild command: node C:\Users\Moid Iqbal\Projects\angnative\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\bin\esbuild scripts/hmr-browser/harness-entry.ts --bundle --outfile=dist\hmr-browser-evidence\harness.js --format=esm --target=es2022 --platform=browser --define:ngDevMode=true --log-level=warning
+2026-11-28T14:25:38.431453+00:00 harness bundle sha256: 9CAA5D28DBA5120819FC1190BF5DA91DBF31134951EF38D6279B96658EC27777
+[angnative aot] Angular compiler-cli: C:\Users\Moid Iqbal\Projects\angnative\node_modules\.pnpm\@angular+compiler-cli@22.3._8cb191225387b3c4b416fdf0845da551\node_modules\@angular\compiler-cli\bundles\src\bin\ngc.js
+[angnative aot] watching with C:\Users\Moid Iqbal\Projects\angnative\dist\hmr-browser-evidence\tsconfig.json (real ngc --watch)...
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+[angnative aot] AOT watch compile complete (Ivy definitions verified).
+
+ANB_COMPILE_OK 0 4231
+[angnative dev] server running on http://localhost:64984
+2026-11-28T14:25:48.097303+00:00 dev server port: 64984
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 1 1539
+
+[angnative dev] ngc watch v1: loop 220 ms (compile 1539 ms, bundle 201 ms), reload v1
+[angnative dev] component compile 1539 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 2 1289
+
+[angnative dev] ngc watch v2 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 3 1244
+
+[angnative dev] ngc watch v3: loop 212 ms (compile 1244 ms, bundle 192 ms), reload v2
+[angnative dev] component compile 1244 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 4 1455
+
+[angnative dev] ngc watch v4: loop 244 ms (compile 1455 ms, bundle 207 ms), reload v3
+[angnative dev] component compile 1455 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 5 1229
+
+[angnative dev] ngc watch v5 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 6 1247
+
+[angnative dev] ngc watch v6: loop 233 ms (compile 1247 ms, bundle 215 ms), reload v4
+[angnative dev] component compile 1247 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 7 1314
+
+[angnative dev] ngc watch v7 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 8 1200
+
+[angnative dev] ngc watch v8: loop 204 ms (compile 1200 ms, bundle 185 ms), reload v5
+[angnative dev] component compile 1200 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 9 1132
+
+[angnative dev] ngc watch v9 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 10 1238
+
+[angnative dev] ngc watch v10: loop 206 ms (compile 1238 ms, bundle 189 ms), reload v6
+[angnative dev] component compile 1238 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 11 1113
+
+[angnative dev] ngc watch v11 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 12 1177
+
+[angnative dev] ngc watch v12: loop 215 ms (compile 1177 ms, bundle 192 ms), reload v7
+[angnative dev] component compile 1177 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 13 1183
+
+[angnative dev] ngc watch v13 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 14 1308
+
+[angnative dev] ngc watch v14: loop 213 ms (compile 1308 ms, bundle 196 ms), reload v8
+[angnative dev] component compile 1308 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 15 1258
+
+[angnative dev] ngc watch v15 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 16 1196
+
+[angnative dev] ngc watch v16: loop 212 ms (compile 1196 ms, bundle 190 ms), reload v9
+[angnative dev] component compile 1196 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+
+ANB_COMPILE_OK 17 1067
+[angnative dev] ngc watch v17 produced no output change; HMR skipped
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 18 1155
+
+[angnative dev] ngc watch v18: loop 217 ms (compile 1155 ms, bundle 204 ms), reload v10
+[angnative dev] component compile 1155 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 19 1206
+
+[angnative dev] ngc watch v19: loop 211 ms (compile 1206 ms, bundle 198 ms), reload v11
+[angnative dev] component compile 1206 ms exceeds 200 ms budget
+[94mmessage[0m[90m TS100: [0mFile change detected. Starting incremental compilation.
+
+[94mmessage[0m[90m TS100: [0mCompilation complete. Watching for file changes.
+ANB_COMPILE_OK 20 1054
+
+[angnative dev] ngc watch v20 produced no output change; HMR skipped

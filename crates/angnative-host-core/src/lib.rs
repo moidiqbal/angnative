@@ -11,13 +11,16 @@
  *   - node       — ViewNode element tree node (NodeId, NodeType, ViewNode)
  *   - element_registry — ElementRegistry: allocate/register/lookup/remove
  *   - command    — Command / CommandBatch protocol types (serde)
+ *   - binary     — versioned ANB1 binary codec (decoder + encoder)
  *   - mutation   — MutationEngine: apply commands to the tree
  */
+pub mod binary;
 pub mod command;
 pub mod element_registry;
 pub mod mutation;
 pub mod node;
 
+pub use binary::{decode_binary_batch, encode_binary_batch, BinaryDecodeError};
 pub use command::{validate_version, Command, CommandBatch, PROTOCOL_VERSION};
 pub use element_registry::ElementRegistry;
 pub use mutation::{MutationEngine, MutationError, NodeSnapshot, TreeSnapshot};

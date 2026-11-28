@@ -1,0 +1,69 @@
+2026-11-27T20:18:01.770890+00:00 event: ready
+2026-11-27T20:18:01.772395+00:00 data: {"version":0}
+2026-11-27T20:18:01.772395+00:00
+2026-11-27T20:18:08.095573+00:00 event: hmr
+2026-11-27T20:18:08.095573+00:00 data: {"type":"hmr","moduleId":"root","version":1,"bundles":{"web":"/dev-bundle.js?v=1","native":"/dev-bundle.native.js?v=1"}}
+2026-11-27T20:18:08.095573+00:00
+2026-11-27T20:18:08.312147+00:00 event: hmr
+2026-11-27T20:18:08.312147+00:00 data: {"type":"hmr","moduleId":"root","version":2,"bundles":{"web":"/dev-bundle.js?v=2","native":"/dev-bundle.native.js?v=2"}}
+2026-11-27T20:18:08.312147+00:00
+2026-11-27T20:18:19.766268+00:00 event: hmr
+2026-11-27T20:18:19.766268+00:00 data: {"type":"hmr","moduleId":"root","version":3,"bundles":{"web":"/dev-bundle.js?v=3","native":"/dev-bundle.native.js?v=3"}}
+2026-11-27T20:18:19.766268+00:00
+2026-11-27T20:18:19.978969+00:00 event: hmr
+2026-11-27T20:18:19.978969+00:00 data: {"type":"hmr","moduleId":"root","version":4,"bundles":{"web":"/dev-bundle.js?v=4","native":"/dev-bundle.native.js?v=4"}}
+2026-11-27T20:18:19.978969+00:00
+2026-11-27T20:18:31.476882+00:00 event: hmr
+2026-11-27T20:18:31.476882+00:00 data: {"type":"hmr","moduleId":"root","version":5,"bundles":{"web":"/dev-bundle.js?v=5","native":"/dev-bundle.native.js?v=5"}}
+2026-11-27T20:18:31.476882+00:00
+2026-11-27T20:18:31.688205+00:00 event: hmr
+2026-11-27T20:18:31.688205+00:00 data: {"type":"hmr","moduleId":"root","version":6,"bundles":{"web":"/dev-bundle.js?v=6","native":"/dev-bundle.native.js?v=6"}}
+2026-11-27T20:18:31.688205+00:00
+2026-11-27T20:18:43.085099+00:00 event: hmr
+2026-11-27T20:18:43.085099+00:00 data: {"type":"hmr","moduleId":"root","version":7,"bundles":{"web":"/dev-bundle.js?v=7","native":"/dev-bundle.native.js?v=7"}}
+2026-11-27T20:18:43.085099+00:00
+2026-11-27T20:18:43.287731+00:00 event: hmr
+2026-11-27T20:18:43.287731+00:00 data: {"type":"hmr","moduleId":"root","version":8,"bundles":{"web":"/dev-bundle.js?v=8","native":"/dev-bundle.native.js?v=8"}}
+2026-11-27T20:18:43.289235+00:00
+2026-11-27T20:18:54.607430+00:00 event: hmr
+2026-11-27T20:18:54.607430+00:00 data: {"type":"hmr","moduleId":"root","version":9,"bundles":{"web":"/dev-bundle.js?v=9","native":"/dev-bundle.native.js?v=9"}}
+2026-11-27T20:18:54.607430+00:00
+2026-11-27T20:18:54.824513+00:00 event: hmr
+2026-11-27T20:18:54.824513+00:00 data: {"type":"hmr","moduleId":"root","version":10,"bundles":{"web":"/dev-bundle.js?v=10","native":"/dev-bundle.native.js?v=10"}}
+2026-11-27T20:18:54.824513+00:00
+2026-11-27T20:19:06.215133+00:00 event: hmr
+2026-11-27T20:19:06.215133+00:00 data: {"type":"hmr","moduleId":"root","version":11,"bundles":{"web":"/dev-bundle.js?v=11","native":"/dev-bundle.native.js?v=11"}}
+2026-11-27T20:19:06.215133+00:00
+2026-11-27T20:19:06.441894+00:00 event: hmr
+2026-11-27T20:19:06.441894+00:00 data: {"type":"hmr","moduleId":"root","version":12,"bundles":{"web":"/dev-bundle.js?v=12","native":"/dev-bundle.native.js?v=12"}}
+2026-11-27T20:19:06.441894+00:00
+2026-11-27T20:19:18.065551+00:00 event: hmr
+2026-11-27T20:19:18.065551+00:00 data: {"type":"hmr","moduleId":"root","version":13,"bundles":{"web":"/dev-bundle.js?v=13","native":"/dev-bundle.native.js?v=13"}}
+2026-11-27T20:19:18.065551+00:00
+2026-11-27T20:19:18.284869+00:00 event: hmr
+2026-11-27T20:19:18.284869+00:00 data: {"type":"hmr","moduleId":"root","version":14,"bundles":{"web":"/dev-bundle.js?v=14","native":"/dev-bundle.native.js?v=14"}}
+2026-11-27T20:19:18.284869+00:00
+2026-11-27T20:19:29.710828+00:00 event: hmr
+2026-11-27T20:19:29.710828+00:00 data: {"type":"hmr","moduleId":"root","version":15,"bundles":{"web":"/dev-bundle.js?v=15","native":"/dev-bundle.native.js?v=15"}}
+2026-11-27T20:19:29.710828+00:00
+2026-11-27T20:19:29.926719+00:00 event: hmr
+2026-11-27T20:19:29.926719+00:00 data: {"type":"hmr","moduleId":"root","version":16,"bundles":{"web":"/dev-bundle.js?v=16","native":"/dev-bundle.native.js?v=16"}}
+2026-11-27T20:19:29.926719+00:00
+2026-11-27T20:19:41.321151+00:00 event: hmr
+2026-11-27T20:19:41.321151+00:00 data: {"type":"hmr","moduleId":"root","version":17,"bundles":{"web":"/dev-bundle.js?v=17","native":"/dev-bundle.native.js?v=17"}}
+2026-11-27T20:19:41.321151+00:00
+2026-11-27T20:19:41.542903+00:00 event: hmr
+2026-11-27T20:19:41.542903+00:00 data: {"type":"hmr","moduleId":"root","version":18,"bundles":{"web":"/dev-bundle.js?v=18","native":"/dev-bundle.native.js?v=18"}}
+2026-11-27T20:19:41.542903+00:00
+2026-11-27T20:19:52.890111+00:00 event: hmr
+2026-11-27T20:19:52.890111+00:00 data: {"type":"hmr","moduleId":"root","version":19,"bundles":{"web":"/dev-bundle.js?v=19","native":"/dev-bundle.native.js?v=19"}}
+2026-11-27T20:19:52.890111+00:00
+2026-11-27T20:19:53.099098+00:00 event: hmr
+2026-11-27T20:19:53.099098+00:00 data: {"type":"hmr","moduleId":"root","version":20,"bundles":{"web":"/dev-bundle.js?v=20","native":"/dev-bundle.native.js?v=20"}}
+2026-11-27T20:19:53.099098+00:00
+2026-11-27T20:20:03.874153+00:00 event: hmr
+2026-11-27T20:20:03.874153+00:00 data: {"type":"hmr","moduleId":"root","version":21,"bundles":{"web":"/dev-bundle.js?v=21","native":"/dev-bundle.native.js?v=21"}}
+2026-11-27T20:20:03.874153+00:00
+2026-11-27T20:20:03.950546+00:00 event: hmr
+2026-11-27T20:20:03.950546+00:00 data: {"type":"hmr","moduleId":"root","version":22,"bundles":{"web":"/dev-bundle.js?v=22","native":"/dev-bundle.native.js?v=22"}}
+2026-11-27T20:20:03.950546+00:00
