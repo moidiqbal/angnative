@@ -196,15 +196,28 @@ jobs:
 
       - name: Boot emulator
         run: |
-          nohup emulator -avd angnative-ci -no-window -no-audio \
-            -no-snapshot -gpu swiftshader > /tmp/emulator.log 2>&1 &
-          adb wait-for-device
-          for i in $(seq 1 60); do
+          EMU_ARGS=(-avd angnative-ci -no-window -no-audio -no-snapshot -gpu swiftshader)
+          if [[ ! -r /dev/kvm ]]; then
+            echo "KVM unavailable; starting emulator with -no-accel"
+            EMU_ARGS+=(-no-accel)
+          fi
+          nohup emulator "${EMU_ARGS[@]}" > /tmp/emulator.log 2>&1 &
+          if ! timeout 600 adb wait-for-device; then
+            echo "emulator did not reach adb; /tmp/emulator.log follows"
+            cat /tmp/emulator.log
+            exit 1
+          fi
+          for i in $(seq 1 180); do
             boot=$(adb shell getprop sys.boot_completed | tr -d '\r')
             if [ "$boot" = "1" ]; then echo "booted"; break; fi
             sleep 5
           done
-          adb shell getprop sys.boot_completed | grep -q 1
+          if ! adb shell getprop sys.boot_completed | grep -q 1; then
+            echo "emulator boot did not complete; /tmp/emulator.log follows"
+            cat /tmp/emulator.log
+            adb logcat -d | tail -n 200 || true
+            exit 1
+          fi
 
       - name: Install and launch
         run: |
