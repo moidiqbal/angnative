@@ -246,13 +246,25 @@ jobs:
       - name: Assert a real tap reaches the Angular listener
         run: |
           coords=$(python3 scripts/android-tap-coords.py /tmp/window.xml)
+          echo "Angular plus tap coords: $coords"
           adb logcat -c
           adb shell input tap $coords
           sleep 3
-          adb logcat -d -s AngNative:I | grep -E 'Angular tap node=[0-9]+ -> [1-9]'
+          log=$(adb logcat -d -s AngNative:I)
+          echo "AngNative log after tap:"
+          echo "$log"
           adb shell uiautomator dump /sdcard/after.xml > /dev/null
           adb pull /sdcard/after.xml /tmp/after.xml
-          grep -q 'Count: 1' /tmp/after.xml
+          echo "Count nodes after tap:"
+          grep -o 'text="Count: [0-9]*"' /tmp/after.xml || true
+          if ! echo "$log" | grep -qE 'Angular tap node=[0-9]+ -> [1-9]'; then
+            echo "Angular listener was not reached by the real tap"
+            exit 1
+          fi
+          if ! grep -q 'Count: 1' /tmp/after.xml; then
+            echo "Count: 1 was not rendered after the real tap"
+            exit 1
+          fi
           echo "Angular real-tap -> native UI update assertion passed"
 
   size:
