@@ -45,6 +45,9 @@
   "author": "AngNative Team",
   "license": "MIT",
   "devDependencies": {
+    "@angnative/common": "0.1.0",
+    "@angnative/platform": "0.1.0",
+    "@angnative/web": "0.1.0",
     "@angular/animations": "22.3.0",
     "@angular/compiler-cli": "22.3.0",
     "@angular/core": "22.3.0",

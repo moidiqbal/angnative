@@ -8,6 +8,15 @@ importers:
 
   .:
     devDependencies:
+      '@angnative/common':
+        specifier: 0.1.0
+        version: link:packages/common
+      '@angnative/platform':
+        specifier: 0.1.0
+        version: link:packages/platform
+      '@angnative/web':
+        specifier: 0.1.0
+        version: link:packages/web
       '@angular/animations':
         specifier: 22.3.0
         version: 22.3.0(@angular/core@22.3.0(@angular/compiler@22.3.0)(rxjs@7.8.2))
