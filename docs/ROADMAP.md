@@ -76,7 +76,7 @@
 - [x] Reconcile `feat/quickjs-bytecode-loader` with pushed `master` (final `dea0beb`) in merge `29af248`, preserving both the HMR/zero-copy/ANB1 work and the bytecode v2 + promise + CI fixes.
 - [x] Prove a genuinely fresh checkout: frozen pnpm install → `build:packages` → AOT/bundles/bytecode → Rust workspace + ignored suite + web/FFI gates (`docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md`).
 - [x] Refresh all stale trackers to the fresh numbers and write `docs/evidence/RELEASE-0.4.0-FRESH-CHECKOUT.md` plus `docs/releases/v0.4.0.md`.
-- [ ] Cut annotated `v0.4.0` tag and push branch + tag; decide the `v0.3.0` remote tag gap.
+- [x] Cut annotated `v0.4.0` tag (`0aeda6a`, on docs commit `35f531e`) and push `release/v0.4.0`; also pushed the local `v0.3.0` tag (`9f90940`) to close the remote tag gap. `master` remains at `dea0beb`.
 - Design: `docs/plans/2026-11-28-phase-0.5-release-engineering-design.md`.
 
 ---
