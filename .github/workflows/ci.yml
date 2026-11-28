@@ -141,6 +141,22 @@ jobs:
             "emulator" \
             "system-images;android-34;google_apis;x86_64"
 
+      - name: Install Rust toolchain for Android
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-11-14
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Build unified Android Rust libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          LIBCLANG_PATH="$(dirname "$(readlink -f "$(find /usr/lib -name 'libclang.so*' | head -n 1)")")"
+          test -n "$LIBCLANG_PATH"
+          echo "LIBCLANG_PATH=${LIBCLANG_PATH}" >> "$GITHUB_ENV"
+          ./scripts/build-android-native.sh all
+
       - name: Create AVD
         run: |
           echo "no" | avdmanager create avd \
