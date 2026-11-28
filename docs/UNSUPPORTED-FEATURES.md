@@ -1,7 +1,13 @@
 # Unsupported / Not-Yet-Tested Feature Register
 
-**Date:** 2026-11-21, updated 2026-11-27. Maintained as part of Phase 7 deliverables.
+**Date:** 2026-11-21, updated 2026-11-28. Maintained as part of Phase 7 deliverables.
 **Rule:** "not yet tested" is never written as "works".
+**Branch scope:** this worktree is `feat/quickjs-bytecode-loader` @ `d4e355c`,
+which diverged from `master` @ `816f82c` before the pushed HMR commit
+`origin/master` @ `fb609ec`. Rows marked **Deferred** below are branch-local:
+HMR, borrowed-buffer JNI and the ANB1 binary mutation protocol are implemented
+and evidenced on `master`/`origin/master` (`docs/evidence/HMR-ZEROCOPY-BINARY-PROTOCOL.md`
+there), not on this branch.
 
 ## Native renderer (all shells)
 
@@ -73,7 +79,7 @@ repository.
 | Web adapter AOT migration | **Implemented and verified (2026-11-26)** | `apps/demo-app/src/main.web.ts` no longer imports `@angular/compiler`; `tsconfig.aot.web.json` + `scripts/bundle-web-aot.mjs` produce a JIT-free browser bundle. Angular partial declarations in `node_modules` are processed by the Angular Linker through `scripts/angular-linker-plugin.mjs`, so no JIT fallback is used. Verified by `pnpm bundle:aot:web`, web/root tests, and a Playwright render + click. Evidence: `docs/evidence/WEB-AOT-MIGRATION.md`. | Lifted. Remaining web work is tracked separately (size-budget gate, HMR, SSR). |
 | Hot Module Replacement (< 1 s) | **Unsupported (deferred)** | No HMR pipeline exists in the QuickJS runtime or web adapter; `packages/cli/src/dev.ts` is a placeholder. The G4 target in `docs/REQUIREMENTS.md` is not met and is not claimed. | A module-invalidation/reload pipeline with state preservation and a measured save-to-screen test. |
 | SSR / hydration | **Unsupported (out of scope)** | No server-render or hydrate path exists; native shells have no server stage and `docs/REQUIREMENTS.md` explicitly excludes replacing Angular Web/SSR. | A deliberate scope change plus an SSR pipeline and hydration contract tests. |
-| QuickJS bytecode loading | **Implemented and verified (2026-11-27, Rust/runtime scope only)** | A versioned `ANGNQJSB1` container guards an rquickjs module-bytecode payload; `JsEngine::load_bytecode()`, the QuickJS override, `AngNativeRuntime` and `RuntimeBridge` are wired. The Rust generator emits real AOT bytecode and the ignored acceptance test proves bootstrap plus live native mutation. No C ABI/JNI/Swift, startup-speed, signature or platform-shell claim. Evidence: `docs/evidence/QUICKJS-BYTECODE-LOADER.md`. | Lifted. Platform asset/shell wiring and Hermes/V8 remain separate/out of scope. |
+| QuickJS bytecode loading | **Implemented and verified (2026-11-28, Rust/runtime scope only)** | A versioned `ANGNQJSB2` container guards an rquickjs module-bytecode payload with a producer fingerprint (rquickjs/QuickJS version + target); legacy `ANGNQJSB1` is rejected with a regenerate message. `JsEngine::load_bytecode()`, the QuickJS override, `AngNativeRuntime` and `RuntimeBridge` are wired; a still-pending module-eval promise is rejected instead of reported as success. The Rust generator emits real AOT bytecode and all 19 ignored acceptance tests pass with a freshly generated v2 artifact. No checksum/signature, C ABI/JNI/Swift, startup-speed, ES-module-loader or platform-shell claim. Evidence: `docs/evidence/QUICKJS-BYTECODE-LOADER.md`. | Lifted. Platform asset/shell wiring and Hermes/V8 remain separate/out of scope. |
 | Hermes / V8 engine adapters | **Not integrated** | Gate F proves the `JsEngine` abstraction with the in-repo `ReferenceEngine`, explicitly not Hermes/V8. No adapter crate or engine runtime was added. | Isolated adapter crates with their own lifecycle/conformance tests. Evidence: `docs/evidence/RUNTIME-BRIDGE-GATE-F.md`. |
 | Desktop real window / GPU rendering | **Not verified** | Only the GPU-free bridge/view-tree integration test is retained. Real window and GPU paths were not exercised. | A real-window/GPU integration run with retained artifacts. Evidence: `docs/evidence/DESKTOP-GPU-FREE-INTEGRATION.md`. |
 | Final-socket generic nine-test suite | **Emulator- and physical-device-verified (2026-11-27)** | `OK (9 tests)` on the API 34 x86_64 emulator (4.77 s) and on physical OnePlus `b6640c8f` / CPH2551 / Android 16 / arm64-v8a (1.89 s, exit 0), both against APK SHA-256 `EDD184C1…B387B7`. Raw logs: `docs/assets/market-pulse-final-socket-9test-emulator.log` and `docs/assets/market-pulse-final-socket-9test-oneplus.log`; evidence: `docs/evidence/FINAL-SOCKET-9TEST-EMULATOR.md` and `docs/evidence/FINAL-SOCKET-9TEST-ONEPLUS.md`. | Lifted. This is instrumentation coverage, not a new live-market-data capture or real-time guarantee. |

@@ -1783,7 +1783,7 @@ mod tests {
         let bytes = std::fs::read(path).expect(
             "run `pnpm compile:aot:animations && pnpm bundle:framework && pnpm bundle:bytecode` first",
         );
-        assert_eq!(&bytes[..9], b"ANGNQJSB1", "bytecode artifact header must match");
+        assert_eq!(&bytes[..9], b"ANGNQJSB2", "v2 bytecode artifact header must match");
 
         let mut bridge = create_runtime_bridge().unwrap();
         bridge

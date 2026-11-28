@@ -36,8 +36,8 @@ Full evidence: [`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md) · [`docs/VE
 
 | Component | Status | Proof |
 |---|---|---|
-| Rust host crates + engine | ✅ | `cargo test --workspace` → **154 passed / 17 ignored**; ignored runtime-bridge suite → **17 passed** |
-| Angular renderer / contract / testing | ✅ | `pnpm test` → **251 passed** (16 files) |
+| Rust host crates + engine | ✅ | `cargo test --workspace` → **174 passed / 19 ignored**; ignored runtime-bridge suite → **19 passed** |
+| Angular renderer / contract / testing | ✅ | `pnpm test` → **266 passed** (18 files) |
 | Production AOT (`ngc` + esbuild) | ✅ | `pnpm run compile:aot`, `angnative build`; Ivy `ɵɵdefineComponent` verified in `dist/aot/` |
 | Android shell (10 APKs) | ✅ | built, installed and launched on emulator **and OnePlus Open (Android 16)**; `WebViews: 0` on every app |
 | MarketPulse socket-only demo | ✅ | Coinbase `matches` → match-derived 30m OHLC + volume; physical `bars=0 → bars=1 state=live`, painted `Custom:na-candlestick`, ABI pass and 11-app sustained repeat 33/33 valid. No real-time guarantee; see [`docs/evidence/ANDROID-MARKETPULSE.md`](docs/evidence/ANDROID-MARKETPULSE.md) section 11 |

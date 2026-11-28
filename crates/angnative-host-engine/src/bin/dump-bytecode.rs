@@ -4,10 +4,13 @@
 //!   cargo run -p angnative-host-engine --bin dump-bytecode -- <input.js> <output.qjsbc>
 //!
 //! The source is compiled as a module with QuickJS's COMPILE_ONLY flag, so
-//! self-contained AOT IIFEs are not executed during generation. The resulting
-//! artifact uses the same rquickjs version as the runtime loader.
+//! self-contained AOT IIFEs are not executed during generation. `encode` stamps
+//! the v2 container with the producer fingerprint (rquickjs/QuickJS version
+//! and target), which the runtime loader checks before `Module::load`.
 
-use angnative_host_engine::bytecode::{compile_module_bytecode, encode, VIRTUAL_MODULE_NAME};
+use angnative_host_engine::bytecode::{
+    compile_module_bytecode, encode, runtime_fingerprint, VIRTUAL_MODULE_NAME,
+};
 use rquickjs::{Context, Runtime};
 use std::path::PathBuf;
 use std::process;
@@ -48,9 +51,10 @@ fn main() {
     std::fs::write(&output, &artifact)
         .unwrap_or_else(|e| fail(format!("cannot write {}: {e}", output.display())));
     println!(
-        "[angnative bytecode] {} bytes from {} -> {}",
+        "[angnative bytecode] {} bytes from {} -> {} (fingerprint: {})",
         artifact.len(),
         input.display(),
-        output.display()
+        output.display(),
+        runtime_fingerprint()
     );
 }

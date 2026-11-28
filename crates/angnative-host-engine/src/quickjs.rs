@@ -103,13 +103,22 @@ impl JsEngine for QuickJsEngine {
                 }
             }
             match promise.result::<()>() {
-                Some(Ok(())) | None => {}
+                Some(Ok(())) => {}
                 Some(Err(e)) => {
                     let mut detail = format!("module promise: {e}");
                     if ctx.has_exception() {
                         detail.push_str(&format!(": {:?}", ctx.catch()));
                     }
                     return Err(EngineError::Bytecode(detail));
+                }
+                // `None` means the module evaluation promise has not settled.
+                // Module eval resolves to `undefined`, so a still-pending
+                // async init must not be indistinguishable from success.
+                None => {
+                    return Err(EngineError::Bytecode(
+                        "module promise: still pending after draining up to 1024 context jobs"
+                            .to_string(),
+                    ));
                 }
             }
             Ok(())
@@ -442,6 +451,39 @@ mod tests {
         assert_eq!(
             engine.get_global("__bytecodeProbe"),
             Some(JsValue::Number(42.0))
+        );
+    }
+
+    #[test]
+    fn quickjs_load_bytecode_rejects_never_settling_module_promise() {
+        use crate::bytecode::{compile_module_bytecode, encode, VIRTUAL_MODULE_NAME};
+
+        let runtime = rquickjs::Runtime::new().unwrap();
+        let context = rquickjs::Context::full(&runtime).unwrap();
+        // The recursive `.then` keeps native jobs available so the loader must
+        // hit its 1024-job drain cap; the top-level `await` never settles.
+        let raw = context
+            .with(|ctx| {
+                compile_module_bytecode(
+                    &ctx,
+                    VIRTUAL_MODULE_NAME,
+                    r#"
+                    Promise.resolve().then(function spin() {
+                        Promise.resolve().then(spin);
+                    });
+                    await new Promise(function () {});
+                    "#,
+                )
+            })
+            .unwrap();
+        let artifact = encode(&raw).unwrap();
+
+        let mut engine = QuickJsEngine::new().unwrap();
+        let err = engine.load_bytecode(&artifact).unwrap_err();
+        assert!(matches!(err, EngineError::Bytecode(_)));
+        assert!(
+            err.to_string().contains("still pending"),
+            "unexpected error: {err}"
         );
     }
 

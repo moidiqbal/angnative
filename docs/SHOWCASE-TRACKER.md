@@ -15,7 +15,7 @@
 | Build system | Gradle 9.9.2 / AGP 9.5.2 / JDK 25 (latest profile) **or** Gradle 8.2 / AGP 8.2 / JDK 17 (legacy) |
 | Android SDK | `C:\Android\Sdk`, API 34/36, NDK 27.2.12479018 |
 | Web adapter | `@angnative/web` — DOM path only, explicitly NOT used for native APKs |
-| Existing tests | `cargo test --workspace`: 154 passed / 0 failed / 17 ignored (ignored runtime-bridge suite 17 passed); `pnpm test`: 251 passed; Android emulator + physical OnePlus UI/tap/ABI verified |
+| Existing tests | `cargo test --workspace`: 174 passed / 0 failed / 19 ignored (ignored runtime-bridge suite 19 passed); `pnpm test`: 266 passed (18 files); Android emulator + physical OnePlus UI/tap/ABI verified |
 
 ### DOM-dependent libraries — verdict before implementation
 Angular Material, PrimeNG, NG-ZORRO, Taiga UI, Spartan UI, AG Grid, ECharts,
