@@ -131,6 +131,10 @@ export function applyHmrUpdate<T>(
 ): Promise<boolean> {
   if (update.version <= lastVersion.value) return Promise.resolve(false);
   return Promise.resolve(load(update)).then((payload) => {
+    // Re-check after the async load: two overlapping events can both pass the
+    // pre-check, and an older bundle must never win just because it resolved
+    // last. lastVersion advances only on a successful replacement.
+    if (update.version <= lastVersion.value) return false;
     const replaced = runtime.replace(update.moduleId, payload.factory, payload.hooks ?? {});
     if (replaced) lastVersion.value = update.version;
     return replaced;

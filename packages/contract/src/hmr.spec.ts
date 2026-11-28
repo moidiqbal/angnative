@@ -69,6 +69,39 @@ describe('shared HMR contract', () => {
     expect(last.value).toBe(5);
   });
 
+  it('rejects an older update whose async load resolves after a newer one', async () => {
+    const runtime = new HmrRuntime();
+    runtime.register('counter', counterFactory(0, 'v1'), counterHooks);
+    runtime.instance<Counter>('counter')!.value = 9;
+    const last = { value: 0 };
+
+    type Payload = ReturnType<typeof counterFactory>;
+    const pending = new Map<number, (payload: { factory: Payload; hooks: typeof counterHooks }) => void>();
+    const load = (update: HmrUpdate) =>
+      new Promise<{ factory: Payload; hooks: typeof counterHooks }>((resolve) => {
+        pending.set(update.version, resolve);
+      });
+
+    const older: HmrUpdate = {
+      type: 'hmr',
+      moduleId: 'counter',
+      version: 6,
+      bundles: { web: '/dev-bundle.js?v=6', native: '/dev-bundle.native.js?v=6' },
+    };
+    const newer: HmrUpdate = { ...older, version: 7 };
+
+    const olderApply = applyHmrUpdate(runtime, older, load, last);
+    const newerApply = applyHmrUpdate(runtime, newer, load, last);
+
+    pending.get(7)!({ factory: counterFactory(0, 'v7'), hooks: counterHooks });
+    expect(await newerApply).toBe(true);
+    pending.get(6)!({ factory: counterFactory(0, 'v6'), hooks: counterHooks });
+    expect(await olderApply).toBe(false);
+
+    expect(runtime.instance<Counter>('counter')).toEqual({ value: 9, label: 'v7' });
+    expect(last.value).toBe(7);
+  });
+
   it('validates reload messages strictly', () => {
     expect(
       isHmrUpdate({

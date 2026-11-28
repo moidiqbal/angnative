@@ -4,8 +4,9 @@
  * This is test wiring, not shipped product code: it imports the REAL dev
  * bundle once, registers it with a REAL HmrRuntime, then calls the REAL
  * startWebHmr with no `subscribe`, `loadModule` or `fetchImpl` override. The
- * only additions are an EventSource observer for SSE timestamps and a DOM
- * element that makes the applied state observable to Playwright.
+ * only additions are a wrapper around the real client's own EventSource for
+ * SSE receive timestamps and a DOM element that makes the applied state
+ * observable to Playwright. There is no second observer connection.
  */
 import { HmrRuntime, type HmrUpdate } from '@angnative/contract/hmr';
 import { startWebHmr } from '../../packages/web/src/hmr';
@@ -105,12 +106,19 @@ async function boot(): Promise<void> {
     };
   };
 
-  // Observation only: the real client below owns the actual HMR delivery.
-  const observer = new EventSource('/hmr');
-  observer.addEventListener('hmr', (event: Event) => {
-    const update = JSON.parse((event as MessageEvent<string>).data) as HmrUpdate;
-    state.sse.push({ version: update.version, url: update.bundles.web, at: Date.now() });
-  });
+  // Probe-only instrumentation: wrap the global EventSource so the REAL client
+  // connection below records its own receive timestamp. No second observer.
+  const NativeEventSource = window.EventSource;
+  class ObservedEventSource extends NativeEventSource {
+    constructor(url: string | URL, config?: EventSourceInit) {
+      super(url, config);
+      this.addEventListener('hmr', (event: Event) => {
+        const update = JSON.parse((event as MessageEvent<string>).data) as HmrUpdate;
+        state.sse.push({ version: update.version, url: update.bundles.web, at: Date.now() });
+      });
+    }
+  }
+  window.EventSource = ObservedEventSource as unknown as typeof EventSource;
 
   const unsubscribe = startWebHmr<LiveInstance>({
     runtime,

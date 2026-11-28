@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { DevServer, DEFAULT_DEV_CONFIG, type DevConfig } from './dev';
-import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'fs';
+import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -132,7 +132,18 @@ describe('DevServer — incremental AOT + fast refresh', () => {
       const last = server.getLastCompile();
       expect(last?.ok).toBe(true);
       expect(last?.bundleMs).toBeGreaterThan(0);
-      expect(existsSync(join(FIXTURE_DIR, 'hmr-bundle.native.js'))).toBe(true);
+
+      // Versioned bundles are immutable; a late fetch of vN cannot see vN+1.
+      const nativeFiles = readdirSync(FIXTURE_DIR).filter((name) =>
+        /^hmr-bundle\.native\.v\d+\.js$/.test(name),
+      );
+      expect(nativeFiles.length).toBeGreaterThan(0);
+
+      const versioned = await fetch(`http://127.0.0.1:${server.getPort()}${event.bundles.web}`);
+      expect(versioned.status).toBe(200);
+      expect(await versioned.text()).toContain('hmrModule');
+      const latest = await fetch(`http://127.0.0.1:${server.getPort()}/dev-bundle.js`);
+      expect(latest.status).toBe(200);
     } finally {
       controller.abort();
       await server.stop();
